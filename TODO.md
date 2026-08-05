@@ -197,9 +197,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Rasterize original plus recipe into a high-quality image while keeping project export separate.
 
-**Implemented.** JPEG, PNG, and uncompressed baseline RGB 8-bit TIFF; JPEG quality; exact longest-edge resize; full source size by default; recipe/geometry parity; worker execution; progress; cancellation; and extension/MIME agreement. Canvas/worker encoding strips source metadata by construction.
+**Implemented.** JPEG, PNG, and uncompressed baseline RGB 8-bit TIFF; JPEG quality; exact longest-edge resize; full source size by default; recipe/geometry parity; worker execution; progress; cancellation; extension/MIME agreement; post-resize low/standard/high output sharpening; and configurable text watermark position, size, and opacity. Canvas/worker encoding strips source metadata by construction.
 
-**Remaining.** 16-bit TIFF after a high-depth pipeline, output sharpening, explicit ICC profiles, selective metadata preservation, watermarking, and tiled full-resolution export.
+**Remaining.** 16-bit TIFF after a high-depth pipeline, explicit ICC profiles, selective metadata preservation, and tiled full-resolution export.
 
 **Acceptance.** Export preview and file agree within tolerance; cancellation leaves no partial file; metadata follows choices; full resolution does not block the main thread; sharpening follows output dimensions; extension, MIME, and bytes agree.
 

@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
 import { CpuPixelDeveloper } from './CpuPixelDeveloper';
 import { CpuViewportTransformer } from './CpuViewportTransformer';
+import { CanvasWatermarkRenderer } from './CanvasWatermarkRenderer';
+import { OutputPixelSharpener } from './OutputPixelSharpener';
 import { PixelHistogramAnalyzer } from './PixelHistogramAnalyzer';
 import { TiffEncoder } from './TiffEncoder';
 import { WebGl2PixelDeveloper } from './WebGl2PixelDeveloper';
@@ -18,6 +20,8 @@ const histogram = new PixelHistogramAnalyzer();
 const tiff = new TiffEncoder();
 const webGl2Developer = new WebGl2PixelDeveloper();
 const webGpuDeveloper = new WebGpuPixelDeveloper();
+const outputSharpener = new OutputPixelSharpener();
+const watermarkRenderer = new CanvasWatermarkRenderer();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -50,15 +54,18 @@ async function render(input: unknown): Promise<void> {
     }
     const { width, height, pixels, backend, sourcePrecision, rawFallbackReason } = developed;
     const transformed = viewportTransformer.transform(pixels, width, height, request.development.viewport);
+    const finishedPixels = outputSharpener.sharpen(transformed.pixels, transformed.width, transformed.height, request.output.sharpening);
     const outputCanvas = new OffscreenCanvas(transformed.width, transformed.height);
     const outputContext = outputCanvas.getContext('2d', { alpha: false });
     if (outputContext === null) throw new Error('The output preview context could not be created.');
-    outputContext.putImageData(new ImageData(transformed.pixels, transformed.width, transformed.height), 0, 0);
+    outputContext.putImageData(new ImageData(finishedPixels, transformed.width, transformed.height), 0, 0);
+    if (request.output.watermark !== null) watermarkRenderer.render(outputContext, transformed.width, transformed.height, request.output.watermark);
     progress(request.id, 'developing', 0.8);
     const analysis = histogram.analyze(transformed.pixels, backend, sourcePrecision, rawFallbackReason);
     progress(request.id, 'analyzing', 0.88);
+    const outputPixels = request.output.watermark === null ? finishedPixels : outputContext.getImageData(0, 0, transformed.width, transformed.height).data;
     const image = request.output.mimeType === 'image/tiff'
-      ? tiff.encode(transformed.pixels, transformed.width, transformed.height)
+      ? tiff.encode(outputPixels, transformed.width, transformed.height)
       : await outputCanvas.convertToBlob({ type: request.output.mimeType, quality: request.output.quality });
     const imageBytes = await image.arrayBuffer();
     progress(request.id, 'encoding', 0.95);

@@ -57,7 +57,10 @@ export class WorkerPhotoExporter implements PhotoExporter {
       id: crypto.randomUUID(),
       source: decodedSource,
       maximumEdge: message.getMaximumEdge(),
-      output: { mimeType: message.getMimeType(), quality: message.getQuality() },
+      output: {
+        mimeType: message.getMimeType(), quality: message.getQuality(),
+        sharpening: message.getOutputSharpening(), watermark: message.getWatermark()
+      },
       development: {
         adjustments: recipe.globalAdjustments,
         curves: recipe.curves,

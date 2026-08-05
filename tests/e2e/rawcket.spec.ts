@@ -260,6 +260,12 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByLabel('Format', { exact: true }).selectOption('png');
+  await page.getByLabel('Output sharpening').selectOption('high');
+  await page.getByLabel('Add text watermark').check();
+  await page.getByLabel('Watermark text').fill('RAWcket test');
+  await page.getByLabel('Watermark opacity numeric value').fill('63');
+  await page.getByLabel('Watermark size numeric value').fill('4.5');
+  await page.getByLabel('Watermark position').selectOption('bottom-center');
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export PNG' }).click();
   const download = await downloadPromise;

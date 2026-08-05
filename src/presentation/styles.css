@@ -424,7 +424,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .candidate-evaluation dd { margin: 0; color: #818b83; font-size: .53rem; line-height: 1.35; }
 
 .dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(4,5,5,.76); backdrop-filter: blur(6px); }
-.dialog { width: min(520px, 100%); max-height: 90vh; overflow: auto; border: 1px solid #3a3f3b; border-radius: 18px; background: #171918; padding: 24px; box-shadow: 0 30px 100px #000; }
+.dialog { width: min(520px, 100%); max-height: 90vh; overflow: auto; scrollbar-gutter: stable; overscroll-behavior: contain; border: 1px solid #3a3f3b; border-radius: 18px; background: #171918; padding: 24px; box-shadow: 0 30px 100px #000; }
 .dialog-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
 .dialog h2 { margin: 5px 0 16px; font-size: 1.65rem; }
 .field-label { display: block; margin: 15px 0 6px; color: #c8ccc9; font-size: .78rem; font-weight: 650; }
@@ -444,8 +444,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .export-value-control > input[type='range'] { width: 100%; accent-color: var(--accent); }
 .export-edge { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; margin: 10px 0; color: #c8ccc9; font-size: .78rem; }
 .export-edge span { color: var(--muted); }
+.export-watermark { display: grid; gap: 7px; margin: 10px 0 14px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255, 255, 255, .02); color: #c8ccc9; font-size: .78rem; }
+.export-watermark > input { min-height: 38px; border: 1px solid var(--line); border-radius: 7px; background: #0f1110; color: var(--text); padding: 0 9px; }
 .export-progress { width: 100%; height: 8px; accent-color: var(--accent); }
-.export-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+.export-actions { position: sticky; z-index: 2; bottom: -24px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 18px -24px -24px; padding: 14px 24px 24px; border-top: 1px solid rgba(255, 255, 255, .06); background: linear-gradient(to bottom, rgba(23, 25, 24, .9), #171918 24%); }
 .check-row { display: flex; gap: 9px; align-items: center; margin-top: 13px; color: #b8bdb9; font-size: .82rem; }
 .check-row input { accent-color: var(--accent); }
 .credential-storage-options { display: grid; gap: 2px; margin: 14px 0 4px; padding: 12px; border: 1px solid #3b403c; border-radius: 10px; }

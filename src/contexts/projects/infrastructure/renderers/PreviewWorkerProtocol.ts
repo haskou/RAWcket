@@ -22,7 +22,14 @@ export const previewWorkerRequestSchema = z.object({
   maximumEdge: z.int().min(64).max(32_768).nullable(),
   output: z.object({
     mimeType: z.enum(['image/webp', 'image/jpeg', 'image/png', 'image/tiff']),
-    quality: z.number().min(0.1).max(1)
+    quality: z.number().min(0.1).max(1),
+    sharpening: z.enum(['none', 'low', 'standard', 'high']),
+    watermark: z.object({
+      text: z.string().trim().min(1).max(120),
+      opacity: z.number().min(0.1).max(1),
+      sizePercent: z.number().min(1).max(10),
+      position: z.enum(['bottom-left', 'bottom-center', 'bottom-right'])
+    }).nullable()
   }),
   development: z.object({
     adjustments: recipeSchema.shape.globalAdjustments,
