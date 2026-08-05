@@ -4,6 +4,7 @@ import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
+import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
@@ -27,12 +28,14 @@ export function EditorPage(): ReactElement {
   const navigate = useNavigate();
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [source, setSource] = useState<Blob | null>(null);
+  const [preview, setPreview] = useState<Blob | null>(null);
+  const [renderProgress, setRenderProgress] = useState<string>('Preparando preview');
   const [revision, setRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [activePanel, setActivePanel] = useState('light');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const sourceUrl = useObjectUrl(source);
+  const sourceUrl = useObjectUrl(preview ?? source);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
   const autosave = useProjectAutosave(project, revision, save);
 
@@ -52,6 +55,30 @@ export function EditorPage(): ReactElement {
     };
     void load();
   }, [application, projectId]);
+
+  useEffect(() => {
+    if (project === null) return;
+    const controller = new AbortController();
+    setRenderProgress('Renderizando');
+    void application.renderProjectPreview.render(
+      project,
+      new RenderProjectPreviewMessage(projectId, 2560),
+      {
+        signal: controller.signal,
+        onProgress: (progress) => setRenderProgress(`${progress.stage} ${Math.round(progress.completed * 100)}%`)
+      }
+    ).then((result) => {
+      if (result instanceof Blob) {
+        setPreview(result);
+        setRenderProgress('Preview actualizada');
+      }
+    }).catch((error: unknown) => {
+      if (!(error instanceof DOMException) || error.name !== 'AbortError') {
+        setRenderProgress('Preview no disponible; mostrando original');
+      }
+    });
+    return () => controller.abort();
+  }, [application, project, projectId, revision]);
 
   const apply = (operation: EditOperation): void => {
     if (project === null) return;
@@ -138,7 +165,7 @@ export function EditorPage(): ReactElement {
           </div>
           <div className="photo-stage">
             {sourceUrl !== null && <img className="source-preview" src={sourceUrl} alt={`Original de ${project.getName().valueOf()}`} style={{ transform: `scale(${zoom})` }} />}
-            <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>Vista del original</strong><small>La receta cambia; el revelado visual esta pendiente</small></span></div>
+            <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>Preview CPU de referencia</strong><small>Exposicion y contraste reales · {renderProgress}</small></span></div>
           </div>
           <div className="recipe-strip">
             <span>Receta activa</span>

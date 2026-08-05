@@ -9,7 +9,7 @@ LibRaw/WASM, WebGPU, WebGL2 y CPU tienen ciclos de vida, capacidades y fallos di
 
 ## Decision
 
-`PreviewRenderer` es el puerto de aplicacion para previews. La implementacion futura vivira en infraestructura y coordinara workers, resoluciones, cancelacion y fallbacks. El editor actual muestra el original y no usa filtros CSS para simular revelado.
+`PreviewRenderer` es el puerto de aplicacion para previews. `WorkerPreviewRenderer` coordina resolucion, progreso, cancelacion, timeout y concurrencia con `@haskou/flow`; una referencia CPU aplica exposicion/contraste sobre pixeles reales. WebGPU/WebGL2 y el pipeline RAW se añadiran como adapters sin contaminar React o dominio.
 
 ## Consecuencias
 

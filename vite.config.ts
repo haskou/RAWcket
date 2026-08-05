@@ -24,7 +24,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id): string | undefined {
-          if (id.includes('@haskou/value-objects')) return 'value-objects';
           if (id.includes('react') || id.includes('scheduler')) return 'react-vendor';
           if (id.includes('fflate')) return 'archive';
           if (id.includes('idb')) return 'storage';

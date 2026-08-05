@@ -2,6 +2,14 @@
 
 Este documento solo contiene funcionalidades de producto pendientes. La configuracion, arquitectura base, CI, persistencia inicial, bundles, cifrado, documentacion y pruebas de esta iteracion ya estan resueltas.
 
+## Progreso del objetivo completo
+
+- [x] Contrato versionado de preview con tamaño validado.
+- [x] Web Worker cancelable con progreso, timeout y concurrencia limitada.
+- [x] Pipeline CPU de referencia para exposicion y contraste JPEG/PNG.
+- [ ] LibRaw/WASM y Sony A6600 ARW.
+- [ ] Pipeline WebGPU/WebGL2 y resto de bloques detallados a continuacion.
+
 ## Orden recomendado inmediato
 
 1. Prototipo LibRaw/WASM en worker con Sony A6600 ARW y extraccion de preview.

@@ -1,0 +1,25 @@
+import type {
+  PreviewRenderer,
+  PreviewRenderControl
+} from '../ports/PreviewRenderer';
+import { PreviewRenderRequest } from '../ports/PreviewRenderer';
+import type { PhotoProject } from '../../domain/PhotoProject';
+import type { RenderProjectPreviewMessage } from './messages/RenderProjectPreviewMessage';
+
+export class RenderProjectPreview {
+  public constructor(private readonly renderer: PreviewRenderer) {}
+
+  public render(
+    project: PhotoProject,
+    message: RenderProjectPreviewMessage,
+    control?: PreviewRenderControl
+  ): Promise<ImageBitmap | Blob> {
+    if (!project.isIdentifiedBy(message.getProjectId())) {
+      throw new Error('La solicitud de preview pertenece a otro proyecto.');
+    }
+    return this.renderer.render(
+      new PreviewRenderRequest(message.getProjectId(), message.getSize(), project),
+      control
+    );
+  }
+}

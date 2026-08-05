@@ -4,7 +4,7 @@
 
 RAWcket es la base de un editor fotografico RAW no destructivo, local-first y ejecutado completamente en el navegador. Busca ofrecer una entrada sencilla y una profundidad progresiva sin copiar la interfaz ni la identidad de otros editores.
 
-Esta primera iteracion construye el producto alrededor del futuro motor de revelado. El original nunca se modifica: cada cambio se registra como una operacion serializable dentro de una receta. **Todavia no hay revelado visual RAW/JPEG/PNG**; el editor muestra honestamente el original y los valores de la receta.
+El original nunca se modifica: cada cambio se registra como una operacion serializable dentro de una receta. JPEG/PNG ya tienen una preview CPU de referencia en Web Worker para exposicion y contraste; el resto de herramientas y el motor RAW continuan marcados honestamente como pendientes.
 
 ## Estado actual
 
@@ -12,7 +12,7 @@ Implementado:
 
 - Aplicacion React + Vite + TypeScript strict, responsive y accesible.
 - Biblioteca local con importacion JPEG/PNG, demo generada en Canvas, reapertura, renombrado, duplicado y borrado confirmado.
-- Editor con modo Simple/Advanced, zoom de vista, paneles de producto y controles de prueba que modifican la receta sin fingir procesamiento.
+- Editor con modo Simple/Advanced, zoom y preview Web Worker que aplica exposicion/contraste a pixeles reales con progreso y cancelacion.
 - Modelo no destructivo: ajustes globales, curvas, transformacion de viewport y siete familias de mascaras.
 - Operaciones comunes para humano e IA, validacion, serializacion, agrupacion de cambios, historial limitado, undo y redo.
 - IndexedDB para proyecto/indice/configuracion y OPFS para originales con fallback IndexedDB.
@@ -25,8 +25,8 @@ Implementado:
 
 No implementado:
 
-- Decodificacion RAW/ARW, demosaicing o pipeline de alta profundidad.
-- Revelado visual por GPU/WASM/CPU, histograma, curvas interactivas o mascaras renderizadas.
+- Decodificacion RAW/ARW, demosaicing o pipeline lineal de alta profundidad.
+- Revelado GPU/WebGL2 y herramientas visuales distintas de exposicion/contraste; histograma, curvas interactivas y mascaras renderizadas.
 - Segmentacion IA, asesor de revelado conectado o llamadas a proveedores.
 - Exportacion fotografica final JPEG/PNG/TIFF. “Exportar” genera un bundle de proyecto portable.
 
@@ -116,7 +116,7 @@ docs/adr/                      decisiones arquitectonicas
 
 ## Limitaciones conocidas
 
-- Solo se importan JPEG y PNG; se visualiza el original sin aplicar la receta a pixeles.
+- Solo se importan JPEG y PNG; la preview CPU aplica exposicion y contraste, pero el resto de la receta aun no transforma pixeles.
 - OPFS, persistencia solicitada y PWA dependen de capacidades del navegador y degradan de forma segura.
 - `pagehide` no garantiza completar escrituras asincronas si el proceso termina abruptamente; el debounce reduce la ventana de perdida.
 - El vault protege datos en reposo, no frente a XSS ejecutandose en el mismo origen.

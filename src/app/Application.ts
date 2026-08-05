@@ -7,6 +7,7 @@ import { DuplicateProject } from '@/contexts/projects/application/duplicate-proj
 import { FindProject } from '@/contexts/projects/application/find-project/FindProject';
 import { ListProjects } from '@/contexts/projects/application/list-projects/ListProjects';
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
+import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import type { ProjectExporter } from '@/contexts/projects/application/ports/ProjectExporter';
 import type { ProjectImporter } from '@/contexts/projects/application/ports/ProjectImporter';
 import type { SourceFileRepository } from '@/contexts/projects/domain/repositories/SourceFileRepository';
@@ -15,6 +16,7 @@ import { ProjectMigrator } from '@/contexts/projects/infrastructure/migrations/P
 import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionZeroToOneProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
+import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
@@ -35,6 +37,7 @@ export type Application = {
   projectImporter: ProjectImporter;
   apiKeyVault: BrowserApiKeyVault;
   persistentStorage: PersistentStorageRequest;
+  renderProjectPreview: RenderProjectPreview;
 };
 
 export function createApplication(databaseName = 'rawcket'): Application {
@@ -44,6 +47,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const sourceFiles = new BrowserSourceFileRepository(database);
   const bundle = new RawcketProjectBundle(projects, sourceFiles, migrator);
   const settings = new RawcketSettingsRepository(database);
+  const previewRenderer = new WorkerPreviewRenderer(sourceFiles);
   return {
     createProject: new CreateProject(projects, sourceFiles),
     findProject: new FindProject(projects),
@@ -58,6 +62,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     projectExporter: bundle,
     projectImporter: bundle,
     apiKeyVault: new BrowserApiKeyVault(settings),
-    persistentStorage: new PersistentStorageRequest()
+    persistentStorage: new PersistentStorageRequest(),
+    renderProjectPreview: new RenderProjectPreview(previewRenderer)
   };
 }
