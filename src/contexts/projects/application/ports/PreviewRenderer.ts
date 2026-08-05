@@ -2,7 +2,7 @@ import type { ProjectId } from '../../domain/value-objects/ProjectId';
 import type { PhotoProject } from '../../domain/PhotoProject';
 import type { PreviewSize } from '../render-project-preview/PreviewSize';
 
-export type PreviewRenderStage = 'queued' | 'decoding' | 'developing' | 'analyzing' | 'encoding';
+export type PreviewRenderStage = 'queued' | 'decoding' | 'developing' | 'analyzing' | 'encoding' | 'cached';
 
 export type PreviewAnalysis = {
   red: number[];

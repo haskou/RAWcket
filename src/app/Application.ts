@@ -27,6 +27,7 @@ import { VersionTwoToThreeProjectMigration } from '@/contexts/projects/infrastru
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
+import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/CachingPreviewRenderer';
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
 import { LocalRecipeAdvisor } from '@/contexts/projects/infrastructure/advisors/LocalRecipeAdvisor';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
@@ -73,7 +74,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const sourceFiles = new BrowserSourceFileRepository(database);
   const bundle = new RawcketProjectBundle(projects, sourceFiles, migrator);
   const settings = new RawcketSettingsRepository(database);
-  const previewRenderer = new WorkerPreviewRenderer(sourceFiles);
+  const previewRenderer = new CachingPreviewRenderer(new WorkerPreviewRenderer(sourceFiles));
   const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
   return {
     createProject: new CreateProject(projects, sourceFiles),
