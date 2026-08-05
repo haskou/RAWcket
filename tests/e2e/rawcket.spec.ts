@@ -35,10 +35,16 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
   await page.getByLabel('Rotation numeric value').fill('10');
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
+  await page.getByRole('button', { name: 'Local Masks', exact: true }).click();
+  await page.getByRole('button', { name: '+ Radial mask' }).click();
+  await page.getByLabel('Local exposure numeric value').fill('1');
+  await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
   await page.getByRole('button', { name: 'Open night' }).click();
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
   await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
+  await page.getByRole('button', { name: 'Local Masks', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
 });

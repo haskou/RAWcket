@@ -1,17 +1,22 @@
 import type { CurveSetPrimitives } from '../../domain/ToneCurve';
 import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments';
 import type { AdjustmentKeyPrimitive } from '../../domain/value-objects/AdjustmentKey';
+import type { MaskDefinitionPrimitives } from '../../domain/MaskDefinition';
+import { CpuMaskEvaluator } from './CpuMaskEvaluator';
 import { ToneCurveLut } from './ToneCurveLut';
 
 export type CpuDevelopmentSettings = {
   adjustments: GlobalAdjustmentsPrimitives;
   curves: CurveSetPrimitives;
   disabledAdjustments: AdjustmentKeyPrimitive[];
+  masks: MaskDefinitionPrimitives[];
 };
 
 type Rgb = { red: number; green: number; blue: number };
 
 export class CpuPixelDeveloper {
+  private readonly masks = new CpuMaskEvaluator();
+
   public develop(
     source: Uint8ClampedArray,
     width: number,
@@ -29,10 +34,17 @@ export class CpuPixelDeveloper {
       luminance: settings.curves.luminance === null ? null : ToneCurveLut.create(settings.curves.luminance)
     };
     for (let index = 0; index < source.length; index += 4) {
-      const developed = this.developPixel(
-        { red: (source[index] ?? 0) / 255, green: (source[index + 1] ?? 0) / 255, blue: (source[index + 2] ?? 0) / 255 },
-        adjustments
-      );
+      const sourcePixel = { red: (source[index] ?? 0) / 255, green: (source[index + 1] ?? 0) / 255, blue: (source[index + 2] ?? 0) / 255 };
+      let developed = this.developPixel(sourcePixel, adjustments);
+      const x = (index / 4 % width + 0.5) / width;
+      const y = (Math.floor(index / 4 / width) + 0.5) / height;
+      for (const mask of settings.masks) {
+        const weight = this.masks.evaluate(mask, { x, y, luminance: this.luminance(sourcePixel) });
+        if (weight <= 0) continue;
+        const local = { ...this.neutralAdjustments(), ...mask.localAdjustments };
+        const locallyDeveloped = this.developPixel(developed, local);
+        developed = this.mix(developed, locallyDeveloped, weight);
+      }
       const curved = this.applyCurves(developed, luts);
       working[index] = curved.red;
       working[index + 1] = curved.green;
@@ -48,6 +60,25 @@ export class CpuPixelDeveloper {
     const active = { ...settings.adjustments };
     for (const key of settings.disabledAdjustments) active[key] = 0;
     return active;
+  }
+
+  private neutralAdjustments(): GlobalAdjustmentsPrimitives {
+    return {
+      exposure: 0,
+      temperature: 0,
+      tint: 0,
+      contrast: 0,
+      highlights: 0,
+      shadows: 0,
+      whites: 0,
+      blacks: 0,
+      saturation: 0,
+      vibrance: 0,
+      clarity: 0,
+      dehaze: 0,
+      sharpness: 0,
+      noiseReduction: 0
+    };
   }
 
   private developPixel(rgb: Rgb, adjustment: GlobalAdjustmentsPrimitives): Rgb {
@@ -156,6 +187,13 @@ export class CpuPixelDeveloper {
   }
 
   private luminance(rgb: Rgb): number { return rgb.red * 0.2126 + rgb.green * 0.7152 + rgb.blue * 0.0722; }
+  private mix(start: Rgb, end: Rgb, amount: number): Rgb {
+    return {
+      red: start.red + (end.red - start.red) * amount,
+      green: start.green + (end.green - start.green) * amount,
+      blue: start.blue + (end.blue - start.blue) * amount
+    };
+  }
   private smoothstep(start: number, end: number, value: number): number {
     const x = this.clamp((value - start) / (end - start));
     return x * x * (3 - 2 * x);

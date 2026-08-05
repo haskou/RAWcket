@@ -105,7 +105,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .canvas-toolbar input[type='number'] { width: 49px; padding: 3px 2px 3px 5px; border: 0; border-radius: 5px; background: #090a0a; color: #ddd; text-align: right; font-size: .68rem; font-variant-numeric: tabular-nums; }
 .photo-stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; overflow: hidden; padding: 70px 60px 35px; cursor: grab; touch-action: none; user-select: none; }
 .photo-stage.panning { cursor: grabbing; }
-.source-preview { display: block; max-width: 86%; max-height: 78vh; object-fit: contain; box-shadow: 0 22px 70px rgba(0,0,0,.48); transform-origin: center; will-change: transform; pointer-events: none; }
+.photo-stage.painting { cursor: crosshair; }
+.preview-surface { position: relative; display: grid; width: max-content; max-width: 86%; max-height: 78vh; transform-origin: center; will-change: transform; box-shadow: 0 22px 70px rgba(0,0,0,.48); pointer-events: none; }
+.source-preview { display: block; max-width: 100%; max-height: 78vh; object-fit: contain; pointer-events: none; }
+.mask-overlay { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; color: rgba(201,240,107,.28); pointer-events: none; }
+.mask-overlay polyline { stroke: rgba(201,240,107,.48); }
 .truth-badge { position: absolute; left: 22px; bottom: 19px; display: flex; gap: 9px; align-items: center; padding: 9px 12px; border: 1px solid #393d3a; border-radius: 9px; background: rgba(16,18,17,.88); backdrop-filter: blur(10px); }
 .truth-badge > span:first-child { color: var(--accent); }
 .truth-badge strong, .truth-badge small { display: block; }
@@ -176,6 +180,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .geometry-actions button { min-height: 34px; border: 1px solid #323733; border-radius: 7px; background: #1b1e1c; color: #bdc3be; cursor: pointer; font-size: .65rem; }
 .geometry-actions button.active { border-color: var(--accent); background: var(--accent-dark); color: var(--accent); }
 .geometry-actions button:last-child { grid-column: 1 / -1; }
+.mask-controls { display: grid; gap: 12px; }
+.mask-create-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.mask-create-actions button, .mask-list button { min-height: 34px; border: 1px solid #323733; border-radius: 7px; background: #1b1e1c; color: #bdc3be; cursor: pointer; font-size: .65rem; }
+.mask-empty { padding: 12px; border: 1px dashed #3a403b; border-radius: 8px; color: #858d87; }
+.mask-list { display: grid; gap: 4px; }
+.mask-list button { display: flex; justify-content: space-between; align-items: center; padding: 0 10px; text-align: left; }
+.mask-list button.active { border-color: var(--accent); background: var(--accent-dark); color: var(--accent); }
+.mask-list small { color: #777f79; font-size: .58rem; }
+.selected-mask-controls { display: grid; gap: 15px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.mask-switches { display: flex; gap: 16px; }
+.mask-switches label { display: flex; align-items: center; gap: 5px; color: #bec4bf; font-size: .68rem; }
+.mask-switches input { accent-color: var(--accent); }
+.mask-number-control > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; color: #c7ccc8; font-size: .69rem; }
+.mask-number-control input[type='number'] { width: 68px; height: 27px; padding: 0 5px; border: 1px solid #343935; border-radius: 6px; background: #0d0f0e; color: var(--accent); text-align: right; font-size: .67rem; }
+.mask-number-control > input[type='range'] { width: 100%; accent-color: var(--accent); }
 .ai-prompt { width: 100%; resize: vertical; min-height: 96px; padding: 10px; border: 1px solid #3b413b; border-radius: 9px; background: #0c0e0d; color: var(--text); line-height: 1.5; }
 .ai-quick-prompts { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 12px; }
 .ai-quick-prompts button { min-height: 27px; padding: 0 8px; }

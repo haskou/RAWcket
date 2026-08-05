@@ -7,7 +7,8 @@ function settings(exposure = 0, contrast = 0): CpuDevelopmentSettings {
   return {
     adjustments: { ...adjustments, exposure, contrast },
     curves: CurveSet.identity().toPrimitives(),
-    disabledAdjustments: []
+    disabledAdjustments: [],
+    masks: []
   };
 }
 
@@ -45,9 +46,33 @@ describe('CpuPixelDeveloper', () => {
           ...CurveSet.identity().toPrimitives(),
           rgb: { points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.5 }, { x: 1, y: 1 }], interpolation: 'linear' }
         },
-        disabledAdjustments: []
+        disabledAdjustments: [],
+        masks: []
       }
     );
     expect(developed[0]).toBeGreaterThan(100);
+  });
+
+  it('applies local adjustments only inside an enabled brush mask', () => {
+    const developed = new CpuPixelDeveloper().develop(
+      new Uint8ClampedArray([64, 64, 64, 255, 64, 64, 64, 255]),
+      2,
+      1,
+      {
+        ...settings(),
+        masks: [{
+          id: crypto.randomUUID(),
+          enabled: true,
+          inverted: false,
+          opacity: 1,
+          feather: 0,
+          density: 1,
+          localAdjustments: { exposure: 1 },
+          shape: { kind: 'brush', strokes: [{ points: [{ x: 0.25, y: 0.5 }], size: 0.4, hardness: 1, flow: 1 }] }
+        }]
+      }
+    );
+
+    expect([...developed]).toEqual([128, 128, 128, 255, 64, 64, 64, 255]);
   });
 });

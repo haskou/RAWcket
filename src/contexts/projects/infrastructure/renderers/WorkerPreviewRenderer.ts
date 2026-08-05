@@ -53,6 +53,7 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
           adjustments: primitives.recipe.globalAdjustments,
           curves: primitives.recipe.curves,
           disabledAdjustments: primitives.recipe.disabledGlobalAdjustments,
+          masks: primitives.recipe.masks,
           viewport: primitives.recipe.viewport
         }
     };

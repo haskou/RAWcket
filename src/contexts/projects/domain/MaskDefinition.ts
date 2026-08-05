@@ -59,9 +59,9 @@ export class MaskDefinition {
     private readonly id: MaskId,
     private readonly primitives: Omit<MaskDefinitionPrimitives, 'id'>
   ) {
-    MaskDefinition.ensureUnitInterval(primitives.opacity, 'opacidad');
+    MaskDefinition.ensureUnitInterval(primitives.opacity, 'opacity');
     MaskDefinition.ensureUnitInterval(primitives.feather, 'feather');
-    MaskDefinition.ensureUnitInterval(primitives.density, 'densidad');
+    MaskDefinition.ensureUnitInterval(primitives.density, 'density');
     this.ensureLocalAdjustments(primitives.localAdjustments);
     this.ensureShape(primitives.shape);
   }
@@ -120,8 +120,8 @@ export class MaskDefinition {
     points.forEach((point) => this.ensurePoint(point));
     boxes.forEach((box) => {
       this.ensurePoint(box);
-      MaskDefinition.ensureUnitInterval(box.width, 'anchura');
-      MaskDefinition.ensureUnitInterval(box.height, 'altura');
+      MaskDefinition.ensureUnitInterval(box.width, 'width');
+      MaskDefinition.ensureUnitInterval(box.height, 'height');
       if (box.x + box.width > 1 || box.y + box.height > 1) {
         throw new Error('Mask boxes must remain inside the image.');
       }
@@ -136,7 +136,7 @@ export class MaskDefinition {
   }
 
   private ensurePoint(point: PointPrimitive): void {
-    MaskDefinition.ensureUnitInterval(point.x, 'coordenada x');
-    MaskDefinition.ensureUnitInterval(point.y, 'coordenada y');
+    MaskDefinition.ensureUnitInterval(point.x, 'x coordinate');
+    MaskDefinition.ensureUnitInterval(point.y, 'y coordinate');
   }
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { MaskDefinitionPrimitives } from '../../domain/MaskDefinition';
 
 const pointSchema = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) });
 const rectangleSchema = pointSchema.extend({ width: z.number().min(0).max(1), height: z.number().min(0).max(1) });
@@ -13,7 +14,7 @@ const toneCurveSchema = z.object({
   interpolation: z.enum(['linear', 'monotonic-cubic'])
 });
 
-export const maskSchema: z.ZodType = z.lazy(() =>
+export const maskSchema: z.ZodType<MaskDefinitionPrimitives> = z.lazy(() =>
   z.object({
     id: z.uuid(),
     enabled: z.boolean(),

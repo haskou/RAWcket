@@ -102,6 +102,10 @@ export class DevelopmentRecipe {
     return mask;
   }
 
+  public getMasks(): MaskDefinition[] {
+    return this.masks.map((mask) => MaskDefinition.fromPrimitives(mask.toPrimitives()));
+  }
+
   public toPrimitives(): DevelopmentRecipePrimitives {
     return {
       globalAdjustments: this.globalAdjustments.toPrimitives(),

@@ -16,6 +16,7 @@ import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choo
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
+import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
 import type { ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
@@ -26,6 +27,7 @@ import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
 import { AdjustmentControls } from '../components/AdjustmentControls';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { GeometryControls } from '../components/GeometryControls';
+import { MaskControls } from '../components/MaskControls';
 import {
   adjustmentDefinitions,
   type AdjustmentSection
@@ -37,6 +39,7 @@ import { downloadBlob } from '../lib/browserImages';
 type EditorPanel = AdjustmentSection | 'curves' | 'crop' | 'masks' | 'ai';
 type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
+type BrushGesture = { pointerId: number; maskId: string; groupId: string };
 
 const minimumZoom = 0.1;
 const maximumZoom = 8;
@@ -70,6 +73,8 @@ export function EditorPage(): ReactElement {
   const application = useApplication();
   const navigate = useNavigate();
   const panGesture = useRef<PanGesture | null>(null);
+  const brushGesture = useRef<BrushGesture | null>(null);
+  const previewSurface = useRef<HTMLDivElement>(null);
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [source, setSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
@@ -79,6 +84,9 @@ export function EditorPage(): ReactElement {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
+  const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
+  const [brushActive, setBrushActive] = useState(false);
+  const [brushSize, setBrushSize] = useState(0.08);
   const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -176,6 +184,8 @@ export function EditorPage(): ReactElement {
       else if (event.key === '4') setActivePanel('curves');
       else if (event.key.toLowerCase() === 'a') setActivePanel('ai');
       else if (event.key.toLowerCase() === 'b') setShowOriginal((value) => !value);
+      else if (event.key.toLowerCase() === 'm') setActivePanel('masks');
+      else if (event.key === 'Escape') setBrushActive(false);
       else if (event.key === '?') setShortcutsOpen((value) => !value);
       else return;
       event.preventDefault();
@@ -238,14 +248,108 @@ export function EditorPage(): ReactElement {
     apply({ kind: EDIT_OPERATION.SET_VIEWPORT_TRANSFORM, viewport, groupId });
   };
 
+  const updateMask = (mask: MaskDefinitionPrimitives, groupId: string | null): void => {
+    apply({ kind: EDIT_OPERATION.UPDATE_MASK, mask, groupId });
+  };
+
+  const addBrushMask = (): void => {
+    const id = crypto.randomUUID();
+    apply({
+      kind: EDIT_OPERATION.ADD_MASK,
+      groupId: null,
+      mask: {
+        id,
+        enabled: true,
+        inverted: false,
+        opacity: 1,
+        feather: 0.2,
+        density: 1,
+        localAdjustments: { exposure: 0.5 },
+        shape: { kind: 'brush', strokes: [] }
+      }
+    });
+    setSelectedMaskId(id);
+    setBrushActive(true);
+  };
+
+  const addRadialMask = (): void => {
+    const id = crypto.randomUUID();
+    apply({
+      kind: EDIT_OPERATION.ADD_MASK,
+      groupId: null,
+      mask: {
+        id,
+        enabled: true,
+        inverted: false,
+        opacity: 1,
+        feather: 0.5,
+        density: 1,
+        localAdjustments: { exposure: 0.5 },
+        shape: { kind: 'radial', center: { x: 0.5, y: 0.5 }, radiusX: 0.25, radiusY: 0.25, rotationDegrees: 0 }
+      }
+    });
+    setSelectedMaskId(id);
+    setBrushActive(false);
+  };
+
+  const removeMask = (id: string): void => {
+    apply({ kind: EDIT_OPERATION.REMOVE_MASK, maskId: id, groupId: null });
+    setSelectedMaskId(null);
+    setBrushActive(false);
+  };
+
+  const pointOnPreview = (event: ReactPointerEvent<HTMLDivElement>): { x: number; y: number } | null => {
+    const bounds = previewSurface.current?.getBoundingClientRect();
+    if (bounds === undefined || bounds.width === 0 || bounds.height === 0) return null;
+    const x = (event.clientX - bounds.left) / bounds.width;
+    const y = (event.clientY - bounds.top) / bounds.height;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+    return { x, y };
+  };
+
+  const beginBrushStroke = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
+    if (!brushActive || selectedMaskId === null) return false;
+    const selected = project?.getMasks().find((mask) => mask.getId().valueOf() === selectedMaskId)?.toPrimitives();
+    const point = pointOnPreview(event);
+    if (selected?.shape.kind !== 'brush' || point === null) return true;
+    const groupId = crypto.randomUUID();
+    updateMask({
+      ...selected,
+      shape: {
+        ...selected.shape,
+        strokes: [...selected.shape.strokes, { points: [point], size: brushSize, hardness: 0.75, flow: 1 }]
+      }
+    }, groupId);
+    brushGesture.current = { pointerId: event.pointerId, maskId: selected.id, groupId };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    return true;
+  };
+
+  const continueBrushStroke = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
+    const gesture = brushGesture.current;
+    if (gesture?.pointerId !== event.pointerId) return false;
+    const selected = project?.getMasks().find((mask) => mask.getId().valueOf() === gesture.maskId)?.toPrimitives();
+    const point = pointOnPreview(event);
+    if (selected?.shape.kind !== 'brush' || point === null) return true;
+    const strokes = [...selected.shape.strokes];
+    const current = strokes.at(-1);
+    const previous = current?.points.at(-1);
+    if (current === undefined || (previous !== undefined && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.002)) return true;
+    strokes[strokes.length - 1] = { ...current, points: [...current.points, point] };
+    updateMask({ ...selected, shape: { ...selected.shape, strokes } }, gesture.groupId);
+    return true;
+  };
+
   const startPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button !== 0) return;
+    if (beginBrushStroke(event)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     panGesture.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, ...pan };
     setPanning(true);
   };
 
   const movePan = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (continueBrushStroke(event)) return;
     const gesture = panGesture.current;
     if (gesture?.pointerId !== event.pointerId) return;
     setPan({
@@ -255,6 +359,11 @@ export function EditorPage(): ReactElement {
   };
 
   const endPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (brushGesture.current?.pointerId === event.pointerId) {
+      brushGesture.current = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      return;
+    }
     if (panGesture.current?.pointerId !== event.pointerId) return;
     panGesture.current = null;
     setPanning(false);
@@ -309,7 +418,7 @@ export function EditorPage(): ReactElement {
             <button className={showOriginal ? 'active' : ''} type="button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
           </div>
           <div
-            className={`photo-stage ${panning ? 'panning' : ''}`}
+            className={`photo-stage ${panning ? 'panning' : ''} ${brushActive ? 'painting' : ''}`}
             onPointerDown={startPan}
             onPointerMove={movePan}
             onPointerUp={endPan}
@@ -317,7 +426,12 @@ export function EditorPage(): ReactElement {
             onWheel={zoomWithWheel}
             aria-label="Photo preview. Drag to pan and use the mouse wheel to zoom."
           >
-            {sourceUrl !== null && <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} style={{ transform }} />}
+            {sourceUrl !== null && (
+              <div ref={previewSurface} className="preview-surface" style={{ transform }}>
+                <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} />
+                {!showOriginal && (activePanel === 'masks' || brushActive) && <MaskOverlay masks={project.getMasks().map((mask) => mask.toPrimitives())} />}
+              </div>
+            )}
             <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>Reference CPU preview</strong><small>Full global recipe and curves · {renderProgress}</small></span></div>
             {showOriginal && <div className="comparison-badge">Original · Before</div>}
             <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
@@ -363,7 +477,20 @@ export function EditorPage(): ReactElement {
             <GeometryControls project={project} onChange={changeViewport} />
           </ToolSection>
           <ToolSection id="masks" title="Masks" active={activePanel === 'masks'} onToggle={setActivePanel} badge="AI ready">
-            <p>Brushes, gradients, range masks, AI segmentation, and add/subtract/intersect composition are represented in the recipe.</p>
+            <p>Local masks remain editable recipe data. Brush and radial coverage now render through the reference pipeline.</p>
+            <MaskControls
+              project={project}
+              selectedId={selectedMaskId}
+              brushActive={brushActive}
+              brushSize={brushSize}
+              onSelect={setSelectedMaskId}
+              onAddBrush={addBrushMask}
+              onAddRadial={addRadialMask}
+              onUpdate={updateMask}
+              onRemove={removeMask}
+              onBrushActiveChange={setBrushActive}
+              onBrushSizeChange={setBrushSize}
+            />
           </ToolSection>
         </aside>
       </section>
@@ -401,6 +528,7 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
     ['Tone Curve', '4'],
     ['AI Studio', 'A'],
     ['Before / after', 'B'],
+    ['Masks', 'M'],
     ['Shortcut guide', '?']
   ];
   return (
@@ -410,5 +538,21 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
         <dl>{shortcuts.map(([label, keys]) => <div key={label}><dt>{label}</dt><dd>{keys}</dd></div>)}</dl>
       </section>
     </div>
+  );
+}
+
+function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactElement {
+  return (
+    <svg className="mask-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Local mask overlay">
+      {masks.filter((mask) => mask.enabled).map((mask) => {
+        if (mask.shape.kind === 'brush') {
+          return <g key={mask.id}>{mask.shape.strokes.map((stroke, index) => <polyline key={index} points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" strokeWidth={stroke.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
+        }
+        if (mask.shape.kind === 'radial') {
+          return <ellipse key={mask.id} cx={mask.shape.center.x} cy={mask.shape.center.y} rx={mask.shape.radiusX} ry={mask.shape.radiusY} fill="currentColor" transform={`rotate(${mask.shape.rotationDegrees} ${mask.shape.center.x} ${mask.shape.center.y})`} />;
+        }
+        return null;
+      })}
+    </svg>
   );
 }

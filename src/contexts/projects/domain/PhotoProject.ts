@@ -149,6 +149,10 @@ export class PhotoProject {
     return ViewportTransform.fromPrimitives(this.recipe.getViewport().toPrimitives());
   }
 
+  public getMasks(): MaskDefinition[] {
+    return this.recipe.getMasks();
+  }
+
   public getInterfaceMode(): InterfaceMode {
     return this.uiState.getMode();
   }
