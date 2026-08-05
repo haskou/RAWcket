@@ -209,20 +209,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .curve-channel-tabs button.active { border-color: #697363; color: var(--text); background: #292d2a; }
 .curve-graph { width: 100%; aspect-ratio: 1; border: 1px solid #394039; border-radius: 7px; background: linear-gradient(145deg, #101211, #090a0a); touch-action: none; cursor: crosshair; }
 .curve-histogram-backdrop { pointer-events: none; }
-.curve-histogram-backdrop polygon { opacity: .28; mix-blend-mode: screen; }
-.curve-histogram-backdrop polygon.luminance { fill: #aab0aa; opacity: .22; }
+.curve-histogram-backdrop polygon { opacity: .22; mix-blend-mode: screen; }
+.curve-histogram-backdrop polygon.luminance { fill: #aab0aa; opacity: .17; }
 .curve-histogram-backdrop polygon.red { fill: #d34742; }
 .curve-histogram-backdrop polygon.green { fill: #45a95b; }
 .curve-histogram-backdrop polygon.blue { fill: #416ed0; }
-.curve-grid { fill: none; stroke: #252a26; stroke-width: .003; vector-effect: non-scaling-stroke; }
-.curve-line { fill: none; stroke: #e1e5df; stroke-width: .009; vector-effect: non-scaling-stroke; }
+.curve-grid { fill: none; stroke: #343a35; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.curve-line-underlay { fill: none; stroke: rgba(0,0,0,.85); stroke-width: 5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.curve-line { fill: none; stroke: #f1f5ef; stroke-width: 2.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.curve-line.identity { stroke: #cbd3cd; stroke-width: 2; }
 .curve-graph.channel-red .curve-line { stroke: #ff7b73; }
 .curve-graph.channel-green .curve-line { stroke: #86d789; }
 .curve-graph.channel-blue .curve-line { stroke: #7ca8ff; }
-.curve-graph circle { fill: #131614; stroke: #e1e5df; stroke-width: .008; vector-effect: non-scaling-stroke; cursor: grab; }
+.curve-graph circle { fill: #131614; stroke: #f1f5ef; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: grab; }
 .curve-graph circle.selected { fill: var(--accent); stroke: #11150d; }
 .curve-axis-labels { display: flex; justify-content: space-between; margin-top: -5px; color: #757d77; font-size: .57rem; font-weight: 650; letter-spacing: .03em; }
 .curve-interaction-hint { margin: -4px 0 0; color: #737b75; font-size: .58rem; line-height: 1.4; }
+.curve-selection-status { margin: -4px 0 0; color: #9ca59e; font-size: .59rem; }
 .curve-point-values { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px; }
 .curve-point-values label { display: flex; align-items: center; gap: 4px; color: #818983; font-size: .62rem; }
 .curve-point-values input { width: 100%; min-width: 0; height: 30px; border: 1px solid #333834; border-radius: 6px; background: #0d0f0e; color: var(--accent); padding: 0 4px; font-size: .65rem; }

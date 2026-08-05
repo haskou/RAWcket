@@ -78,12 +78,16 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
   const curveGraph = page.locator('.curve-graph');
   await expect(curveGraph.locator('path.curve-line')).toHaveAttribute('d', /^M0,1 L/);
+  await expect(page.getByText('Neutral curve · no control point selected')).toBeVisible();
+  await expect(curveGraph.locator('circle')).toHaveCount(0);
+  await expect(curveGraph.locator('path.curve-line')).toHaveCSS('stroke-width', '2px');
   const graphBounds = await curveGraph.boundingBox();
   if (graphBounds === null) throw new Error('The tone curve graph is unavailable.');
   await page.mouse.move(graphBounds.x + graphBounds.width * 0.35, graphBounds.y + graphBounds.height * 0.5);
   await page.mouse.down();
   await page.mouse.move(graphBounds.x + graphBounds.width * 0.7, graphBounds.y + graphBounds.height * 0.4, { steps: 4 });
   await page.mouse.up();
+  await expect(curveGraph.locator('circle')).toHaveCount(3);
   await expect.poll(async () => Number(await page.getByLabel('Curve point X').inputValue())).toBeGreaterThan(0.69);
   const middlePoint = curveGraph.locator('circle').nth(1);
   const pointBounds = await middlePoint.boundingBox();
