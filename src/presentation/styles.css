@@ -53,6 +53,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .drop-target-icon { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid #779148; border-radius: 50%; background: #1e2819; color: var(--accent); font-size: 2rem; }
 .library-header { height: 82px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line-soft); }
 .header-actions { display: flex; gap: 9px; }
+.local-model-header-progress { display: flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 10px; border: 1px solid #53643a; border-radius: 9px; background: #12170f; color: #cfe1bf; font-size: .64rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .library-intro { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, .75fr); gap: 60px; align-items: end; padding: 74px 0 42px; }
 .library-intro h1 { margin: 9px 0 14px; max-width: 760px; font-size: clamp(2.6rem, 6vw, 5.9rem); line-height: .94; letter-spacing: -.065em; font-weight: 660; }
 .library-intro p { margin: 0; max-width: 670px; color: #aaafaa; line-height: 1.7; font-size: 1rem; }
@@ -190,6 +191,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-prompt-shell .ai-prompt { padding-right: 56px; padding-bottom: 48px; }
 .ai-prompt-submit { position: absolute; right: 10px; bottom: 10px; display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #a8ca54; border-radius: 10px; background: var(--accent); color: #17200f; cursor: pointer; font-size: 1.05rem; }
 .ai-prompt-submit:disabled { cursor: wait; opacity: .72; }
+.auto-enhance-explanation { margin: -2px 0 8px !important; color: #7f8980; font-size: .6rem; line-height: 1.45; }
 .ai-working-state { display: flex; align-items: flex-start; gap: 10px; margin: 10px 0; padding: 12px; border: 1px solid #68744f; border-radius: 10px; background: rgba(201,240,107,.045); }
 .ai-working-state strong, .ai-working-state small { display: block; }
 .ai-working-state strong { color: #dce7cf; font-size: .72rem; }
@@ -397,7 +399,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .development-tutor { display: grid; gap: 7px; margin-bottom: 16px; padding-bottom: 15px; border-bottom: 1px solid var(--line-soft); }
 .development-tutor > p { margin: 4px 0 !important; color: #778078; font-size: .67rem; }
 .development-tutor-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; color: var(--accent); }
-.development-tutor-heading > div { min-width: 0; }
+.development-tutor > summary { padding: 8px; border: 1px solid #343b34; border-radius: 8px; background: #111411; cursor: pointer; list-style: none; }
+.development-tutor > summary::-webkit-details-marker { display: none; }
+.development-tutor-heading > span:last-child { min-width: 0; }
 .development-tutor-heading strong, .development-tutor-heading small { display: block; }
 .development-tutor-heading strong { color: #dce3d8; font-size: .72rem; }
 .development-tutor-heading small { color: #7e897b; font-size: .57rem; }
@@ -499,6 +503,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .provider-card p { margin: 5px 0 8px; color: #9ca69e; font-size: .7rem; line-height: 1.5; }
 .provider-card a { color: var(--accent); font-size: .7rem; text-underline-offset: 3px; }
 .provider-setup-link { display: inline-block; margin: 7px 0 12px; color: var(--accent); font-size: .68rem; text-underline-offset: 3px; }
+.google-account-card { display: grid; gap: 9px; margin: 14px 0; padding: 13px; border: 1px solid #46505b; border-radius: 10px; background: #121517; }
+.google-account-card strong, .google-account-card small { display: block; }
+.google-account-card strong { color: #e0e5e9; font-size: .74rem; }
+.google-account-card small { margin-top: 3px; color: #8f989f; font-size: .62rem; line-height: 1.45; }
+.button.google-sign-in { display: flex; align-items: center; justify-content: center; gap: 9px; border-color: #68727d; background: #f5f7f8; color: #202124; }
+.button.google-sign-in > svg { width: 18px; height: 18px; flex: 0 0 18px; }
 .cloud-connection-card { display: grid; gap: 8px; margin: 15px 0; padding: 13px; border: 1px solid #3d4b38; border-radius: 10px; background: #111611; }
 .cloud-connection-card strong { color: #dce9cf; font-size: .76rem; }
 .cloud-connection-card p { margin: 0; color: #9ca69e; font-size: .67rem; line-height: 1.5; }

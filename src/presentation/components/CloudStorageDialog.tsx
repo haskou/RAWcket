@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { ConfigureCloudStorageMessage } from '@/contexts/cloud-storage/application/manage-cloud-storage/messages/ConfigureCloudStorageMessage';
 import type { CloudStorageStatus } from '@/contexts/cloud-storage/application/ports/CloudStorageGateway';
 import { useApplication } from '../ApplicationContext';
+import { GoogleMark } from './GoogleMark';
 
-const disconnected: CloudStorageStatus = { configured: false, connected: false, accountEmail: null, clientId: null, autoUploadExports: false };
+const disconnected: CloudStorageStatus = { configured: false, connected: false, accountEmail: null, autoUploadExports: false };
 
 export function CloudStorageDialog({ open, onClose, onUploadProject, onUploadOriginal }: {
   open: boolean;
@@ -13,26 +14,18 @@ export function CloudStorageDialog({ open, onClose, onUploadProject, onUploadOri
 }): ReactElement | null {
   const application = useApplication();
   const [status, setStatus] = useState<CloudStorageStatus>(disconnected);
-  const [clientId, setClientId] = useState('');
   const [autoUploadExports, setAutoUploadExports] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('Configure your own Google OAuth Web Client ID. RAWcket ships with no shared Google credential.');
-  const draftTouched = useRef(false);
+  const [message, setMessage] = useState('Continue with Google to use Drive backups and private account settings.');
 
   useEffect(() => {
-    if (!open) {
-      draftTouched.current = false;
-      return;
-    }
+    if (!open) return;
     let cancelled = false;
     setBusy(true);
     void application.manageCloudStorage.inspect().then((current) => {
       if (cancelled) return;
       setStatus(current);
-      if (!draftTouched.current) {
-        setClientId(current.clientId ?? '');
-        setAutoUploadExports(current.autoUploadExports);
-      }
+      setAutoUploadExports(current.autoUploadExports);
       if (current.connected) setMessage(`Connected as ${current.accountEmail ?? 'Google account'}.`);
     }).catch((error: unknown) => {
       if (!cancelled) setMessage(error instanceof Error ? error.message : 'Google Drive settings could not be inspected.');
@@ -44,14 +37,18 @@ export function CloudStorageDialog({ open, onClose, onUploadProject, onUploadOri
 
   if (!open) return null;
 
-  const configure = async (event: FormEvent): Promise<void> => {
-    event.preventDefault();
+  const configure = async (enabled: boolean): Promise<void> => {
+    const previous = autoUploadExports;
+    setAutoUploadExports(enabled);
     setBusy(true);
     try {
-      const next = await application.manageCloudStorage.configure(new ConfigureCloudStorageMessage(clientId, autoUploadExports));
+      const next = await application.manageCloudStorage.configure(new ConfigureCloudStorageMessage(enabled));
       setStatus(next);
-      setMessage('Google Drive configuration saved locally. Connect from the button below when you want to use it.');
-    } catch (error: unknown) { setMessage(error instanceof Error ? error.message : 'Google Drive could not be configured.'); }
+      setMessage(enabled ? 'Future photo exports will also be copied to Google Drive.' : 'Automatic Drive upload is off. Explicit uploads remain available.');
+    } catch (error: unknown) {
+      setAutoUploadExports(previous);
+      setMessage(error instanceof Error ? error.message : 'Google Drive could not be configured.');
+    }
     finally { setBusy(false); }
   };
 
@@ -61,7 +58,8 @@ export function CloudStorageDialog({ open, onClose, onUploadProject, onUploadOri
     try {
       const next = await application.manageCloudStorage.connect();
       setStatus(next);
-      setMessage(`Connected as ${next.accountEmail ?? 'Google account'}. Google keeps the account session; RAWcket keeps the short-lived access token only in this tab.`);
+      const restored = await application.restoreAiFromAccount.restore();
+      setMessage(`Connected as ${next.accountEmail ?? 'Google account'}.${restored ? ' Your saved OpenAI key is ready for this session.' : ''} Google keeps the account session; RAWcket keeps the short-lived access token only in this tab.`);
     } catch (error: unknown) { setMessage(error instanceof Error ? error.message : 'Google sign-in was not completed.'); }
     finally { setBusy(false); }
   };
@@ -84,25 +82,20 @@ export function CloudStorageDialog({ open, onClose, onUploadProject, onUploadOri
   return <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="dialog cloud-storage-dialog" role="dialog" aria-modal="true" aria-labelledby="cloud-storage-title" onMouseDown={(event) => event.stopPropagation()}>
       <div className="dialog-heading"><div><span className="eyebrow">Optional cloud storage</span><h2 id="cloud-storage-title">Google Drive</h2></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close Google Drive settings">×</button></div>
-      <p className="notice warning">Local projects remain the source of truth. Google receives a file only when you upload it or enable export upload. OpenAI keys and Google access tokens never enter projects or bundles.</p>
-      <form onSubmit={(event) => void configure(event)}>
-        <label className="field-label" htmlFor="google-client-id">Google OAuth Web Client ID</label>
-        <input id="google-client-id" type="text" value={clientId} disabled={busy} placeholder="123…apps.googleusercontent.com" onChange={(event) => { draftTouched.current = true; setClientId(event.target.value); }} />
-        <a className="provider-setup-link" href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noreferrer noopener">Create or manage a Google OAuth client ↗</a>
-        <label className="check-row"><input type="checkbox" checked={autoUploadExports} disabled={busy} onChange={(event) => { draftTouched.current = true; setAutoUploadExports(event.target.checked); }} /> Automatically upload future photo exports</label>
-        <button className="button ghost full" type="submit" disabled={busy || clientId.trim().length === 0}>Save Google configuration</button>
-      </form>
+      <p className="notice warning">Local projects remain the source of truth. Google receives files only when you upload them or enable export upload. Account-stored OpenAI keys stay out of projects and bundles.</p>
       <div className="cloud-connection-card">
-        <strong>{status.connected ? `Connected · ${status.accountEmail ?? 'Google account'}` : status.configured ? 'Configured · not connected' : 'Not configured'}</strong>
-        <p>Google Identity Services uses the account session already open in your browser. Access tokens are short-lived and tab-only, so reconnecting may be required without re-entering your Google password.</p>
-        {status.connected ? <button className="button ghost full" type="button" disabled={busy} onClick={() => void disconnect()}>Disconnect Google Drive</button> : <button className="button primary full" type="button" disabled={busy || !status.configured} onClick={() => void connect()}>{busy ? 'Connecting…' : 'Connect Google Drive'}</button>}
+        <strong>{status.connected ? `Google account · ${status.accountEmail ?? 'connected'}` : 'Google account'}</strong>
+        <p>One Google connection enables Drive backups and the optional private OpenAI key vault. Users never paste a Google token or OAuth Client ID.</p>
+        {status.connected ? <button className="button ghost full" type="button" disabled={busy} onClick={() => void disconnect()}>Disconnect Google account</button> : <button className="button google-sign-in full" type="button" disabled={busy || !status.configured} onClick={() => void connect()}><GoogleMark />{busy ? 'Connecting…' : status.configured ? 'Continue with Google' : 'Google sign-in unavailable'}</button>}
+        {!status.configured && <small>This build needs <code>VITE_GOOGLE_CLIENT_ID</code> configured once by the RAWcket deployer.</small>}
       </div>
+      <label className="check-row"><input type="checkbox" checked={autoUploadExports} disabled={busy || !status.connected} onChange={(event) => void configure(event.target.checked)} /> Automatically upload future photo exports to Drive</label>
       {status.connected && (onUploadProject !== undefined || onUploadOriginal !== undefined) && <div className="cloud-upload-actions">
         {onUploadProject !== undefined && <button className="button ghost" type="button" disabled={busy} onClick={() => void upload(onUploadProject, 'Project bundle')}>Upload project bundle</button>}
         {onUploadOriginal !== undefined && <button className="button ghost" type="button" disabled={busy} onClick={() => void upload(onUploadOriginal, 'Original photograph')}>Upload original</button>}
       </div>}
       <p className="ai-status" aria-live="polite">{message}</p>
-      <small className="cloud-scope-note">Scope: Drive files created by RAWcket (<code>drive.file</code>), plus basic Google identity. Files are stored in visible RAWcket/Projects, RAWcket/Originals, and RAWcket/Exports folders.</small>
+      <small className="cloud-scope-note">Scopes: RAWcket-created Drive files (<code>drive.file</code>) and hidden per-app settings (<code>drive.appdata</code>), plus basic Google identity. Photos remain in visible RAWcket folders; the optional OpenAI key is stored separately in private app data.</small>
     </section>
   </div>;
 }

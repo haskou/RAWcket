@@ -11,7 +11,7 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
   ) {}
 
   public async propose(context: EditingContext): Promise<EditProposal> {
-    const result = parseAiStructuredResult(openAiEditProposalSchema, await this.client.reason({
+    const request = {
       schemaName: 'rawcket_edit_proposal',
       schema: openAiEditProposalJsonSchema,
       images: [{ label: 'current-render', preview: context.preview }],
@@ -23,9 +23,10 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
         `Project: ${context.projectName}. Current adjustment values: ${JSON.stringify(context.currentAdjustments)}.`,
         `Histogram: ${(context.shadowClipping * 100).toFixed(2)}% shadow clipping and ${(context.highlightClipping * 100).toFixed(2)}% highlight clipping.`,
         `Current tone curves: ${JSON.stringify(context.currentCurves)}. Current crop and geometry: ${JSON.stringify(context.currentViewport)}. Existing local masks: ${context.existingMaskCount}.`,
+        'The supplied image is the CURRENT rendered state after the active recipe, not the untouched original. Judge it as shown and propose absolute final settings that build on that current state.',
         'Return a candid critique, strengths, opportunities, a concrete suggestedIntent, and a complete editable proposal in this single response.',
         'Judge the visible photograph, preserve believable color and texture, and propose any combination of global adjustments, monotonic-cubic tone curves, crop and geometry, radial masks, linear gradient masks, luminance-range masks, and point-guided smart masks that materially supports the intent.',
-        'Always evaluate whether a tighter crop, rotation, or perspective correction improves hierarchy. Include a viewport operation when it does; do not omit crop merely because it is structurally more complex than a slider.',
+        'Make an explicit framing decision on every request. Unless the current frame is already clearly optimal, include exactly one viewport operation with a purposeful crop and any justified rotation or perspective correction. Never omit a beneficial crop merely because it is more complex than a slider, and explain the compositional gain.',
         'Use smart-mask only for a visually identifiable subject or region. Supply normalized positive/negative points and optional bounding boxes; the resulting local spatial-luminance segmentation remains editable in RAWcket.',
         'Return absolute slider values, not deltas. Exposure must be between -5 and 5. Sharpness and noiseReduction must be between 0 and 100; every other value must be between -100 and 100.',
         'Curve points use normalized x/y coordinates, must start at (0,0), end at (1,1), and have strictly increasing unique x values. Keep curves purposeful and normally use 3–6 points.',
@@ -33,7 +34,17 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
         'Horizontal and vertical perspective corrections range from -100 to 100. Keep both at zero unless visible converging architecture or a receding plane clearly benefits from a bounded keystone correction.',
         'Do not claim that edits were applied. Explain the visual reasoning so every proposed value remains reviewable.'
       ].join('\n')
-    }), 'an editing proposal');
+    };
+    let result = parseAiStructuredResult(openAiEditProposalSchema, await this.client.reason(request), 'an editing proposal');
+    const missing = this.missingExplicitTools(context, result);
+    if (missing.length > 0) {
+      result = parseAiStructuredResult(openAiEditProposalSchema, await this.client.reason({
+        ...request,
+        instructions: `${request.instructions}\nYour previous proposal contradicted the requested/recommended edit by omitting: ${missing.join(', ')}. Return a corrected complete proposal and include those operation kinds explicitly.`
+      }), 'a repaired editing proposal');
+      const stillMissing = this.missingExplicitTools(context, result);
+      if (stillMissing.length > 0) throw new Error(`AI Companion omitted required ${stillMissing.join(' and ')} operations twice. No incomplete proposal was accepted.`);
+    }
     return {
       suggestedIntent: result.suggestedIntent,
       critique: result.critique,
@@ -42,5 +53,13 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
       explanation: result.explanation,
       operations: this.mapper.map(result)
     };
+  }
+
+  private missingExplicitTools(context: EditingContext, result: { suggestedIntent: string; explanation: string; operations: Array<{ kind: string }> }): string[] {
+    const requested = `${context.intent ?? ''} ${result.suggestedIntent} ${result.explanation}`;
+    const missing: string[] = [];
+    if (/(crop|cropping|reframe|reframing|recort|encuadr)/iu.test(requested) && !result.operations.some((operation) => operation.kind === 'viewport')) missing.push('crop/viewport');
+    if (/(tone curve|curves|curve|curvas|curva)/iu.test(context.intent ?? '') && !result.operations.some((operation) => operation.kind === 'tone-curve')) missing.push('tone-curve');
+    return missing;
   }
 }

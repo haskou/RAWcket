@@ -2,6 +2,8 @@ import { Queue, QueueOptions } from '@haskou/flow';
 import { ConfigureAi } from '@/contexts/ai/application/configure-ai/ConfigureAi';
 import { InspectAiConfiguration } from '@/contexts/ai/application/inspect-ai-configuration/InspectAiConfiguration';
 import { RemoveAi } from '@/contexts/ai/application/remove-ai/RemoveAi';
+import { RemoveAiFromAccount } from '@/contexts/ai/application/remove-ai-from-account/RemoveAiFromAccount';
+import { RestoreAiFromAccount } from '@/contexts/ai/application/restore-ai-from-account/RestoreAiFromAccount';
 import { ManageCloudStorage } from '@/contexts/cloud-storage/application/manage-cloud-storage/ManageCloudStorage';
 import { BrowserGoogleDriveGateway } from '@/contexts/cloud-storage/infrastructure/google/BrowserGoogleDriveGateway';
 import { UnlockAi } from '@/contexts/ai/application/unlock-ai/UnlockAi';
@@ -29,6 +31,7 @@ import { ManageRecipePresets } from '@/contexts/projects/application/manage-reci
 import { InspectSourceImage } from '@/contexts/projects/application/inspect-source-image/InspectSourceImage';
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
 import { SuggestPhotoTags } from '@/contexts/projects/application/suggest-photo-tags/SuggestPhotoTags';
+import { SuggestAutomaticEnhancement } from '@/contexts/projects/application/suggest-automatic-enhancement/SuggestAutomaticEnhancement';
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
 import { RequestPhotoOpinion } from '@/contexts/projects/application/request-photo-opinion/RequestPhotoOpinion';
@@ -93,6 +96,7 @@ export type Application = {
   pasteDevelopmentSettings: PasteDevelopmentSettings;
   saveProject: SaveProject;
   suggestPhotoTags: SuggestPhotoTags;
+  suggestAutomaticEnhancement: SuggestAutomaticEnhancement;
   deleteProject: DeleteProject;
   decideAiDevelopmentAdvice: DecideAiDevelopmentAdvice;
   duplicateProject: DuplicateProject;
@@ -104,6 +108,8 @@ export type Application = {
   inspectAiConfiguration: InspectAiConfiguration;
   unlockAi: UnlockAi;
   removeAi: RemoveAi;
+  removeAiFromAccount: RemoveAiFromAccount;
+  restoreAiFromAccount: RestoreAiFromAccount;
   manageCloudStorage: ManageCloudStorage;
   persistentStorage: PersistentStorageRequest;
   renderProjectPreview: RenderProjectPreview;
@@ -152,6 +158,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const sourceImageInspector = new BrowserSourceImageInspector();
   const projectSidecarCodec = new JsonProjectSidecarCodec();
   const aiCredentialVault = new BrowserApiKeyVault(settings);
+  const googleDrive = new BrowserGoogleDriveGateway(settings, import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '');
   const openAi = new OpenAiResponsesClient(aiCredentialVault, new BrowserAiImageEncoder());
   return {
     createProject: new CreateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
@@ -169,6 +176,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     pasteDevelopmentSettings: new PasteDevelopmentSettings(developmentSettingsClipboard),
     saveProject: new SaveProject(projects),
     suggestPhotoTags: new SuggestPhotoTags(semanticSegmentationModel),
+    suggestAutomaticEnhancement: new SuggestAutomaticEnhancement(),
     deleteProject: new DeleteProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     decideAiDevelopmentAdvice: new DecideAiDevelopmentAdvice(),
     duplicateProject: new DuplicateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
@@ -176,11 +184,13 @@ export function createApplication(databaseName = 'rawcket'): Application {
     sourceFiles,
     projectExporter: bundle,
     projectImporter: bundle,
-    configureAi: new ConfigureAi(aiCredentialVault),
+    configureAi: new ConfigureAi(aiCredentialVault, googleDrive),
     inspectAiConfiguration: new InspectAiConfiguration(aiCredentialVault),
     unlockAi: new UnlockAi(aiCredentialVault),
     removeAi: new RemoveAi(aiCredentialVault),
-    manageCloudStorage: new ManageCloudStorage(new BrowserGoogleDriveGateway(settings)),
+    removeAiFromAccount: new RemoveAiFromAccount(googleDrive),
+    restoreAiFromAccount: new RestoreAiFromAccount(googleDrive, aiCredentialVault),
+    manageCloudStorage: new ManageCloudStorage(googleDrive),
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi, new OpenAiEditProposalMapper())),

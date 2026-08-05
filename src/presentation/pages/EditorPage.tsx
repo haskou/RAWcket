@@ -29,6 +29,7 @@ import { RenderProjectPreviewMessage } from '@/contexts/projects/application/ren
 import { RecordAiDevelopmentAdviceMessage } from '@/contexts/projects/application/record-ai-development-advice/messages/RecordAiDevelopmentAdviceMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
 import { ReviewDevelopmentMessage } from '@/contexts/projects/application/review-development/messages/ReviewDevelopmentMessage';
+import { SuggestAutomaticEnhancementMessage } from '@/contexts/projects/application/suggest-automatic-enhancement/messages/SuggestAutomaticEnhancementMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
 import type { DevelopmentGuidanceItem } from '@/contexts/projects/application/ports/DevelopmentTutor';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
@@ -44,7 +45,6 @@ import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectU
 import { CurveSet, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
-import { GlobalAdjustmentValue } from '@/contexts/projects/domain/value-objects/GlobalAdjustmentValue';
 import type { SemanticMaskCategoryPrimitive } from '@/contexts/projects/domain/value-objects/SemanticMaskCategory';
 import { useApplication } from '../ApplicationContext';
 import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
@@ -75,7 +75,7 @@ type BrushGesture = { pointerId: number; maskId: string; groupId: string };
 type CropGesture = { pointerId: number; start: { x: number; y: number } };
 type AiPointPolarity = 'positive' | 'negative';
 type ImageDimensions = { width: number; height: number };
-type PendingAiAction = 'companion' | null;
+type PendingAiAction = 'opinion' | 'prompt' | null;
 
 const minimumZoom = 0.1;
 const maximumZoom = 8;
@@ -156,6 +156,7 @@ export function EditorPage(): ReactElement {
   const horizonAbort = useRef<AbortController | null>(null);
   const recipePresetInput = useRef<HTMLInputElement>(null);
   const semanticAbort = useRef<AbortController | null>(null);
+  const semanticInstallAbort = useRef<AbortController | null>(null);
   const renderSequence = useRef(0);
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [beforeSource, setBeforeSource] = useState<Blob | null>(null);
@@ -204,8 +205,7 @@ export function EditorPage(): ReactElement {
   const [semanticTask, setSemanticTask] = useState<SemanticModelTask>(null);
   const [semanticProgress, setSemanticProgress] = useState(0);
   const [semanticCategory, setSemanticCategory] = useState<SemanticMaskCategoryPrimitive>('sky');
-  const [semanticConsent, setSemanticConsent] = useState(false);
-  const [semanticMessage, setSemanticMessage] = useState('The semantic model is optional. Manual and point-guided masks always remain available.');
+  const [semanticMessage, setSemanticMessage] = useState('Preparing the verified local segmentation model automatically…');
   const [horizonBusy, setHorizonBusy] = useState(false);
   const [horizonMessage, setHorizonMessage] = useState('Local edge analysis can estimate a dominant horizon or architectural vertical.');
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -214,6 +214,36 @@ export function EditorPage(): ReactElement {
   const autosave = useProjectAutosave(project, revision, save);
   const semanticDescriptor = application.manageSemanticSegmentationModel.describe();
 
+  const prepareSemanticModel = useCallback(async (): Promise<void> => {
+    if (semanticInstallAbort.current !== null) return;
+    let controller: AbortController | null = null;
+    try {
+      const status = await application.manageSemanticSegmentationModel.inspect();
+      setSemanticStatus(status);
+      if (status !== 'not-installed') return;
+      controller = new AbortController();
+      semanticInstallAbort.current = controller;
+      setSemanticTask('installing');
+      setSemanticProgress(0);
+      setSemanticMessage('Downloading and verifying the local segmentation model automatically…');
+      await application.manageSemanticSegmentationModel.install({ signal: controller.signal, onProgress: setSemanticProgress });
+      setSemanticStatus('installed');
+      setSemanticProgress(1);
+      setSemanticMessage('Local semantic selection is ready. The photograph never leaves this device.');
+    } catch (error: unknown) {
+      const status = await application.manageSemanticSegmentationModel.inspect().catch(() => 'unavailable' as const);
+      setSemanticStatus(status);
+      setSemanticMessage(error instanceof DOMException && error.name === 'AbortError'
+        ? 'The local model download paused when this workspace closed.'
+        : error instanceof Error ? `${error.message} Retry the local download below.` : 'The local semantic model could not be prepared.');
+    } finally {
+      if (semanticInstallAbort.current === controller) {
+        semanticInstallAbort.current = null;
+        setSemanticTask(null);
+      }
+    }
+  }, [application]);
+
   useEffect(() => {
     let mounted = true;
     void application.manageRecipePresets.list().then((presets) => {
@@ -221,19 +251,16 @@ export function EditorPage(): ReactElement {
     }).catch((error: unknown) => {
       if (mounted) setRecipePresetMessage(error instanceof Error ? error.message : 'Recipe presets could not be loaded.');
     });
-    void application.manageSemanticSegmentationModel.inspect().then((status) => {
-      if (mounted) setSemanticStatus(status);
-    }).catch((error: unknown) => {
-      if (!mounted) return;
-      setSemanticStatus('unavailable');
-      setSemanticMessage(error instanceof Error ? error.message : 'The local semantic model could not be inspected.');
-    });
+    void prepareSemanticModel();
     return () => {
       mounted = false;
       semanticAbort.current?.abort();
+      const installController = semanticInstallAbort.current;
+      semanticInstallAbort.current = null;
+      installController?.abort();
       horizonAbort.current?.abort();
     };
-  }, [application]);
+  }, [application, prepareSemanticModel]);
 
   useEffect(() => {
     const load = async (): Promise<void> => {
@@ -718,40 +745,13 @@ export function EditorPage(): ReactElement {
     setAiPointActive(true);
   };
 
-  const installSemanticModel = async (): Promise<void> => {
-    if (!semanticConsent || semanticTask !== null) return;
-    const controller = new AbortController();
-    semanticAbort.current = controller;
-    setSemanticTask('installing');
-    setSemanticProgress(0);
-    setSemanticMessage('Downloading the pinned model and verifying every resource locally…');
-    try {
-      await application.manageSemanticSegmentationModel.install({
-        signal: controller.signal,
-        onProgress: setSemanticProgress
-      });
-      setSemanticStatus('installed');
-      setSemanticProgress(1);
-      setSemanticMessage('Local semantic selection is ready. The photograph never leaves this device.');
-    } catch (error: unknown) {
-      setSemanticStatus(await application.manageSemanticSegmentationModel.inspect());
-      setSemanticMessage(error instanceof DOMException && error.name === 'AbortError'
-        ? 'Model download cancelled. Any verified partial download can resume later.'
-        : error instanceof Error ? error.message : 'The local semantic model could not be installed.');
-    } finally {
-      semanticAbort.current = null;
-      setSemanticTask(null);
-    }
-  };
-
   const removeSemanticModel = async (): Promise<void> => {
     if (semanticTask !== null) return;
     try {
       await application.manageSemanticSegmentationModel.remove();
       setSemanticStatus('not-installed');
-      setSemanticConsent(false);
       setSemanticProgress(0);
-      setSemanticMessage('The local semantic model and its browser cache were removed.');
+      setSemanticMessage('The local model cache was removed. RAWcket will download it again automatically the next time local segmentation starts.');
     } catch (error: unknown) {
       setSemanticMessage(error instanceof Error ? error.message : 'The local semantic model could not be removed.');
     }
@@ -794,24 +794,27 @@ export function EditorPage(): ReactElement {
     setAiPointActive(false);
   };
 
-  const generateAiProposal = async (): Promise<void> => {
+  const generateAiProposal = async (request: string, pendingAction: Exclude<PendingAiAction, null>): Promise<void> => {
     if (project === null || preview === null) return;
     const configuration = await application.inspectAiConfiguration.inspect();
     if (!configuration.ready) {
-      setPendingAiAction('companion');
-      setAiMessage('Configure OpenAI API to ask the Companion. Your draft will be kept.');
+      setPendingAiAction(pendingAction);
+      setAiMessage(pendingAction === 'opinion'
+        ? 'Configure OpenAI API to ask for an opinion. RAWcket will continue afterwards.'
+        : 'Configure OpenAI API to generate this proposal. Your written brief will be kept.');
       setSettingsOpen(true);
       return;
     }
     setAiGenerating(true);
-    setAiMessage('Reviewing subject, story, light, crop, curves, geometry, and local masks in one request…');
+    setAiMessage(pendingAction === 'opinion'
+      ? 'Reviewing the photograph and writing an editable intent and proposal in one request…'
+      : 'Turning your written intent into an editable proposal with crop, curves, geometry, and local masks…');
     try {
-      const request = aiPrompt;
       const proposal = await application.requestEditingAdvice.propose(
         project,
         new RequestEditingAdviceMessage(
           projectId,
-          aiPrompt,
+          request,
           preview,
           previewAnalysis?.shadowClipping ?? 0,
           previewAnalysis?.highlightClipping ?? 0
@@ -832,7 +835,7 @@ export function EditorPage(): ReactElement {
         proposal.explanation,
         proposal.operations
       ));
-      setAiPrompt(proposal.suggestedIntent);
+      if (pendingAction === 'opinion') setAiPrompt(proposal.suggestedIntent);
       setAiProposal(proposal);
       setAiProposalId(adviceId);
       setAiSelection(new Set(proposal.operations.map((_, index) => index)));
@@ -846,31 +849,23 @@ export function EditorPage(): ReactElement {
   };
 
   const applyClassicAutoEnhance = (): void => {
-    if (project === null) return;
-    const current = project.toPrimitives().recipe;
-    const additions = builtInPreset('Natural').globalAdjustments;
-    const changedKeys = (Object.keys(additions) as AdjustmentKeyPrimitive[]).filter((key) => additions[key] !== 0);
-    const globalAdjustments = { ...current.globalAdjustments };
-    changedKeys.forEach((key) => {
-      const adjustmentKey = AdjustmentKey.fromPrimitives(key);
-      globalAdjustments[key] = GlobalAdjustmentValue.clamp(adjustmentKey, globalAdjustments[key] + additions[key]).valueOf();
-    });
-    apply({
-      kind: EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS,
-      settings: {
-        globalAdjustments,
-        curves: current.curves,
-        disabledGlobalAdjustments: current.disabledGlobalAdjustments.filter((key) => !changedKeys.includes(key))
-      },
-      groupId: null
-    });
-    setAiMessage('Classic Auto Enhance added bounded tonal/detail deltas to the current recipe. Existing curves and unrelated edits were preserved.');
+    if (project === null || previewAnalysis === null) {
+      setAiMessage('Auto Enhance needs the rendered histogram before it can make a safe correction.');
+      return;
+    }
+    const suggestion = application.suggestAutomaticEnhancement.suggest(
+      project,
+      new SuggestAutomaticEnhancementMessage(projectId, previewAnalysis.shadowClipping, previewAnalysis.highlightClipping)
+    );
+    if (suggestion.operation !== null) apply(suggestion.operation);
+    setAiMessage(suggestion.explanation);
   };
 
   const continuePendingAiAction = (): void => {
     const pending = pendingAiAction;
     setPendingAiAction(null);
-    if (pending === 'companion') void generateAiProposal();
+    if (pending === 'opinion') void generateAiProposal('', 'opinion');
+    if (pending === 'prompt') void generateAiProposal(aiPrompt, 'prompt');
   };
 
   const applyAiProposal = (): void => {
@@ -1155,6 +1150,7 @@ export function EditorPage(): ReactElement {
           <button className="icon-button" type="button" onClick={() => setPhotoInformationOpen(true)} aria-label="Photo information">ⓘ</button>
           <button className="icon-button" type="button" onClick={() => setHistoryOpen(true)} aria-label="Visual history">≡</button>
         </div>
+        {semanticTask === 'installing' && <div className="local-model-header-progress" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span>Local AI · {Math.round(semanticProgress * 100)}%</span></div>}
         <button className="button ghost" type="button" onClick={() => setCloudStorageOpen(true)}>Drive</button>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
@@ -1239,9 +1235,10 @@ export function EditorPage(): ReactElement {
           </div>
           {toolWorkspace === 'ai' ? <>
           <ToolSection id="ai" title="AI Companion" active onToggle={openPanel} badge="Core workflow">
-            <div className="development-tutor" aria-label="Local development tutor">
-              <div className="development-tutor-heading"><span aria-hidden="true">◇</span><div><strong>Local Development Tutor</strong><small>Measured, explainable, never auto-applied</small></div></div>
-              {developmentGuidance.length === 0 ? <p>Waiting for the rendered frame analysis…</p> : developmentGuidance.map((item) => (
+            <details className="development-tutor" aria-label="Technical image checks">
+              <summary className="development-tutor-heading"><span aria-hidden="true">◇</span><span><strong>Technical checks</strong><small>{previewAnalysis === null ? 'Analyzing the rendered frame…' : developmentGuidance.length === 0 ? 'No material issues detected' : `${developmentGuidance.length} item${developmentGuidance.length === 1 ? '' : 's'} worth checking`}</small></span></summary>
+              <p>Optional, measurement-based warnings about clipping or unusually strong combinations. They are not aesthetic judgments and never change the recipe.</p>
+              {developmentGuidance.map((item) => (
                 <button className={`guidance-item ${item.severity}`} type="button" key={`${item.title}-${item.evidence}`} onClick={() => openPanel(item.targetPanel)}>
                   <span><strong>{item.title}</strong><small>{item.kind === 'measurement' ? 'Measured fact' : 'Review suggestion'}</small></span>
                   <p>{item.detail}</p>
@@ -1249,13 +1246,15 @@ export function EditorPage(): ReactElement {
                   <b>Open {item.targetPanel} →</b>
                 </button>
               ))}
-            </div>
+            </details>
             <label className="field-label" htmlFor="ai-edit-prompt">What should RAWcket create?</label>
             <div className="ai-prompt-shell">
-              <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} disabled={aiGenerating} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Describe a result, or leave this empty and ask RAWcket for its opinion." />
-              <button className="ai-prompt-submit" type="button" aria-label="Ask AI Companion and generate proposal" title="Review the photograph and create one editable proposal" disabled={aiGenerating || preview === null} onClick={() => void generateAiProposal()}>{aiGenerating ? <span className="mini-spinner" aria-hidden="true" /> : <span aria-hidden="true">✦</span>}</button>
+              <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} disabled={aiGenerating} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Write the result you want, then generate a proposal. Or ask for an opinion first." />
+              <button className="ai-prompt-submit" type="button" aria-label="Ask AI Companion for an opinion" title="Ask RAWcket to assess the photograph, write the intent, and prepare a proposal" disabled={aiGenerating || preview === null} onClick={() => void generateAiProposal('', 'opinion')}>{aiGenerating ? <span className="mini-spinner" aria-hidden="true" /> : <span aria-hidden="true">✦</span>}</button>
             </div>
-            <button className="button ghost full" type="button" disabled={aiGenerating} title="Adds bounded Natural preset deltas without removing existing curves or unrelated edits" onClick={applyClassicAutoEnhance}>Auto Enhance · additive · no AI</button>
+            <button className="button ai-primary full" type="button" disabled={aiGenerating || preview === null || aiPrompt.trim().length === 0} onClick={() => void generateAiProposal(aiPrompt, 'prompt')}>Generate proposal from my text</button>
+            <button className="button ghost full" type="button" disabled={aiGenerating || previewAnalysis === null} title="Corrects only material output clipping; never changes color, detail, curves, crop, or masks" onClick={applyClassicAutoEnhance}>Auto Enhance</button>
+            <p className="auto-enhance-explanation">Uses the rendered histogram only when highlights or shadows are materially clipped. If no safe technical correction is needed, it changes nothing.</p>
             {aiGenerating && <div className="ai-working-state" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>AI Companion is building one editable proposal</strong><small>Reviewing framing, curves, geometry, light, and local masks. The current recipe is unchanged while you wait.</small></span></div>}
             <p className="ai-status" aria-live="polite">{aiMessage}</p>
             {aiProposal !== null && (
@@ -1299,12 +1298,10 @@ export function EditorPage(): ReactElement {
               task={semanticTask}
               progress={semanticProgress}
               category={semanticCategory}
-              consented={semanticConsent}
               message={semanticMessage}
               previewAvailable={preview !== null}
               onCategoryChange={setSemanticCategory}
-              onConsentChange={setSemanticConsent}
-              onInstall={() => void installSemanticModel()}
+              onInstall={() => void prepareSemanticModel()}
               onCancel={() => semanticAbort.current?.abort()}
               onRemove={() => void removeSemanticModel()}
               onGenerate={() => void generateSemanticMask()}

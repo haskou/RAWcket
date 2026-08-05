@@ -10,7 +10,7 @@ describe('ReviewDevelopment', () => {
 
     const guidance = review.review(
       project,
-      new ReviewDevelopmentMessage(project.getId().valueOf(), 0.02, 0.03)
+      new ReviewDevelopmentMessage(project.getId().valueOf(), 0.04, 0.03)
     );
 
     expect(guidance).toEqual(expect.arrayContaining([

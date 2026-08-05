@@ -15,7 +15,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Rendered non-destructive crop/geometry, before/after, masks, histogram, and clipping.
 - [x] Local reviewable AI proposals, measurement-backed tutor, and deterministic smart-point masks.
 - [x] Consented, pinned, integrity-verified ONNX semantic model with removable local storage and WebGPU/WASM execution.
-- [x] Dedicated import/dropzone dialog with consented on-device semantic tags applied as editable project tags.
+- [x] Dedicated import/dropzone dialog with automatically prepared on-device semantic tags applied as editable project tags.
 - [x] JPEG/PNG/TIFF worker export with resize, progress, and cancellation.
 - [x] ARW embedded-preview extraction while preserving the original RAW.
 - [x] LibRaw/WASM mosaic development to linear 16-bit RGB, bounded input/output memory, camera white balance/matrix settings, visible embedded-preview fallback, and no silent export fallback.
@@ -139,11 +139,11 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented foundation.** Positive/negative points and editable bounding boxes persist as normal AI-mask recipe data. The current `local-spatial-luminance` strategy is deterministic, offline, requires no download, and is labeled honestly rather than presented as SAM.
 
-**Implemented.** An optional pinned SegFormer ONNX model is disclosed before download, stored in a dedicated Cache Storage namespace, and checked against exact byte sizes and SHA-256 hashes. Installation, inference, and removal are explicit; network and active inference are cancellable; WebGPU is preferred with a WASM fallback; the deterministic point-guided and manual paths remain available.
+**Implemented.** A pinned SegFormer ONNX model is prepared automatically with visible progress, stored in a dedicated Cache Storage namespace, and checked against exact byte sizes and SHA-256 hashes. Model-dependent controls remain blocked until it is ready; network and active inference are cancellable; WebGPU is preferred with a WASM fallback; the deterministic point-guided and manual paths remain available.
 
 **Remaining.** Evaluate SAM 2 or a compatible promptable alternative; compute one embedding per preview; decode subsequent prompts quickly; offer light/advanced models; and add preview/model-hash cache reuse.
 
-**Acceptance.** Nothing downloads without consent; cancellation stops network and compute; embeddings reuse a preview/model hash; the project preserves prompts/points/boxes/model/version rather than depending on a raster; the model works offline after download; unsupported devices retain manual tools.
+**Acceptance.** Preparation progress is visible and dependent actions remain blocked until verification; cancellation stops network and compute; embeddings reuse a preview/model hash; the project preserves prompts/points/boxes/model/version rather than depending on a raster; the model works offline after download; unsupported devices retain manual tools.
 
 **Risks.** Model size, RAM/VRAM, WebGPU support, warm-up time, output quality, model supply chain, quota, obsolete weights.
 
@@ -173,7 +173,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Propose explainable, bounded edits without giving AI direct authority over a project.
 
-**Implemented.** OpenAI is the first provider adapter. Provider, key, and vision-capable model are configured explicitly; no model is silently selected. Missing configuration opens setup and resumes the pending Companion or contact-sheet action after success. One Companion request now evaluates subject, story, light, focus, crop potential, curves, geometry, and local-mask opportunities; it returns the suggested intent, critique, strengths, opportunities, explanation, and editable proposal together. AI Companion sends a reduced JPEG preview plus rendered clipping measurements through the Responses API with `store: false`, requests strict structured JSON, validates it again with Zod and domain Value Objects, and returns ordinary reviewable operations. Proposals can combine global adjustments, monotonic-cubic RGB/channel/luminance curves, crop/translation/scale/rotation/flips/aspect ratio, editable radial, linear-gradient, or luminance-range masks, and point/box-guided smart masks. A visible cancellable-looking work state keeps the current recipe and previous preview unchanged while the response is pending. Classic Auto Enhance is clearly labelled deterministic non-AI behavior and adds bounded deltas without replacing existing curves, geometry, masks, or unrelated adjustments.
+**Implemented.** OpenAI is the first provider adapter and `gpt-5.6-luna` is the visible editable default. Missing configuration opens setup and resumes the pending action. Companion evaluates the current rendered state plus the active sliders, curves, viewport, and mask count. It can return global adjustments, monotonic-cubic curves, crop/geometry, and editable local masks. A crop or curve explicitly requested or recommended cannot silently disappear: RAWcket repairs one inconsistent provider response and rejects a second omission. The photographer's written brief remains unchanged; only the opinion action fills it from AI. Auto Enhance now reacts only to material rendered clipping and otherwise performs no operation.
 
 **Remaining optional cloud scope.** A future local VLM, per-request cost/token estimates, cancellation, provider/model capability discovery, weaker proposal variants, and selected opt-in EXIF/noise facts. Never send full RAW or log images.
 
@@ -185,7 +185,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Teach photographic decisions without replacing the user’s judgment.
 
-**Implemented.** The Local Development Tutor distinguishes measured facts from suggestions, explains rendered clipping, flags likely noise after strong shadow lift, warns when clarity and sharpening compound, and links directly to the relevant panel. It never auto-applies advice.
+**Implemented.** Collapsible Technical checks distinguish measured facts from suggestions, explain material rendered clipping, flag likely noise only after a strong shadow lift, warn when high clarity and sharpening compound, and link directly to the relevant panel. A clean image stays quiet and advice is never auto-applied.
 
 **Remaining.** White-balance/curve lessons, unrecoverable RAW-data analysis after LibRaw, guided/copilot/manual modes, consequence previews, and opt-in local preference learning.
 
@@ -217,7 +217,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** A persistent write-ahead journal covers create, duplicate, bundle import, and delete across IndexedDB/OPFS. All mutations and startup reconciliation share one FIFO queue. Recovery completes interrupted deletes and removes only sources proven orphaned by journal state; missing referenced originals produce an actionable warning instead of deletion.
 
-**Implemented optional cloud backup.** A user-configured Google OAuth Web Client ID enables Google Identity Services without a bundled credential. The `drive.file` adapter holds its short-lived access token in memory only, reuses the browser's Google account session when Google permits it, creates visible RAWcket/Projects, Originals, and Exports folders, uploads bundles and originals explicitly, and can auto-upload future final photo exports after opt-in. Local projects remain authoritative.
+**Implemented optional Google account.** The deployer configures the public Web Client ID through `VITE_GOOGLE_CLIENT_ID`; photographers see a real Continue with Google action and never paste a Google token or Client ID. The short-lived access token remains memory-only. `drive.file` powers visible RAWcket backup folders, while `drive.appdata` can hold the optional OpenAI credential in hidden per-app storage so it restores after sign-in without a RAWcket master password. Local projects remain authoritative.
 
 **Remaining.** Optional File System Access links, Drive conflict/version reconciliation, background resumable uploads for very large RAW files, and future collections.
 
@@ -229,9 +229,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Reduce local and optional-integration risk with understandable controls.
 
-**Implemented.** API keys are either session-only and never persisted or saved with AES-GCM/PBKDF2-SHA-256 encryption and a non-persisted master password. Encrypted storage is the setup default and no unencrypted persistence path exists. Removal clears session/device settings. RAWcket has no analytics and its production CSP excludes `unsafe-eval`, objects, and all unlisted scripts, frames, and network origins. The only external script/frame allowance is the explicit Google Identity Services origin used by optional Drive storage.
+**Implemented.** API keys may be session-only, AES-GCM/PBKDF2 encrypted on-device, or stored in Google Drive's hidden app-specific folder after explicit Google sign-in. The Google option removes RAWcket password prompts but is account-protected storage, not RAWcket end-to-end encryption. RAWcket has no analytics and its CSP excludes `unsafe-eval`, objects, and all unlisted origins.
 
-**Implemented.** The OpenAI adapter reduces previews to bounded JPEGs, sets API response storage off, keeps the model explicit, schema-validates every result, never reads keys from serializable project state, and returns provider failures without response bodies or secret-bearing errors. Google Drive stores only the non-secret Client ID and preference; its access token is tab-memory-only and revoked on disconnect. The CSP permits the explicit OpenAI endpoint, pinned local-model hosts, and only the Google Identity/Drive origins required by the optional adapter.
+**Implemented.** The OpenAI adapter reduces previews to bounded JPEGs, sets API response storage off, schema-validates every result, and never reads keys from serializable project state. The public Google Client ID is build configuration, the access token is tab-memory-only, and the optional OpenAI key is isolated in `appDataFolder`; credentials remain excluded from projects and bundles.
 
 **Remaining.** Trusted Types compatibility, automated dependency/supply-chain auditing, verifiable browser-storage deletion caveats, a per-request confirmation mode, opt-in telemetry controls if telemetry is ever added, and clearer provider retention/account-policy links.
 
@@ -245,7 +245,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** The service-worker app shell, offline-ready notice, outdated-cache cleanup, and a new-version prompt that can be postponed rather than auto-activating while editing.
 
-**Implemented.** The semantic model is downloaded only from an explicit AI control that shows its source, pinned revision, model size, possible compatibility-runtime size, status, terms link, progress, cancellation, and removal.
+**Implemented.** The semantic model prepares itself automatically from model-dependent surfaces. RAWcket shows its source, pinned revision, status, terms link, progress, cancellation, and removal, and blocks only the dependent actions until it is ready.
 
 **Implemented.** Chromium-compatible installation is offered as a quiet library-header action only after the browser emits its installability event. RAWcket suppresses the browser's ambient prompt and never opens installation without an explicit click; unsupported or already-installed environments show nothing.
 

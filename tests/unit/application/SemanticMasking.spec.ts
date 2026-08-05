@@ -104,9 +104,34 @@ describe('Semantic masking application services', () => {
     expect(manager.describe().supportedCategories).toEqual(['sky']);
     await manager.install({ signal: new AbortController().signal, onProgress: (value) => progress.push(value) });
     expect(await manager.inspect()).toBe('installed');
-    expect(progress).toEqual([1]);
+    expect(progress).toEqual([0, 1]);
     await manager.remove();
     expect(model.removed).toBe(true);
+  });
+
+  it('shares one background installation while each caller receives progress independently', async () => {
+    const model = new ControllableSemanticModel();
+    let release: (() => void) | undefined;
+    const install = vi.spyOn(model, 'install').mockImplementation((options) => new Promise<void>((resolve) => {
+      release = () => { options.onProgress?.(1); resolve(); };
+    }));
+    const manager = new ManageSemanticSegmentationModel(model);
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+    const firstProgress: number[] = [];
+    const secondProgress: number[] = [];
+    const first = manager.install({ signal: firstController.signal, onProgress: (value) => firstProgress.push(value) });
+    const second = manager.install({ signal: secondController.signal, onProgress: (value) => secondProgress.push(value) });
+
+    firstController.abort();
+    const firstResult = expect(first).rejects.toThrow(/cancelled/);
+    release?.();
+    await firstResult;
+    await second;
+
+    expect(install).toHaveBeenCalledTimes(1);
+    expect(firstProgress).toEqual([0]);
+    expect(secondProgress).toEqual([0, 1]);
   });
 
   it('turns local semantic detections into validated editable project tags', async () => {

@@ -5,8 +5,8 @@ describe('LocalDevelopmentTutor', () => {
 
   it('explains measured clipping and links it to light controls', () => {
     const guidance = tutor.review({
-      highlightClipping: 0.024,
-      shadowClipping: 0.003,
+      highlightClipping: 0.09,
+      shadowClipping: 0.06,
       adjustments: {}
     });
 
@@ -14,14 +14,14 @@ describe('LocalDevelopmentTutor', () => {
       expect.objectContaining({ title: 'Highlights touch the output ceiling', severity: 'warning', targetPanel: 'light' }),
       expect.objectContaining({ title: 'Some shadows have no output detail', targetPanel: 'light' })
     ]));
-    expect(guidance[0]?.evidence).toContain('2.4%');
+    expect(guidance[0]?.evidence).toContain('9.0%');
   });
 
   it('distinguishes suggestions inferred from the current recipe', () => {
     const guidance = tutor.review({
       highlightClipping: 0,
       shadowClipping: 0,
-      adjustments: { shadows: 60, noiseReduction: 0, clarity: 50, sharpness: 60 }
+      adjustments: { shadows: 70, noiseReduction: 0, clarity: 70, sharpness: 80 }
     });
 
     expect(guidance).toEqual(expect.arrayContaining([
@@ -30,9 +30,7 @@ describe('LocalDevelopmentTutor', () => {
     ]));
   });
 
-  it('states when there is no material technical warning without prescribing an aesthetic', () => {
-    expect(tutor.review({ highlightClipping: 0, shadowClipping: 0, adjustments: {} })).toEqual([
-      expect.objectContaining({ severity: 'neutral', targetPanel: 'curves' })
-    ]);
+  it('stays quiet when there is no material technical warning', () => {
+    expect(tutor.review({ highlightClipping: 0, shadowClipping: 0, adjustments: {} })).toEqual([]);
   });
 });

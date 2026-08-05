@@ -44,7 +44,7 @@ describe('OpenAiEditingAdvisor', () => {
     ]);
     expect(proposal.operations[2]).toMatchObject({ viewport: { horizontalPerspective: 6, verticalPerspective: -4 } });
     expect(reason.mock.calls[0]?.[0].instructions).toContain('radial masks');
-    expect(reason.mock.calls[0]?.[0].instructions).toContain('do not omit crop');
+    expect(reason.mock.calls[0]?.[0].instructions).toContain('Never omit a beneficial crop');
     expect(proposal.operations[4]).toMatchObject({ mask: { shape: { kind: 'ai-segmentation', prompt: 'face' } } });
   });
 
@@ -55,5 +55,67 @@ describe('OpenAiEditingAdvisor', () => {
       explanation: 'Invalid ordering',
       operations: [{ kind: 'tone-curve', channel: 'rgb', interpolation: 'monotonic-cubic', points: [{ x: 0, y: 0 }, { x: 0.8, y: 0.7 }, { x: 0.6, y: 0.8 }, { x: 1, y: 1 }] }]
     })).toThrow(/increasing, unique x/);
+  });
+
+  it('repairs a proposal that recommends a crop but omits the viewport operation', async () => {
+    const base = {
+      suggestedIntent: 'Aplicar un recorte leve para dirigir la mirada.',
+      critique: 'El encuadre tiene espacio prescindible.', strengths: ['Atmósfera'], opportunities: ['Recorte'],
+      explanation: 'El recorte mejora la jerarquía.',
+      operations: [{ kind: 'global-adjustment', key: 'contrast', value: 5 }]
+    };
+    const viewport = { kind: 'viewport', cropFrame: { x: 0.05, y: 0.05, width: 0.9, height: 0.9 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null };
+    const reason = vi.fn<(request: OpenAiStructuredRequest) => Promise<unknown>>()
+      .mockResolvedValueOnce(base)
+      .mockResolvedValueOnce({ ...base, operations: [...base.operations, viewport] });
+    const advisor = new OpenAiEditingAdvisor({ reason } as unknown as OpenAiResponsesClient, new OpenAiEditProposalMapper());
+
+    const proposal = await advisor.propose({
+      projectName: 'Alley', intent: '¿Aplicarías un recorte?', preview: new Blob(['preview']), shadowClipping: 0, highlightClipping: 0,
+      currentAdjustments: {},
+      currentCurves: {
+        rgb: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        red: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        green: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        blue: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' }, luminance: null
+      },
+      currentViewport: { cropFrame: { x: 0, y: 0, width: 1, height: 1 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
+      existingMaskCount: 0
+    });
+
+    expect(reason).toHaveBeenCalledTimes(2);
+    expect(reason.mock.calls[1]?.[0].instructions).toContain('crop/viewport');
+    expect(proposal.operations.some((operation) => operation.kind === EDIT_OPERATION.SET_VIEWPORT_TRANSFORM)).toBe(true);
+  });
+
+  it('repairs a proposal that omits an explicitly requested tone curve', async () => {
+    const base = {
+      suggestedIntent: 'Use a restrained tonal adjustment.',
+      critique: 'The midtones lack separation.', strengths: ['Atmosphere'], opportunities: ['Tonal structure'],
+      explanation: 'A small contrast adjustment will improve separation.',
+      operations: [{ kind: 'global-adjustment', key: 'contrast', value: 5 }]
+    };
+    const curve = { kind: 'tone-curve', channel: 'rgb', interpolation: 'monotonic-cubic', points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.2 }, { x: 0.75, y: 0.8 }, { x: 1, y: 1 }] };
+    const reason = vi.fn<(request: OpenAiStructuredRequest) => Promise<unknown>>()
+      .mockResolvedValueOnce(base)
+      .mockResolvedValueOnce({ ...base, operations: [...base.operations, curve] });
+    const advisor = new OpenAiEditingAdvisor({ reason } as unknown as OpenAiResponsesClient, new OpenAiEditProposalMapper());
+
+    const proposal = await advisor.propose({
+      projectName: 'Alley', intent: 'Apply an RGB tone curve', preview: new Blob(['preview']), shadowClipping: 0, highlightClipping: 0,
+      currentAdjustments: {},
+      currentCurves: {
+        rgb: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        red: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        green: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        blue: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' }, luminance: null
+      },
+      currentViewport: { cropFrame: { x: 0, y: 0, width: 1, height: 1 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
+      existingMaskCount: 0
+    });
+
+    expect(reason).toHaveBeenCalledTimes(2);
+    expect(reason.mock.calls[1]?.[0].instructions).toContain('tone-curve');
+    expect(proposal.operations.some((operation) => operation.kind === EDIT_OPERATION.SET_CURVE)).toBe(true);
   });
 });

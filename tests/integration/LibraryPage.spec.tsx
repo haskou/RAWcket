@@ -7,6 +7,26 @@ import { ApplicationProvider } from '@/presentation/ApplicationContext';
 import { LibraryPage } from '@/presentation/pages/LibraryPage';
 
 describe('LibraryPage', () => {
+  it('downloads the local model automatically, exposes progress, and blocks import until ready', async () => {
+    const application = createApplication(`rawcket-auto-model-${crypto.randomUUID()}`);
+    vi.spyOn(application.manageSemanticSegmentationModel, 'inspect').mockResolvedValue('not-installed');
+    let finishInstallation: (() => void) | undefined;
+    vi.spyOn(application.manageSemanticSegmentationModel, 'install').mockImplementation((options) => {
+      options.onProgress?.(0.42);
+      return new Promise<void>((resolve) => { finishInstallation = resolve; });
+    });
+    render(
+      <ApplicationProvider application={application}>
+        <MemoryRouter><LibraryPage /></MemoryRouter>
+      </ApplicationProvider>
+    );
+
+    expect(await screen.findByText('Local AI · 42%')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Local AI 42%' })).toBeDisabled();
+    finishInstallation?.();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Import image' })).toBeEnabled());
+  });
+
   it('shows the empty state and imports a local image into the editor', async () => {
     Object.defineProperty(globalThis, 'createImageBitmap', {
       value: vi.fn(() => Promise.resolve({ width: 2, height: 1, close: vi.fn() })),

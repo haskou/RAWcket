@@ -22,11 +22,9 @@ export function SemanticMaskControls({
   task,
   progress,
   category,
-  consented,
   message,
   previewAvailable,
   onCategoryChange,
-  onConsentChange,
   onInstall,
   onCancel,
   onRemove,
@@ -38,11 +36,9 @@ export function SemanticMaskControls({
   task: SemanticModelTask;
   progress: number;
   category: SemanticMaskCategoryPrimitive;
-  consented: boolean;
   message: string;
   previewAvailable: boolean;
   onCategoryChange: (category: SemanticMaskCategoryPrimitive) => void;
-  onConsentChange: (consented: boolean) => void;
   onInstall: () => void;
   onCancel: () => void;
   onRemove: () => void;
@@ -55,7 +51,7 @@ export function SemanticMaskControls({
   return <div className="semantic-mask-controls" role="region" aria-label="Local semantic masks">
     <div className="semantic-mask-heading">
       <span className="ai-orb small" aria-hidden="true">✦</span>
-      <span><strong>Semantic Select</strong><small>On-device segmentation · optional model</small></span>
+      <span><strong>Semantic Select</strong><small>On-device segmentation · prepared automatically</small></span>
     </div>
     <p>Select sky, water, vegetation, people, or buildings without uploading the photograph.</p>
 
@@ -69,13 +65,9 @@ export function SemanticMaskControls({
         <div><dt>Fallback</dt><dd>Up to 21.6 MB WASM runtime</dd></div>
         <div><dt>Storage</dt><dd>Browser cache on this device</dd></div>
       </dl>
-      <p>Weights are downloaded from Hugging Face only after consent, verified against pinned SHA-256 hashes, and can be removed here.</p>
+      <p>RAWcket downloads these pinned weights automatically, verifies every file against its SHA-256 hash, and blocks semantic selection until the model is ready.</p>
       <a href={`https://huggingface.co/${descriptor.id}`} target="_blank" rel="noreferrer">Review model card and terms ↗</a>
-      <label className="semantic-consent-check">
-        <input type="checkbox" checked={consented} disabled={busy} onChange={(event) => onConsentChange(event.target.checked)} />
-        <span>I consent to download and store this pinned model locally.</span>
-      </label>
-      <button className="button ai-primary full" type="button" disabled={!consented || busy} onClick={onInstall}>Download local model</button>
+      {task === null && <button className="button ai-primary full" type="button" onClick={onInstall}>Retry local model download</button>}
     </div>}
 
     {status === 'installed' && <div className="semantic-model-ready">
@@ -84,13 +76,13 @@ export function SemanticMaskControls({
         {descriptor.supportedCategories.map((value) => <option key={value} value={value}>{categoryLabels[value]}</option>)}
       </select>
       <button className="button ai-primary full" type="button" disabled={busy || !previewAvailable} onClick={onGenerate}>Generate semantic mask</button>
-      <button className="button danger-link full" type="button" disabled={busy} onClick={onRemove}>Remove local model</button>
+      <button className="button danger-link full" type="button" disabled={busy} onClick={onRemove}>Clear downloaded model</button>
     </div>}
 
     {busy && <div className="semantic-progress">
       <progress max={1} value={progress} aria-label={task === 'installing' ? 'Model download progress' : 'Semantic mask progress'} />
       <span>{task === 'installing' ? 'Downloading and verifying' : 'Segmenting locally'} · {Math.round(progress * 100)}%</span>
-      <button className="button ghost full" type="button" onClick={onCancel}>Cancel</button>
+      {task === 'segmenting' && <button className="button ghost full" type="button" onClick={onCancel}>Cancel segmentation</button>}
     </div>}
     <p className="semantic-model-message" aria-live="polite">{message}</p>
 

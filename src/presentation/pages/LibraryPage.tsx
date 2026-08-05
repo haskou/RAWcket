@@ -51,7 +51,7 @@ export function LibraryPage(): ReactElement {
   const [pendingImportFiles, setPendingImportFiles] = useState<File[] | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [automaticTags, setAutomaticTags] = useState(true);
-  const [tagModelStatus, setTagModelStatus] = useState<SemanticModelStatus>('not-installed');
+  const [tagModelStatus, setTagModelStatus] = useState<SemanticModelStatus | 'checking'>('checking');
   const [installingTagModel, setInstallingTagModel] = useState(false);
   const [tagModelProgress, setTagModelProgress] = useState(0);
   const [tagModelMessage, setTagModelMessage] = useState('Automatic tags never upload the photograph.');
@@ -62,9 +62,42 @@ export function LibraryPage(): ReactElement {
     projectFilter.getMinimumRating(),
     projectFilter.shouldListFavoritesOnly()
   )), [projectFilter, projects]);
+  const localModelPreparing = tagModelStatus === 'checking' || installingTagModel;
 
   const refresh = useCallback(async (): Promise<void> => {
     setProjects(await application.listProjects.list(new ListProjectsMessage('', 0)));
+  }, [application]);
+
+  const prepareTagModel = useCallback(async (): Promise<void> => {
+    if (modelInstallAbort.current !== null) return;
+    setTagModelStatus('checking');
+    let controller: AbortController | null = null;
+    try {
+      const status = await application.manageSemanticSegmentationModel.inspect();
+      setTagModelStatus(status);
+      if (status !== 'not-installed') return;
+      controller = new AbortController();
+      modelInstallAbort.current = controller;
+      setInstallingTagModel(true);
+      setTagModelProgress(0);
+      setTagModelMessage('Downloading and verifying the local tagging model automatically…');
+      await application.manageSemanticSegmentationModel.install({ signal: controller.signal, onProgress: setTagModelProgress });
+      setTagModelStatus('installed');
+      setAutomaticTags(true);
+      setTagModelProgress(1);
+      setTagModelMessage('Local model ready. New imports will be tagged automatically.');
+    } catch (caught: unknown) {
+      const status = await application.manageSemanticSegmentationModel.inspect().catch(() => 'unavailable' as const);
+      setTagModelStatus(status);
+      setTagModelMessage(caught instanceof DOMException && caught.name === 'AbortError'
+        ? 'The local model continues preparing in the background.'
+        : caught instanceof Error ? `${caught.message} You can retry from the import dialog.` : 'The local tag model could not be prepared.');
+    } finally {
+      if (modelInstallAbort.current === controller) {
+        modelInstallAbort.current = null;
+        setInstallingTagModel(false);
+      }
+    }
   }, [application]);
 
   useEffect(() => {
@@ -76,7 +109,14 @@ export function LibraryPage(): ReactElement {
     void application.assessImportCapacity.assess(new AssessImportCapacityMessage(1)).then(setStorageCapacity);
   }, [application, refresh]);
 
-  useEffect(() => () => modelInstallAbort.current?.abort(), []);
+  useEffect(() => {
+    void prepareTagModel();
+    return () => {
+      const controller = modelInstallAbort.current;
+      modelInstallAbort.current = null;
+      controller?.abort();
+    };
+  }, [prepareTagModel]);
 
   const persistImportedFile = async (file: File, inspection: SourceImageInspection): Promise<void> => {
       const capacity = await application.assessImportCapacity.assess(new AssessImportCapacityMessage(file.size));
@@ -136,6 +176,11 @@ export function LibraryPage(): ReactElement {
 
   const importImages = (files: File[]): void => {
     if (files.length === 0) return;
+    if (localModelPreparing) {
+      setImportDialogOpen(true);
+      setTagModelMessage(`Local AI is still downloading · ${Math.round(tagModelProgress * 100)}%. Import unlocks when it is ready.`);
+      return;
+    }
     setImportDialogOpen(false);
     if (files.length === 1 && files[0] !== undefined) void createFromFile(files[0]);
     if (files.length > 1) void reviewImportCandidates(files);
@@ -143,44 +188,21 @@ export function LibraryPage(): ReactElement {
 
   const openImportDialog = (): void => {
     setImportDialogOpen(true);
-    setTagModelMessage('Automatic tags never upload the photograph.');
-    void application.manageSemanticSegmentationModel.inspect().then(setTagModelStatus).catch(() => setTagModelStatus('unavailable'));
-  };
-
-  const installTagModel = async (): Promise<void> => {
-    modelInstallAbort.current?.abort();
-    const controller = new AbortController();
-    modelInstallAbort.current = controller;
-    setInstallingTagModel(true);
-    setTagModelProgress(0);
-    setTagModelMessage('Downloading and verifying the pinned local model…');
-    try {
-      await application.manageSemanticSegmentationModel.install({ signal: controller.signal, onProgress: setTagModelProgress });
-      setTagModelStatus('installed');
-      setAutomaticTags(true);
-      setTagModelMessage('Local model ready. New imports will be tagged automatically.');
-    } catch (caught: unknown) {
-      setTagModelMessage(caught instanceof DOMException && caught.name === 'AbortError'
-        ? 'Local model installation cancelled.'
-        : caught instanceof Error ? caught.message : 'The local tag model could not be installed.');
-    } finally {
-      modelInstallAbort.current = null;
-      setInstallingTagModel(false);
-    }
+    if (tagModelStatus === 'not-installed' && !installingTagModel) void prepareTagModel();
   };
 
   const dragImagesIntoLibrary = (event: DragEvent<HTMLElement>): void => {
     if (!event.dataTransfer.types.includes('Files')) return;
     event.preventDefault();
     dragDepth.current += 1;
-    event.dataTransfer.dropEffect = busy ? 'none' : 'copy';
+    event.dataTransfer.dropEffect = busy || localModelPreparing ? 'none' : 'copy';
     setImageDropActive(true);
   };
 
   const dragImagesOverLibrary = (event: DragEvent<HTMLElement>): void => {
     if (!event.dataTransfer.types.includes('Files')) return;
     event.preventDefault();
-    event.dataTransfer.dropEffect = busy ? 'none' : 'copy';
+    event.dataTransfer.dropEffect = busy || localModelPreparing ? 'none' : 'copy';
   };
 
   const dragImagesOutOfLibrary = (event: DragEvent<HTMLElement>): void => {
@@ -194,7 +216,7 @@ export function LibraryPage(): ReactElement {
     event.preventDefault();
     dragDepth.current = 0;
     setImageDropActive(false);
-    if (busy) return;
+    if (busy || localModelPreparing) return;
     importImages([...event.dataTransfer.files]);
   };
 
@@ -344,20 +366,21 @@ export function LibraryPage(): ReactElement {
       onDrop={dropImagesIntoLibrary}
     >
       {imageDropActive && (
-        <div className={`library-drop-overlay ${busy ? 'blocked' : ''}`} role="status" aria-live="polite">
+        <div className={`library-drop-overlay ${busy || localModelPreparing ? 'blocked' : ''}`} role="status" aria-live="polite">
           <span className="drop-target-icon" aria-hidden="true">↓</span>
-          <strong>{busy ? 'Finish the current import first' : 'Drop photographs to import'}</strong>
-          <small>{busy ? 'RAWcket is already processing a photograph.' : 'JPEG, PNG, or Sony ARW · drop several to compare them first'}</small>
+          <strong>{installingTagModel ? `Preparing Local AI · ${Math.round(tagModelProgress * 100)}%` : busy ? 'Finish the current import first' : 'Drop photographs to import'}</strong>
+          <small>{installingTagModel ? 'Import unlocks as soon as the verified local tagging model is ready.' : busy ? 'RAWcket is already processing a photograph.' : 'JPEG, PNG, or Sony ARW · drop several to compare them first'}</small>
         </div>
       )}
       <header className="library-header">
         <a className="brand" href="/" aria-label="RAWcket library"><span className="brand-mark">R</span><span>RAWcket</span></a>
         <div className="header-actions">
+          {installingTagModel && <div className="local-model-header-progress" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span>Local AI · {Math.round(tagModelProgress * 100)}%</span></div>}
           <PwaInstallButton />
           <button className="button ghost" type="button" onClick={() => setCloudStorageOpen(true)}>Google Drive</button>
           <button className="button ai-header-button" type="button" onClick={() => setSettingsOpen(true)}>✦ AI Companion</button>
           <button className="button ghost" type="button" onClick={() => bundleInput.current?.click()}>Import .rawcket</button>
-          <button className="button primary" type="button" onClick={openImportDialog} disabled={busy}>{busy ? 'Importing…' : 'Import image'}</button>
+          <button className="button primary" type="button" onClick={openImportDialog} disabled={busy || localModelPreparing}>{localModelPreparing ? `Local AI ${Math.round(tagModelProgress * 100)}%` : busy ? 'Importing…' : 'Import image'}</button>
         </div>
       </header>
       <input ref={imageInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,.arw,image/x-sony-arw" onChange={onImage} aria-label="Select one or more JPEG, PNG, or Sony ARW images" />
@@ -400,7 +423,7 @@ export function LibraryPage(): ReactElement {
             <div className="empty-icon" aria-hidden="true">+</div>
             <h3>Start with a photograph</h3>
             <p>Click Choose image or drop JPEG, PNG, or Sony ARW files here. The original remains untouched and local.</p>
-            <button className="button primary" type="button" onClick={openImportDialog}>Choose image</button>
+            <button className="button primary" type="button" onClick={openImportDialog} disabled={localModelPreparing}>{localModelPreparing ? `Preparing Local AI · ${Math.round(tagModelProgress * 100)}%` : 'Choose image'}</button>
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="empty-state compact">
@@ -443,11 +466,11 @@ export function LibraryPage(): ReactElement {
         installingModel={installingTagModel}
         modelProgress={tagModelProgress}
         modelMessage={tagModelMessage}
-        onClose={() => { modelInstallAbort.current?.abort(); setImportDialogOpen(false); }}
+        onClose={() => setImportDialogOpen(false)}
         onBrowse={() => imageInput.current?.click()}
         onFiles={importImages}
         onAutomaticTagsChange={setAutomaticTags}
-        onInstallModel={() => void installTagModel()}
+        onInstallModel={() => void prepareTagModel()}
       />
       {importCandidates !== null && <ImportSelectionDialog candidates={importCandidates} selected={selectedCandidate} onSelect={setSelectedCandidate} onCancel={() => setImportCandidates(null)} onContinue={continueWithCandidate} />}
     </main>

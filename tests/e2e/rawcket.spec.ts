@@ -4,6 +4,10 @@ function openAiEnvelope(result: unknown): string {
   return JSON.stringify({ output: [{ content: [{ type: 'output_text', text: JSON.stringify(result) }] }] });
 }
 
+test.beforeEach(async ({ page }) => {
+  await page.route('https://huggingface.co/**', (route) => route.abort('failed'));
+});
+
 test('imports, edits, saves, closes, and reopens a local project', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('/');
@@ -30,7 +34,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   const importDialog = page.getByRole('dialog', { name: 'Import photographs' });
   await expect(importDialog).toBeVisible();
   await expect(importDialog.getByText(/JPEG, PNG, or Sony ARW/)).toBeVisible();
-  await expect(importDialog.getByText(/Nothing is downloaded without your consent/)).toBeVisible();
+  await expect(importDialog.getByText(/automatically downloads/)).toBeVisible();
   const imageChooser = page.waitForEvent('filechooser');
   await importDialog.getByRole('button', { name: 'Choose photographs' }).click();
   await (await imageChooser).setFiles({
@@ -69,9 +73,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: 'Detail Shortcut 3' })).toBeVisible();
   await page.getByRole('tab', { name: '✦ AI Companion' }).click();
   await expect(page.getByRole('region', { name: 'Local semantic masks' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Download local model' })).toBeDisabled();
-  await page.getByRole('checkbox', { name: /consent to download and store/ }).check();
-  await expect(page.getByRole('button', { name: 'Download local model' })).toBeEnabled();
+  await expect(page.getByText(/prepared automatically/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ask AI Companion for an opinion' })).toBeVisible();
   let aiRequestCount = 0;
   await page.route('https://api.openai.com/v1/responses', async (route) => {
     aiRequestCount += 1;
@@ -90,7 +93,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
       };
     await route.fulfill({ status: 200, contentType: 'application/json', body: openAiEnvelope(result) });
   });
-  await page.getByRole('button', { name: 'Ask AI Companion and generate proposal' }).click();
+  await page.getByLabel('What should RAWcket create?').fill('Create a cinematic night portrait with a tighter crop.');
+  await page.getByRole('button', { name: 'Generate proposal from my text' }).click();
   const aiSettings = page.getByRole('dialog', { name: 'Configure AI Companion' });
   await expect(aiSettings).toBeVisible();
   await expect(aiSettings.getByText('OpenAI API', { exact: true }).first()).toBeVisible();
@@ -111,8 +115,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Auto Enhance · additive · no AI' }).click();
-  await expect(page.getByText(/added bounded tonal\/detail deltas/)).toBeVisible();
+  await page.getByRole('button', { name: 'Auto Enhance', exact: true }).click();
+  await expect(page.getByText(/Auto Enhance (corrected|left the recipe unchanged)/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
@@ -362,6 +366,7 @@ test('imports a photograph by dropping it into the import dialog', async ({ page
   await page.getByRole('button', { name: 'Import image' }).click();
   const dialog = page.getByRole('dialog', { name: 'Import photographs' });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Choose photographs' })).toBeEnabled();
   await dialog.locator('.import-dialog-dropzone').dispatchEvent('dragenter', { dataTransfer });
   await dialog.locator('.import-dialog-dropzone').dispatchEvent('drop', { dataTransfer });
   await expect(dialog).toHaveCount(0);
@@ -369,18 +374,28 @@ test('imports a photograph by dropping it into the import dialog', async ({ page
   await dataTransfer.dispose();
 });
 
-test('configures optional Google Drive without a hardcoded client', async ({ page }) => {
+test('signs in with Google without asking the user for a token or client ID', async ({ page }) => {
+  await page.addInitScript(() => {
+    Reflect.set(window, 'google', { accounts: { oauth2: {
+      initTokenClient: (configuration: { callback: (response: { access_token: string; expires_in: number; scope: string }) => void }) => ({
+        requestAccessToken: () => configuration.callback({ access_token: 'e2e-google-token', expires_in: 3600, scope: 'drive.file drive.appdata' })
+      }),
+      revoke: () => undefined
+    } } });
+  });
+  await page.route('https://openidconnect.googleapis.com/v1/userinfo', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ email: 'photographer@example.com' }) }));
+  await page.route('https://www.googleapis.com/drive/v3/files?**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [] }) }));
   await page.goto('/');
   await page.getByRole('button', { name: 'Google Drive' }).click();
   const dialog = page.getByRole('dialog', { name: 'Google Drive' });
-  await expect(dialog.getByText(/ships with no shared Google credential/)).toBeVisible();
-  await expect(dialog.getByRole('link', { name: /Create or manage a Google OAuth client/ })).toHaveAttribute('href', 'https://console.cloud.google.com/auth/clients');
-  await expect(dialog.getByRole('button', { name: 'Connect Google Drive' })).toBeDisabled();
-  await dialog.getByLabel('Google OAuth Web Client ID').fill('123-e2e.apps.googleusercontent.com');
-  await dialog.getByLabel('Automatically upload future photo exports').check();
-  await dialog.getByRole('button', { name: 'Save Google configuration' }).click();
-  await expect(dialog.getByRole('button', { name: 'Connect Google Drive' })).toBeEnabled();
-  await expect(dialog.getByText(/short-lived and tab-only/)).toBeVisible();
+  await expect(dialog.getByLabel('Google OAuth Web Client ID')).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Continue with Google' })).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Continue with Google' }).click();
+  await expect(dialog.getByText(/Google account · photographer@example.com/)).toBeVisible();
+  const automaticExports = dialog.getByLabel('Automatically upload future photo exports to Drive');
+  await expect(automaticExports).toBeEnabled();
+  await automaticExports.check();
+  await expect(dialog.getByText(/Future photo exports/)).toBeVisible();
 });
 
 test('keeps the preview visible at maximum spatial detail settings', async ({ page }) => {
@@ -437,6 +452,10 @@ test('compares multiple imports by post-edit potential and lets the photographer
     return { sharp: render(true), soft: render(false) };
   });
 
+  await page.getByRole('button', { name: 'Import image' }).click();
+  const importDialog = page.getByRole('dialog', { name: 'Import photographs' });
+  await expect(importDialog.getByRole('button', { name: 'Choose photographs' })).toBeEnabled();
+  await importDialog.getByRole('button', { name: 'Close import' }).click();
   await page.getByLabel('Select one or more JPEG, PNG, or Sony ARW images').setInputFiles([
     { name: 'sharp.png', mimeType: 'image/png', buffer: Buffer.from(images.sharp, 'base64') },
     { name: 'soft.png', mimeType: 'image/png', buffer: Buffer.from(images.soft, 'base64') }
