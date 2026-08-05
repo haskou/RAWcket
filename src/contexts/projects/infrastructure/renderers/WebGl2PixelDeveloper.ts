@@ -1,13 +1,17 @@
 import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments';
 import type { CpuDevelopmentSettings } from './CpuPixelDeveloper';
+import { CpuMaskWeightRasterizer } from './CpuMaskWeightRasterizer';
 import { ToneCurveLut } from './ToneCurveLut';
 
 const adjustmentOrder = [
   'exposure', 'temperature', 'tint', 'contrast', 'highlights', 'shadows', 'whites', 'blacks',
   'saturation', 'vibrance', 'clarity', 'texture', 'dehaze', 'sharpness', 'noiseReduction', 'vignette'
 ] as const;
+const maximumWebGlMasks = 4;
 
 export class WebGl2PixelDeveloper {
+  private readonly maskRasterizer = new CpuMaskWeightRasterizer();
+
   public develop(
     source: Uint8ClampedArray,
     width: number,
@@ -35,7 +39,7 @@ export class WebGl2PixelDeveloper {
   }
 
   private canDevelop(settings: CpuDevelopmentSettings): boolean {
-    return settings.masks.length === 0;
+    return settings.masks.length <= maximumWebGlMasks;
   }
 
   private render(
@@ -68,6 +72,13 @@ export class WebGl2PixelDeveloper {
     gl.uniform1fv(location, new Float32Array(adjustmentOrder.map((key) => adjustments[key])));
     this.uniform1i(gl, program, 'uHasLuminanceCurve', curves.luminance === null ? 0 : 1);
     this.uniform2f(gl, program, 'uDimensions', width, height);
+    const maskTexture = this.createMaskWeightTexture(gl, source, width, height, settings);
+    textures.push(maskTexture);
+    this.bindTexture(gl, program, maskTexture, 'uMaskWeights', 6);
+    this.uniform1i(gl, program, 'uMaskCount', settings.masks.length);
+    const localAdjustmentLocation = gl.getUniformLocation(program, 'uLocalAdjustments[0]');
+    if (localAdjustmentLocation === null) throw new Error('The WebGL2 local-adjustment uniform is unavailable.');
+    gl.uniform1fv(localAdjustmentLocation, this.localAdjustments(settings));
     const framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     let inputTexture = this.createOutputTexture(gl, width, height);
@@ -166,6 +177,38 @@ export class WebGl2PixelDeveloper {
     return texture;
   }
 
+  private createMaskWeightTexture(
+    gl: WebGL2RenderingContext,
+    source: Uint8ClampedArray,
+    width: number,
+    height: number,
+    settings: CpuDevelopmentSettings
+  ): WebGLTexture {
+    const texture = this.texture(gl);
+    const packed = new Float32Array(new ArrayBuffer(width * height * maximumWebGlMasks * Float32Array.BYTES_PER_ELEMENT));
+    if (settings.masks.length > 0) {
+      const weights = this.maskRasterizer.rasterize(source, width, height, settings.masks);
+      const pixelCount = width * height;
+      settings.masks.forEach((_, maskIndex) => {
+        for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+          packed[pixel * maximumWebGlMasks + maskIndex] = weights[maskIndex * pixelCount + pixel] ?? 0;
+        }
+      });
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, packed);
+    return texture;
+  }
+
+  private localAdjustments(settings: CpuDevelopmentSettings): Float32Array<ArrayBuffer> {
+    const values = new Float32Array(new ArrayBuffer(maximumWebGlMasks * adjustmentOrder.length * Float32Array.BYTES_PER_ELEMENT));
+    settings.masks.forEach((mask, maskIndex) => {
+      adjustmentOrder.forEach((key, adjustmentIndex) => {
+        values[maskIndex * adjustmentOrder.length + adjustmentIndex] = mask.localAdjustments[key] ?? 0;
+      });
+    });
+    return values;
+  }
+
   private attachOutput(gl: WebGL2RenderingContext, texture: WebGLTexture): void {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
@@ -220,8 +263,11 @@ uniform sampler2D uGreenCurve;
 uniform sampler2D uBlueCurve;
 uniform sampler2D uLuminanceCurve;
 uniform float uAdjustments[16];
+uniform float uLocalAdjustments[64];
 uniform int uHasLuminanceCurve;
+uniform int uMaskCount;
 uniform vec2 uDimensions;
+uniform sampler2D uMaskWeights;
 
 float luminance(vec3 rgb) { return dot(rgb, vec3(0.2126, 0.7152, 0.0722)); }
 float shapedStep(float start, float end, float value) {
@@ -233,6 +279,34 @@ float curve(sampler2D lut, float value) {
   int lower = int(floor(position));
   int upper = min(1023, lower + 1);
   return mix(texelFetch(lut, ivec2(lower, 0), 0).r, texelFetch(lut, ivec2(upper, 0), 0).r, position - float(lower));
+}
+float localAdjustment(int mask, int adjustment) {
+  return uLocalAdjustments[mask * 16 + adjustment];
+}
+vec3 developLocal(vec3 sourceRgb, int mask) {
+  vec3 rgb = sourceRgb * exp2(localAdjustment(mask, 0));
+  float temperature = localAdjustment(mask, 1) / 100.0;
+  float tint = localAdjustment(mask, 2) / 100.0;
+  rgb.r += temperature * 0.15 - tint * 0.035;
+  rgb.g += tint * 0.12 - abs(temperature) * 0.015;
+  rgb.b -= temperature * 0.15 + tint * 0.035;
+  float light = luminance(rgb);
+  float tonalDelta = (1.0 - shapedStep(0.0, 0.55, light)) * localAdjustment(mask, 5) / 400.0
+    + shapedStep(0.45, 1.0, light) * localAdjustment(mask, 4) / 400.0
+    + light * localAdjustment(mask, 6) / 500.0
+    + (1.0 - light) * localAdjustment(mask, 7) / 500.0;
+  rgb += vec3(tonalDelta);
+  float contrast = 1.0 + localAdjustment(mask, 3) / 100.0;
+  float clarityWeight = 1.0 - min(1.0, abs(light - 0.5) * 2.0);
+  float clarity = 1.0 + localAdjustment(mask, 10) / 180.0 * clarityWeight;
+  float dehaze = 1.0 + localAdjustment(mask, 12) / 140.0;
+  rgb = ((rgb - vec3(0.5)) * contrast * clarity + vec3(0.5)) * dehaze;
+  light = luminance(rgb);
+  float chroma = max(max(rgb.r, rgb.g), rgb.b) - min(min(rgb.r, rgb.g), rgb.b);
+  float saturation = 1.0 + localAdjustment(mask, 8) / 100.0;
+  float vibrance = 1.0 + localAdjustment(mask, 9) / 100.0 * (1.0 - min(1.0, chroma));
+  float colorFactor = saturation * vibrance * (1.0 + max(0.0, localAdjustment(mask, 12)) / 300.0);
+  return clamp(vec3(light) + (rgb - vec3(light)) * colorFactor, 0.0, 1.0);
 }
 void main() {
   ivec2 pixel = ivec2(gl_FragCoord.xy - vec2(0.5));
@@ -260,6 +334,12 @@ void main() {
   float vibrance = 1.0 + uAdjustments[9] / 100.0 * (1.0 - min(1.0, chroma));
   float colorFactor = saturation * vibrance * (1.0 + max(0.0, uAdjustments[12]) / 300.0);
   rgb = clamp(vec3(light) + (rgb - vec3(light)) * colorFactor, 0.0, 1.0);
+  vec4 maskWeights = texelFetch(uMaskWeights, pixel, 0);
+  for (int mask = 0; mask < 4; mask += 1) {
+    if (mask < uMaskCount && maskWeights[mask] > 0.0) {
+      rgb = mix(rgb, developLocal(rgb, mask), maskWeights[mask]);
+    }
+  }
   rgb = vec3(
     curve(uRedCurve, curve(uRgbCurve, rgb.r)),
     curve(uGreenCurve, curve(uRgbCurve, rgb.g)),

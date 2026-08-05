@@ -23,14 +23,14 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Versioned LRU previews, quota preflight, SHA-256 snapshots, and corruption recovery.
 - [x] Safe, postponable PWA updates and a production CSP without `unsafe-eval`.
 - [ ] Sony A6600-specific redistributable fixture and trusted-reference color/matrix golden verification.
-- [x] WebGPU-first global-development/curve/spatial pipeline, WebGL2 fallback, GPU device-loss recovery, and explicit CPU fallback for masks.
-- [ ] Complete GPU mask coverage and the remaining capabilities below.
+- [x] WebGPU-first global-development/curve/spatial pipeline, WebGL2 fallback, GPU device-loss recovery, and bounded masked local-development passes from deterministic weight rasters.
+- [ ] Move vector-mask rasterization itself to GPU and complete the remaining capabilities below.
 
 ## Recommended implementation order
 
 1. Secure a redistributable Sony A6600 ARW fixture and establish trusted color/matrix golden references for the working LibRaw path.
 2. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
-3. Extend the WebGPU and WebGL2 renderers behind the existing preview boundary to cover masks and broaden the current spatial parity corpus.
+3. Move disposable vector-mask weight rasterization to WebGPU/WebGL2 and broaden the current masked spatial parity corpus.
 4. Extend semantic selection with embedding reuse, model tiers, more categories, and mask composition.
 5. Add per-request cost estimates, cancellation, and capability discovery to the implemented optional OpenAI adapter.
 
@@ -58,9 +58,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Scope.** Use WebGPU first, WebGL2 as the graphics fallback, and CPU/WASM where appropriate. Produce 512 px thumbnails, 2048–3072 px interactive previews, and full resolution only for final export. Add 1024/4096-entry curve LUTs, initial sRGB color management, future Display P3 support, clipping warnings, RGB/luminance histograms, optional scopes, before/after comparison, intelligent caches, and incremental rendering.
 
-**Implemented.** The worker now selects WebGPU compute shaders first for compatible global adjustments, RGB/R/G/B/luminance LUTs, vignette, denoise, texture, and sharpening, then real WebGL2 fragment shaders when WebGPU is unavailable. Spatial passes use the same operation order as the CPU reference and a browser parity test enforces a maximum eight-channel-value delta on the initial golden fixture. Device acquisition or loss returns control to the normal fallback pipeline. Recipes with masks still deliberately use the reference CPU pipeline, and the active backend is visible in the canvas. The same boundary already provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
+**Implemented.** The worker now selects WebGPU compute shaders first for compatible global adjustments, ordered local masked adjustments, RGB/R/G/B/luminance LUTs, vignette, denoise, texture, and sharpening, then real WebGL2 fragment shaders when WebGPU is unavailable. `CpuMaskWeightRasterizer` produces disposable weights from every current brush, gradient, range, AI, and composite source using the unchanged image luminance; no raster enters the project recipe. WebGL2 packs up to four mask planes into one RGBA32F texture and WebGPU accepts up to 32 storage-buffer planes, with an explicit CPU fallback beyond those bounds. A Chromium parity fixture combines radial and luminance masks with spatial filters and enforces a maximum eight-channel-value delta from the CPU reference. Device acquisition or loss returns control to the normal fallback pipeline. The active backend is visible in the canvas. The same boundary already provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
 
-**Remaining.** WebGPU/WebGL2 mask passes, a larger representative CPU/GPU golden-image corpus, Display P3/ICC work, optional scopes, and incremental tiled rendering.
+**Remaining.** Native WebGPU/WebGL2 vector-mask rasterization, a larger representative CPU/GPU golden-image corpus, Display P3/ICC work, optional scopes, and incremental tiled rendering.
 
 **Dependencies.** Linear RAW engine; capability detection; preview boundary and worker protocol; color fixtures; documented operation order; versioned caches.
 

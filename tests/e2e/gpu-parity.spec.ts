@@ -3,7 +3,7 @@ import type { CpuPixelDeveloper as CpuPixelDeveloperClass } from '@/contexts/pro
 import type { WebGl2PixelDeveloper as WebGl2PixelDeveloperClass } from '@/contexts/projects/infrastructure/renderers/WebGl2PixelDeveloper';
 import type { WebGpuPixelDeveloper as WebGpuPixelDeveloperClass } from '@/contexts/projects/infrastructure/renderers/WebGpuPixelDeveloper';
 
-test('keeps accelerated spatial development within the CPU reference tolerance', async ({ page }) => {
+test('keeps accelerated masked spatial development within the CPU reference tolerance', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {
     const cpuUrl = '/src/contexts/projects/infrastructure/renderers/CpuPixelDeveloper.ts';
@@ -21,7 +21,18 @@ test('keeps accelerated spatial development within the CPU reference tolerance',
       },
       curves: { rgb: identity, red: identity, green: identity, blue: identity, luminance: null },
       disabledAdjustments: [],
-      masks: []
+      masks: [
+        {
+          id: '00000000-0000-4000-8000-000000000001', enabled: true, inverted: false,
+          opacity: 0.8, feather: 0.6, density: 0.9, localAdjustments: { exposure: 0.45, saturation: 12 },
+          shape: { kind: 'radial' as const, center: { x: 0.5, y: 0.5 }, radiusX: 0.36, radiusY: 0.42, rotationDegrees: 12 }
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000002', enabled: true, inverted: false,
+          opacity: 0.5, feather: 0, density: 1, localAdjustments: { shadows: 18, temperature: -6 },
+          shape: { kind: 'luminance-range' as const, minimum: 0.25, maximum: 0.7 }
+        }
+      ]
     };
     const width = 5;
     const height = 5;

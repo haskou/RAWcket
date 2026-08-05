@@ -14,7 +14,7 @@ Implemented:
 - Local library with a dedicated JPEG/PNG/Sony ARW dropzone dialog, direct library drag and drop, multi-photo selection, optional on-device automatic tags, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, quota preflight, and portable project bundles.
 - Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
 - Collapsible, navigable Active Recipe sidebar that lists only non-default instructions, with reversible enable switches and links back to each editor.
-- Adaptive renderer with cancellable scheduling: LibRaw/WASM develops supported camera mosaics to linear 16-bit RGB in its isolated browser worker, then a render worker applies the recipe. WebGPU compute runs compatible global development, curve LUTs, denoise, texture, and sharpening; real WebGL2 shaders provide the graphics fallback; and the reference CPU backend handles high-depth RAW input and masks. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, device-loss fallback, and a versioned LRU preview cache share the same boundary.
+- Adaptive renderer with cancellable scheduling: LibRaw/WASM develops supported camera mosaics to linear 16-bit RGB in its isolated browser worker, then a render worker applies the recipe. WebGPU compute runs compatible global development, local masked adjustments, curve LUTs, denoise, texture, and sharpening; real WebGL2 shaders provide the graphics fallback. Deterministic CPU weight rasters cover every current mask family, while the reference CPU backend handles high-depth RAW input and bounded fallbacks. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, device-loss fallback, and a versioned LRU preview cache share the same boundary.
 - Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
@@ -36,7 +36,7 @@ Implemented:
 Not implemented yet:
 
 - A legally redistributable Sony A6600 fixture and trusted-reference color/matrix golden corpus. The current external verification fixture is a locally downloaded Sony FX30 ARW and is intentionally not committed because its image license is unclear.
-- WebGPU/WebGL2 passes for masks and a broader GPU/CPU golden-image parity corpus. Spatial filters now run on both accelerated paths and WebGPU device loss falls back cleanly.
+- Native GPU vector-mask rasterization and a broader GPU/CPU golden-image parity corpus. Masked local development and spatial filters now run on both accelerated paths from deterministic disposable weight rasters, and WebGPU device loss falls back cleanly.
 - Larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
 - 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking. RAW sensor development is already high-depth, but current file encoders quantize their output to 8-bit.

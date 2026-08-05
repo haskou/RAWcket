@@ -157,7 +157,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('tab', { name: '✦ AI Companion' }).click();
   await page.getByRole('button', { name: 'Create and place points' }).click();
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
-  await expect(page.getByText('CPU compatibility preview')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(webGpuAvailable ? 'WebGPU accelerated preview' : 'WebGL2 accelerated preview')).toBeVisible({ timeout: 15_000 });
   await page.keyboard.press('4');
   await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
   await page.getByRole('button', { name: 'Reset channel' }).click();

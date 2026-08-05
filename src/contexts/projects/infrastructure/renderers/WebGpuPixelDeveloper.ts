@@ -1,13 +1,17 @@
 import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments';
 import type { CpuDevelopmentSettings } from './CpuPixelDeveloper';
+import { CpuMaskWeightRasterizer } from './CpuMaskWeightRasterizer';
 import { ToneCurveLut } from './ToneCurveLut';
 
 const adjustmentOrder = [
   'exposure', 'temperature', 'tint', 'contrast', 'highlights', 'shadows', 'whites', 'blacks',
   'saturation', 'vibrance', 'clarity', 'texture', 'dehaze', 'sharpness', 'noiseReduction', 'vignette'
 ] as const;
+const maximumGpuMasks = 32;
 
 export class WebGpuPixelDeveloper {
+  private readonly maskRasterizer = new CpuMaskWeightRasterizer();
+
   public async develop(
     source: Uint8ClampedArray,
     width: number,
@@ -18,7 +22,10 @@ export class WebGpuPixelDeveloper {
     const gpu = this.gpu();
     if (gpu === null) return null;
     const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
-    if (adapter === null || source.byteLength > adapter.limits.maxStorageBufferBindingSize) return null;
+    const maskWeightBytes = width * height * settings.masks.length * Float32Array.BYTES_PER_ELEMENT;
+    if (adapter === null
+      || source.byteLength > adapter.limits.maxStorageBufferBindingSize
+      || maskWeightBytes > adapter.limits.maxStorageBufferBindingSize) return null;
     let device: GPUDevice | null = null;
     const buffers: GPUBuffer[] = [];
     try {
@@ -31,10 +38,16 @@ export class WebGpuPixelDeveloper {
       const parameterBuffer = this.buffer(device, parameters.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
       const curves = this.curves(settings);
       const curveBuffer = this.buffer(device, curves.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-      buffers.push(sourceBuffer, outputBuffer, readBuffer, parameterBuffer, curveBuffer);
+      const maskWeights = this.maskWeights(source, width, height, settings);
+      const maskWeightBuffer = this.buffer(device, maskWeights.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      const localAdjustments = this.localAdjustments(settings);
+      const localAdjustmentBuffer = this.buffer(device, localAdjustments.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      buffers.push(sourceBuffer, outputBuffer, readBuffer, parameterBuffer, curveBuffer, maskWeightBuffer, localAdjustmentBuffer);
       device.queue.writeBuffer(sourceBuffer, 0, sourceWords);
       device.queue.writeBuffer(parameterBuffer, 0, parameters);
       device.queue.writeBuffer(curveBuffer, 0, curves);
+      device.queue.writeBuffer(maskWeightBuffer, 0, maskWeights);
+      device.queue.writeBuffer(localAdjustmentBuffer, 0, localAdjustments);
       const module = device.createShaderModule({ label: 'RAWcket global development', code: computeShader });
       const pipeline = device.createComputePipeline({
         label: 'RAWcket global development pipeline',
@@ -47,7 +60,9 @@ export class WebGpuPixelDeveloper {
           { binding: 0, resource: { buffer: sourceBuffer } },
           { binding: 1, resource: { buffer: outputBuffer } },
           { binding: 2, resource: { buffer: parameterBuffer } },
-          { binding: 3, resource: { buffer: curveBuffer } }
+          { binding: 3, resource: { buffer: curveBuffer } },
+          { binding: 4, resource: { buffer: maskWeightBuffer } },
+          { binding: 5, resource: { buffer: localAdjustmentBuffer } }
         ]
       });
       const encoder = device.createCommandEncoder({ label: 'RAWcket development commands' });
@@ -85,7 +100,7 @@ export class WebGpuPixelDeveloper {
   }
 
   private canDevelop(settings: CpuDevelopmentSettings): boolean {
-    return settings.masks.length === 0;
+    return settings.masks.length <= maximumGpuMasks;
   }
 
   private encodeSpatialPasses(
@@ -167,7 +182,23 @@ export class WebGpuPixelDeveloper {
     integers[16] = width;
     integers[17] = height;
     integers[18] = settings.curves.luminance === null ? 0 : 1;
+    integers[19] = settings.masks.length;
     return buffer;
+  }
+
+  private maskWeights(source: Uint8ClampedArray, width: number, height: number, settings: CpuDevelopmentSettings): Float32Array<ArrayBuffer> {
+    if (settings.masks.length === 0) return new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
+    return this.maskRasterizer.rasterize(source, width, height, settings.masks);
+  }
+
+  private localAdjustments(settings: CpuDevelopmentSettings): Float32Array<ArrayBuffer> {
+    const values = new Float32Array(new ArrayBuffer(Math.max(1, settings.masks.length * adjustmentOrder.length) * Float32Array.BYTES_PER_ELEMENT));
+    settings.masks.forEach((mask, maskIndex) => {
+      adjustmentOrder.forEach((key, adjustmentIndex) => {
+        values[maskIndex * adjustmentOrder.length + adjustmentIndex] = mask.localAdjustments[key] ?? 0;
+      });
+    });
+    return values;
   }
 
   private curves(settings: CpuDevelopmentSettings): Float32Array<ArrayBuffer> {
@@ -220,13 +251,15 @@ struct Parameters {
   a3: vec4f,
   dimensions: vec2u,
   hasLuminanceCurve: u32,
-  padding: u32,
+  maskCount: u32,
 }
 
 @group(0) @binding(0) var<storage, read> source: array<u32>;
 @group(0) @binding(1) var<storage, read_write> output: array<u32>;
 @group(0) @binding(2) var<uniform> parameters: Parameters;
 @group(0) @binding(3) var<storage, read> curves: array<f32>;
+@group(0) @binding(4) var<storage, read> maskWeights: array<f32>;
+@group(0) @binding(5) var<storage, read> localAdjustments: array<f32>;
 
 fn luminance(rgb: vec3f) -> f32 { return dot(rgb, vec3f(0.2126, 0.7152, 0.0722)); }
 fn shapedStep(start: f32, end: f32, value: f32) -> f32 {
@@ -251,6 +284,34 @@ fn unpack(value: u32) -> vec4f {
 fn pack(value: vec4f) -> u32 {
   let bytes = vec4u(round(clamp(value, vec4f(0.0), vec4f(1.0)) * 255.0));
   return bytes.r | (bytes.g << 8u) | (bytes.b << 16u) | (bytes.a << 24u);
+}
+fn localAdjustment(mask: u32, adjustment: u32) -> f32 {
+  return localAdjustments[mask * 16u + adjustment];
+}
+fn developLocal(sourceRgb: vec3f, mask: u32) -> vec3f {
+  var rgb = sourceRgb * exp2(localAdjustment(mask, 0u));
+  let temperature = localAdjustment(mask, 1u) / 100.0;
+  let tint = localAdjustment(mask, 2u) / 100.0;
+  rgb.r += temperature * 0.15 - tint * 0.035;
+  rgb.g += tint * 0.12 - abs(temperature) * 0.015;
+  rgb.b -= temperature * 0.15 + tint * 0.035;
+  var light = luminance(rgb);
+  let tonalDelta = (1.0 - shapedStep(0.0, 0.55, light)) * localAdjustment(mask, 5u) / 400.0
+    + shapedStep(0.45, 1.0, light) * localAdjustment(mask, 4u) / 400.0
+    + light * localAdjustment(mask, 6u) / 500.0
+    + (1.0 - light) * localAdjustment(mask, 7u) / 500.0;
+  rgb += vec3f(tonalDelta);
+  let contrast = 1.0 + localAdjustment(mask, 3u) / 100.0;
+  let clarityWeight = 1.0 - min(1.0, abs(light - 0.5) * 2.0);
+  let clarity = 1.0 + localAdjustment(mask, 10u) / 180.0 * clarityWeight;
+  let dehaze = 1.0 + localAdjustment(mask, 12u) / 140.0;
+  rgb = ((rgb - vec3f(0.5)) * contrast * clarity + vec3f(0.5)) * dehaze;
+  light = luminance(rgb);
+  let chroma = max(max(rgb.r, rgb.g), rgb.b) - min(min(rgb.r, rgb.g), rgb.b);
+  let saturation = 1.0 + localAdjustment(mask, 8u) / 100.0;
+  let vibrance = 1.0 + localAdjustment(mask, 9u) / 100.0 * (1.0 - min(1.0, chroma));
+  let colorFactor = saturation * vibrance * (1.0 + max(0.0, localAdjustment(mask, 12u)) / 300.0);
+  return clamp(vec3f(light) + (rgb - vec3f(light)) * colorFactor, vec3f(0.0), vec3f(1.0));
 }
 
 @compute @workgroup_size(256)
@@ -282,6 +343,10 @@ fn develop(@builtin(global_invocation_id) invocation: vec3u) {
   let vibrance = 1.0 + parameters.a2.y / 100.0 * (1.0 - min(1.0, chroma));
   let colorFactor = saturation * vibrance * (1.0 + max(0.0, parameters.a3.x) / 300.0);
   rgb = clamp(vec3f(light) + (rgb - vec3f(light)) * colorFactor, vec3f(0.0), vec3f(1.0));
+  for (var mask = 0u; mask < parameters.maskCount; mask += 1u) {
+    let weight = maskWeights[mask * pixelCount + index];
+    if (weight > 0.0) { rgb = mix(rgb, developLocal(rgb, mask), weight); }
+  }
   rgb = vec3f(curve(1u, curve(0u, rgb.r)), curve(2u, curve(0u, rgb.g)), curve(3u, curve(0u, rgb.b)));
   if (parameters.hasLuminanceCurve == 1u) {
     let beforeLight = luminance(rgb);
