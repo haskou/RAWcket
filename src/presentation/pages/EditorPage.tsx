@@ -51,6 +51,7 @@ import { useProjectAutosave } from '../hooks/useProjectAutosave';
 import { downloadBlob } from '../lib/browserImages';
 
 type EditorPanel = AdjustmentSection | 'curves' | 'crop' | 'masks' | 'ai';
+type ToolWorkspace = 'ai' | 'develop';
 type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
 type BrushGesture = { pointerId: number; maskId: string; groupId: string };
@@ -133,6 +134,7 @@ export function EditorPage(): ReactElement {
   const [aiPointPolarity, setAiPointPolarity] = useState<AiPointPolarity>('positive');
   const [brushSize, setBrushSize] = useState(0.08);
   const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
+  const [toolWorkspace, setToolWorkspace] = useState<ToolWorkspace>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
@@ -226,6 +228,16 @@ export function EditorPage(): ReactElement {
     setPan({ x: 0, y: 0 });
   }, []);
 
+  const openPanel = useCallback((panel: EditorPanel): void => {
+    setActivePanel(panel);
+    setToolWorkspace(panel === 'ai' ? 'ai' : 'develop');
+    if (panel !== 'ai' && panel !== 'light' && panel !== 'color' && project?.getInterfaceMode().valueOf() === 'simple') {
+      application.chooseInterfaceMode.choose(project, new ChooseInterfaceModeMessage('advanced'));
+      setRevision((current) => current + 1);
+    }
+    window.requestAnimationFrame(() => document.getElementById(`tool-${panel}`)?.scrollIntoView({ block: 'start' }));
+  }, [application, project]);
+
   useEffect(() => {
     const handleShortcut = (event: globalThis.KeyboardEvent): void => {
       if (isTextEntryTarget(event.target) || settingsOpen) return;
@@ -247,13 +259,13 @@ export function EditorPage(): ReactElement {
       else if (event.key === 'ArrowRight') setPan((value) => ({ ...value, x: value.x + 24 }));
       else if (event.key === 'ArrowUp') setPan((value) => ({ ...value, y: value.y - 24 }));
       else if (event.key === 'ArrowDown') setPan((value) => ({ ...value, y: value.y + 24 }));
-      else if (event.key === '1') setActivePanel('light');
-      else if (event.key === '2') setActivePanel('color');
-      else if (event.key === '3') setActivePanel('detail');
-      else if (event.key === '4') setActivePanel('curves');
-      else if (event.key.toLowerCase() === 'a') setActivePanel('ai');
+      else if (event.key === '1') openPanel('light');
+      else if (event.key === '2') openPanel('color');
+      else if (event.key === '3') openPanel('detail');
+      else if (event.key === '4') openPanel('curves');
+      else if (event.key.toLowerCase() === 'a') openPanel('ai');
       else if (event.key.toLowerCase() === 'b') setShowOriginal((value) => !value);
-      else if (event.key.toLowerCase() === 'm') setActivePanel('masks');
+      else if (event.key.toLowerCase() === 'm') openPanel('masks');
       else if (event.key === 'Escape') { setBrushActive(false); setAiPointActive(false); }
       else if (event.key === '?') setShortcutsOpen((value) => !value);
       else return;
@@ -261,11 +273,13 @@ export function EditorPage(): ReactElement {
     };
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [changeHistory, fitPreview, settingsOpen]);
+  }, [changeHistory, fitPreview, openPanel, settingsOpen]);
 
   const changeMode = (mode: InterfaceModePrimitive): void => {
     if (project === null) return;
     application.chooseInterfaceMode.choose(project, new ChooseInterfaceModeMessage(mode));
+    setToolWorkspace('develop');
+    if (mode === 'simple' && !['light', 'color'].includes(activePanel)) setActivePanel('light');
     setRevision((current) => current + 1);
   };
 
@@ -333,8 +347,7 @@ export function EditorPage(): ReactElement {
   };
 
   const showAdjustment = (section: AdjustmentSection): void => {
-    setActivePanel(section);
-    window.requestAnimationFrame(() => document.getElementById(`tool-${section}`)?.scrollIntoView({ block: 'start' }));
+    openPanel(section);
   };
 
   const copyDevelopmentSettings = async (): Promise<void> => {
@@ -683,7 +696,7 @@ export function EditorPage(): ReactElement {
           <button className="icon-button" type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')} aria-label="Redo">↷</button>
           <button className="icon-button shortcut-button" type="button" onClick={() => setShortcutsOpen(true)} aria-label="Keyboard shortcuts">⌨</button>
         </div>
-        <button className="button ai-header-button" type="button" onClick={() => setActivePanel('ai')}><span aria-hidden="true">✦</span> AI Edit</button>
+        <button className="button ai-header-button" type="button" onClick={() => openPanel('ai')}><span aria-hidden="true">✦</span> AI Edit</button>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
@@ -692,7 +705,7 @@ export function EditorPage(): ReactElement {
           project={project}
           onNavigate={showAdjustment}
           onToggle={toggleAdjustment}
-          onNavigateTool={setActivePanel}
+          onNavigateTool={openPanel}
           onCopy={() => void copyDevelopmentSettings()}
           onPaste={() => void pasteDevelopmentSettings()}
           onApplyPreset={applyBuiltInPreset}
@@ -728,21 +741,20 @@ export function EditorPage(): ReactElement {
           </div>
         </div>
         <aside className="tools-panel" aria-label="Editing tools">
+          <div className="tool-workspace-switch" role="tablist" aria-label="Editing workspace">
+            <button role="tab" aria-selected={toolWorkspace === 'ai'} className={toolWorkspace === 'ai' ? 'active ai' : ''} type="button" onClick={() => openPanel('ai')}>✦ AI</button>
+            <button role="tab" aria-selected={toolWorkspace === 'develop'} className={toolWorkspace === 'develop' ? 'active' : ''} type="button" onClick={() => { setToolWorkspace('develop'); if (activePanel === 'ai') setActivePanel('light'); }}>Develop</button>
+          </div>
+          {toolWorkspace === 'ai' ? <>
           <section className="ai-hero">
             <div><span className="ai-orb" aria-hidden="true">✦</span><span><strong>RAWcket AI</strong><small>Your editing copilot</small></span></div>
-            <p>Describe the result you want. Local Smart Edit turns it into explicit, reversible recipe changes.</p>
-            <button className="button ai-primary full" type="button" onClick={() => setActivePanel('ai')}>Create with AI</button>
+            <p>Describe the result you want. Every suggestion remains explicit, reviewable, and reversible.</p>
           </section>
-          <HistogramPanel analysis={previewAnalysis} />
-          <div className="mode-switch" aria-label="Interface level">
-            <button className={mode === 'simple' ? 'active' : ''} type="button" onClick={() => changeMode('simple')}>Simple</button>
-            <button className={mode === 'advanced' ? 'active' : ''} type="button" onClick={() => changeMode('advanced')}>Advanced</button>
-          </div>
-          <ToolSection id="ai" title="AI Studio" active={activePanel === 'ai'} onToggle={setActivePanel} badge="Core workflow">
+          <ToolSection id="ai" title="AI Studio" active onToggle={openPanel} badge="Core workflow">
             <div className="development-tutor" aria-label="Local development tutor">
               <div className="development-tutor-heading"><span aria-hidden="true">◇</span><div><strong>Local Development Tutor</strong><small>Measured, explainable, never auto-applied</small></div></div>
               {developmentGuidance.length === 0 ? <p>Waiting for the rendered frame analysis…</p> : developmentGuidance.map((item) => (
-                <button className={`guidance-item ${item.severity}`} type="button" key={`${item.title}-${item.evidence}`} onClick={() => setActivePanel(item.targetPanel)}>
+                <button className={`guidance-item ${item.severity}`} type="button" key={`${item.title}-${item.evidence}`} onClick={() => openPanel(item.targetPanel)}>
                   <span><strong>{item.title}</strong><small>{item.kind === 'measurement' ? 'Measured fact' : 'Review suggestion'}</small></span>
                   <p>{item.detail}</p>
                   <em>{item.evidence}</em>
@@ -774,14 +786,26 @@ export function EditorPage(): ReactElement {
                 </div>
               </div>
             )}
+            <div className="ai-mask-entry">
+              <span><strong>Local AI masks</strong><small>Pixels stay on this device</small></span>
+              <button className="button ai-primary full" type="button" onClick={() => { addAiMask(); openPanel('masks'); }}>Create Local Smart Mask</button>
+            </div>
             <button className="button ghost full" type="button" onClick={() => setSettingsOpen(true)}>Optional cloud AI and privacy settings</button>
           </ToolSection>
+          </> : <>
+          <HistogramPanel analysis={previewAnalysis} />
+          <div className="mode-switch" aria-label="Interface level">
+            <button className={mode === 'simple' ? 'active' : ''} type="button" onClick={() => changeMode('simple')}>Simple</button>
+            <button className={mode === 'advanced' ? 'active' : ''} type="button" onClick={() => changeMode('advanced')}>Advanced</button>
+          </div>
+          <p className="mode-explanation">{mode === 'simple' ? 'Essential light and color controls.' : 'Full technical control, curves, geometry, and masks.'}</p>
           <ToolSection id="light" title="Light" active={activePanel === 'light'} onToggle={setActivePanel} badge="Shortcut 1">
             <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} />
           </ToolSection>
           <ToolSection id="color" title="Color" active={activePanel === 'color'} onToggle={setActivePanel} badge="Shortcut 2">
             <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeAdjustment} />
           </ToolSection>
+          {mode === 'advanced' && <>
           <ToolSection id="detail" title="Detail" active={activePanel === 'detail'} onToggle={setActivePanel} badge="Shortcut 3">
             <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} />
           </ToolSection>
@@ -810,7 +834,6 @@ export function EditorPage(): ReactElement {
               onAddRadial={addRadialMask}
               onAddLinear={addLinearMask}
               onAddLuminance={addLuminanceMask}
-              onAddAi={addAiMask}
               onUpdate={updateMask}
               onRemove={removeMask}
               onBrushActiveChange={(active) => { setBrushActive(active); if (active) setAiPointActive(false); }}
@@ -819,6 +842,9 @@ export function EditorPage(): ReactElement {
               onBrushSizeChange={setBrushSize}
             />
           </ToolSection>
+          </>}
+          {mode === 'simple' && <section className="advanced-invitation"><strong>Need curves, geometry, or masks?</strong><p>Advanced keeps the same non-destructive recipe and reveals the complete technical toolset.</p><button className="button ghost full" type="button" onClick={() => changeMode('advanced')}>Open Advanced controls</button></section>}
+          </>}
         </aside>
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />

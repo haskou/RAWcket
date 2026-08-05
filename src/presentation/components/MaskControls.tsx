@@ -16,7 +16,6 @@ export function MaskControls({
   onAddRadial,
   onAddLinear,
   onAddLuminance,
-  onAddAi,
   onUpdate,
   onRemove,
   onBrushActiveChange,
@@ -35,7 +34,6 @@ export function MaskControls({
   onAddRadial: () => void;
   onAddLinear: () => void;
   onAddLuminance: () => void;
-  onAddAi: () => void;
   onUpdate: (mask: MaskDefinitionPrimitives, groupId: string | null) => void;
   onRemove: (id: string) => void;
   onBrushActiveChange: (active: boolean) => void;
@@ -126,7 +124,6 @@ export function MaskControls({
         <button type="button" onClick={onAddRadial}>+ Radial mask</button>
         <button type="button" onClick={onAddLinear}>+ Linear gradient</button>
         <button type="button" onClick={onAddLuminance}>+ Luminance range</button>
-        <button type="button" onClick={onAddAi}>✦ Local Smart Mask</button>
       </div>
       {masks.length === 0 && <p className="mask-empty">Create a local mask, then paint or position it directly over the photograph.</p>}
       <div className="mask-list">

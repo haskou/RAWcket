@@ -160,6 +160,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-orb { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #7f9a47; border-radius: 50%; background: #202c18; color: var(--accent); box-shadow: 0 0 20px rgba(201,240,107,.2); }
 .button.ai-primary { border-color: var(--accent); background: linear-gradient(120deg, #c9f06b, #99c946); color: #11150d; }
 .histogram-panel { margin: 0 14px 14px; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: #0d0f0e; }
+.tool-workspace-switch { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: rgba(16,18,17,.96); backdrop-filter: blur(12px); }
+.tool-workspace-switch button { min-height: 36px; border: 1px solid #303531; border-radius: 8px; background: #151817; color: #8f9691; cursor: pointer; font-size: .72rem; font-weight: 750; }
+.tool-workspace-switch button.active { border-color: #65705f; background: #292d2a; color: var(--text); }
+.tool-workspace-switch button.active.ai { border-color: #819a50; background: #202a18; color: var(--accent); }
 .histogram-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; color: #c4cac5; font-size: .68rem; font-weight: 700; }
 .histogram-heading small { color: #666e68; font-size: .56rem; font-weight: 500; }
 .histogram-panel svg { width: 100%; height: 68px; display: block; overflow: hidden; border-radius: 5px; background: linear-gradient(to right, transparent 49.8%, #242824 50%, transparent 50.2%); }
@@ -176,6 +180,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .mode-switch { display: grid; grid-template-columns: 1fr 1fr; margin: 14px; padding: 3px; border-radius: 9px; background: #0c0d0d; }
 .mode-switch button { height: 32px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; font-size: .75rem; }
 .mode-switch button.active { background: #292d2a; color: var(--text); box-shadow: 0 1px 5px #000; }
+.mode-explanation { margin: -6px 16px 12px; color: #747c76; font-size: .61rem; text-align: center; }
+.advanced-invitation { margin: 14px; padding: 13px; border: 1px solid #343a35; border-radius: 10px; background: #111412; }
+.advanced-invitation strong { color: #c7cdc8; font-size: .72rem; }
+.advanced-invitation p { margin: 5px 0 10px; color: #7e8780; font-size: .63rem; line-height: 1.45; }
 .panel-intro { margin: 0; padding: 0 16px 13px; color: #777e79; font-size: .7rem; line-height: 1.5; }
 .tool-section { border-top: 1px solid var(--line-soft); }
 .tool-heading { width: 100%; min-height: 49px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border: 0; background: transparent; cursor: pointer; text-align: left; font-size: .82rem; font-weight: 700; }
@@ -278,6 +286,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-proposal-operations input { accent-color: var(--accent); }
 .ai-proposal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .ai-proposal-actions .button { min-height: 34px; padding-inline: 8px; font-size: .67rem; }
+.ai-mask-entry { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid #465636; border-radius: 9px; background: #12170f; }
+.ai-mask-entry strong, .ai-mask-entry small { display: block; }
+.ai-mask-entry strong { color: #dce3d8; font-size: .7rem; }
+.ai-mask-entry small { color: #7f8a7c; font-size: .57rem; }
 .shortcut-dialog dl { margin: 0; }
 .shortcut-dialog dl > div { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line-soft); }
 .shortcut-dialog dt { color: #cbd0cc; font-size: .8rem; }
