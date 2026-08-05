@@ -289,10 +289,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-proposal-operations input { accent-color: var(--accent); }
 .ai-proposal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .ai-proposal-actions .button { min-height: 34px; padding-inline: 8px; font-size: .67rem; }
-.ai-mask-entry { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid #465636; border-radius: 9px; background: #12170f; }
-.ai-mask-entry strong, .ai-mask-entry small { display: block; }
-.ai-mask-entry strong { color: #dce3d8; font-size: .7rem; }
-.ai-mask-entry small { color: #7f8a7c; font-size: .57rem; }
+.semantic-mask-controls { display: grid; gap: 10px; margin: 16px 0; padding: 13px; border: 1px solid #465636; border-radius: 10px; background: linear-gradient(150deg, #151b12, #101311); }
+.semantic-mask-heading { display: flex; gap: 9px; align-items: center; }
+.semantic-mask-heading .ai-orb.small { width: 28px; height: 28px; font-size: .7rem; }
+.semantic-mask-heading strong, .semantic-mask-heading small { display: block; }
+.semantic-mask-heading strong { color: #e3eadf; font-size: .73rem; }
+.semantic-mask-heading small { margin-top: 2px; color: #7f8a7c; font-size: .56rem; font-weight: 500; }
+.semantic-mask-controls > p, .semantic-model-consent > p { margin: 0; color: #929b94; font-size: .63rem; line-height: 1.5; }
+.semantic-model-consent, .semantic-model-ready, .semantic-progress { display: grid; gap: 9px; }
+.semantic-model-consent dl { display: grid; gap: 5px; margin: 0; padding: 9px; border: 1px solid #2b312c; border-radius: 7px; background: #0e110f; }
+.semantic-model-consent dl > div { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 7px; }
+.semantic-model-consent dt { color: #747c76; font-size: .55rem; }
+.semantic-model-consent dd { overflow: hidden; margin: 0; color: #b8c0ba; font-family: var(--mono); font-size: .54rem; text-overflow: ellipsis; white-space: nowrap; }
+.semantic-model-consent a { width: max-content; color: var(--accent); font-size: .6rem; text-underline-offset: 3px; }
+.semantic-consent-check { display: grid; grid-template-columns: auto 1fr; gap: 7px; align-items: start; color: #b0b8b2; font-size: .6rem; line-height: 1.4; }
+.semantic-consent-check input { margin: 1px 0 0; accent-color: var(--accent); }
+.semantic-model-ready select { width: 100%; height: 36px; padding: 0 9px; border: 1px solid #3a423c; border-radius: 7px; background: #0d100e; color: #d8ded9; }
+.button.danger-link { border-color: #543536; background: #201516; color: #d7a2a2; }
+.semantic-progress progress { width: 100%; height: 6px; accent-color: var(--accent); }
+.semantic-progress span { color: #9da69f; font-size: .58rem; }
+.semantic-model-status.warning { color: #d9bb74; }
+.semantic-model-message { min-height: 1.5em; color: #aeb7b0 !important; }
+.smart-point-fallback { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid #303631; }
+.smart-point-fallback strong, .smart-point-fallback small { display: block; }
+.smart-point-fallback strong { color: #cdd4ce; font-size: .65rem; }
+.smart-point-fallback small { margin-top: 2px; color: #747e76; font-size: .55rem; }
 .shortcut-dialog dl { margin: 0; }
 .shortcut-dialog dl > div { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line-soft); }
 .shortcut-dialog dt { color: #cbd0cc; font-size: .8rem; }

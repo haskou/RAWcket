@@ -14,6 +14,7 @@ import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { CopyDevelopmentSettingsMessage } from '@/contexts/projects/application/copy-development-settings/messages/CopyDevelopmentSettingsMessage';
+import { CreateSemanticMaskMessage } from '@/contexts/projects/application/create-semantic-mask/messages/CreateSemanticMaskMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { ExportProjectPhotoMessage } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
@@ -24,6 +25,7 @@ import { PasteDevelopmentSettingsMessage } from '@/contexts/projects/application
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
 import type { DevelopmentGuidanceItem } from '@/contexts/projects/application/ports/DevelopmentTutor';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
+import type { SemanticModelStatus } from '@/contexts/projects/application/ports/SemanticSegmentationModel';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
 import { GlobalAdjustments } from '@/contexts/projects/domain/GlobalAdjustments';
 import type { DevelopmentSettingsPrimitives } from '@/contexts/projects/domain/DevelopmentRecipe';
@@ -33,6 +35,7 @@ import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectU
 import { CurveSet, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
+import type { SemanticMaskCategoryPrimitive } from '@/contexts/projects/domain/value-objects/SemanticMaskCategory';
 import { useApplication } from '../ApplicationContext';
 import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
 import { AdjustmentControls } from '../components/AdjustmentControls';
@@ -40,6 +43,7 @@ import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { GeometryControls } from '../components/GeometryControls';
 import { ExportPhotoDialog, type PhotoExportSettings } from '../components/ExportPhotoDialog';
 import { MaskControls } from '../components/MaskControls';
+import { SemanticMaskControls, type SemanticModelTask } from '../components/SemanticMaskControls';
 import { ToneCurveEditor } from '../components/ToneCurveEditor';
 import { HistogramPanel } from '../components/HistogramPanel';
 import {
@@ -117,6 +121,7 @@ export function EditorPage(): ReactElement {
   const brushGesture = useRef<BrushGesture | null>(null);
   const previewSurface = useRef<HTMLDivElement>(null);
   const exportAbort = useRef<AbortController | null>(null);
+  const semanticAbort = useRef<AbortController | null>(null);
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [beforeSource, setBeforeSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
@@ -147,10 +152,32 @@ export function EditorPage(): ReactElement {
   const [aiProposal, setAiProposal] = useState<EditProposal | null>(null);
   const [aiSelection, setAiSelection] = useState<Set<number>>(new Set());
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [semanticStatus, setSemanticStatus] = useState<SemanticModelStatus | 'checking'>('checking');
+  const [semanticTask, setSemanticTask] = useState<SemanticModelTask>(null);
+  const [semanticProgress, setSemanticProgress] = useState(0);
+  const [semanticCategory, setSemanticCategory] = useState<SemanticMaskCategoryPrimitive>('sky');
+  const [semanticConsent, setSemanticConsent] = useState(false);
+  const [semanticMessage, setSemanticMessage] = useState('The semantic model is optional. Manual and point-guided masks always remain available.');
   const [loadError, setLoadError] = useState<string | null>(null);
   const sourceUrl = useObjectUrl(showOriginal ? beforeSource : preview ?? beforeSource);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
   const autosave = useProjectAutosave(project, revision, save);
+  const semanticDescriptor = application.manageSemanticSegmentationModel.describe();
+
+  useEffect(() => {
+    let mounted = true;
+    void application.manageSemanticSegmentationModel.inspect().then((status) => {
+      if (mounted) setSemanticStatus(status);
+    }).catch((error: unknown) => {
+      if (!mounted) return;
+      setSemanticStatus('unavailable');
+      setSemanticMessage(error instanceof Error ? error.message : 'The local semantic model could not be inspected.');
+    });
+    return () => {
+      mounted = false;
+      semanticAbort.current?.abort();
+    };
+  }, [application]);
 
   useEffect(() => {
     const load = async (): Promise<void> => {
@@ -519,6 +546,76 @@ export function EditorPage(): ReactElement {
     setAiPointActive(true);
   };
 
+  const installSemanticModel = async (): Promise<void> => {
+    if (!semanticConsent || semanticTask !== null) return;
+    const controller = new AbortController();
+    semanticAbort.current = controller;
+    setSemanticTask('installing');
+    setSemanticProgress(0);
+    setSemanticMessage('Downloading the pinned model and verifying every resource locally…');
+    try {
+      await application.manageSemanticSegmentationModel.install({
+        signal: controller.signal,
+        onProgress: setSemanticProgress
+      });
+      setSemanticStatus('installed');
+      setSemanticProgress(1);
+      setSemanticMessage('Local semantic selection is ready. The photograph never leaves this device.');
+    } catch (error: unknown) {
+      setSemanticStatus(await application.manageSemanticSegmentationModel.inspect());
+      setSemanticMessage(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Model download cancelled. Any verified partial download can resume later.'
+        : error instanceof Error ? error.message : 'The local semantic model could not be installed.');
+    } finally {
+      semanticAbort.current = null;
+      setSemanticTask(null);
+    }
+  };
+
+  const removeSemanticModel = async (): Promise<void> => {
+    if (semanticTask !== null) return;
+    try {
+      await application.manageSemanticSegmentationModel.remove();
+      setSemanticStatus('not-installed');
+      setSemanticConsent(false);
+      setSemanticProgress(0);
+      setSemanticMessage('The local semantic model and its browser cache were removed.');
+    } catch (error: unknown) {
+      setSemanticMessage(error instanceof Error ? error.message : 'The local semantic model could not be removed.');
+    }
+  };
+
+  const generateSemanticMask = async (): Promise<void> => {
+    if (project === null || preview === null || semanticTask !== null) return;
+    const controller = new AbortController();
+    const maskId = crypto.randomUUID();
+    semanticAbort.current = controller;
+    setSemanticTask('segmenting');
+    setSemanticProgress(0);
+    setSemanticMessage(`Finding ${semanticCategory} locally…`);
+    try {
+      const mask = await application.createSemanticMask.create(
+        project,
+        new CreateSemanticMaskMessage(projectId, maskId, semanticCategory, preview),
+        { signal: controller.signal, onProgress: setSemanticProgress }
+      );
+      apply({ kind: EDIT_OPERATION.ADD_MASK, mask: mask.toPrimitives(), groupId: null });
+      setSelectedMaskId(maskId);
+      setBrushActive(false);
+      setAiPointActive(false);
+      setSemanticProgress(1);
+      setSemanticMessage(`${semanticCategory[0]?.toUpperCase() ?? ''}${semanticCategory.slice(1)} mask created as editable recipe data.`);
+      openPanel('masks');
+    } catch (error: unknown) {
+      setSemanticMessage(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Semantic selection cancelled.'
+        : error instanceof Error ? error.message : 'The semantic mask could not be created.');
+    } finally {
+      semanticAbort.current = null;
+      setSemanticTask(null);
+    }
+  };
+
   const selectMask = (id: string): void => {
     setSelectedMaskId(id);
     setBrushActive(false);
@@ -786,10 +883,23 @@ export function EditorPage(): ReactElement {
                 </div>
               </div>
             )}
-            <div className="ai-mask-entry">
-              <span><strong>Local AI masks</strong><small>Pixels stay on this device</small></span>
-              <button className="button ai-primary full" type="button" onClick={() => { addAiMask(); openPanel('masks'); }}>Create Local Smart Mask</button>
-            </div>
+            <SemanticMaskControls
+              descriptor={semanticDescriptor}
+              status={semanticStatus}
+              task={semanticTask}
+              progress={semanticProgress}
+              category={semanticCategory}
+              consented={semanticConsent}
+              message={semanticMessage}
+              previewAvailable={preview !== null}
+              onCategoryChange={setSemanticCategory}
+              onConsentChange={setSemanticConsent}
+              onInstall={() => void installSemanticModel()}
+              onCancel={() => semanticAbort.current?.abort()}
+              onRemove={() => void removeSemanticModel()}
+              onGenerate={() => void generateSemanticMask()}
+              onCreatePointMask={() => { addAiMask(); openPanel('masks'); }}
+            />
             <button className="button ghost full" type="button" onClick={() => setSettingsOpen(true)}>Optional cloud AI and privacy settings</button>
           </ToolSection>
           </> : <>

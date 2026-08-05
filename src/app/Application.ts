@@ -4,11 +4,13 @@ import { ChangeHistory } from '@/contexts/projects/application/change-history/Ch
 import { ChooseInterfaceMode } from '@/contexts/projects/application/choose-interface-mode/ChooseInterfaceMode';
 import { CopyDevelopmentSettings } from '@/contexts/projects/application/copy-development-settings/CopyDevelopmentSettings';
 import { CreateProject } from '@/contexts/projects/application/create-project/CreateProject';
+import { CreateSemanticMask } from '@/contexts/projects/application/create-semantic-mask/CreateSemanticMask';
 import { DeleteProject } from '@/contexts/projects/application/delete-project/DeleteProject';
 import { DuplicateProject } from '@/contexts/projects/application/duplicate-project/DuplicateProject';
 import { ExportProjectPhoto } from '@/contexts/projects/application/export-project-photo/ExportProjectPhoto';
 import { FindProject } from '@/contexts/projects/application/find-project/FindProject';
 import { ListProjects } from '@/contexts/projects/application/list-projects/ListProjects';
+import { ManageSemanticSegmentationModel } from '@/contexts/projects/application/manage-semantic-segmentation-model/ManageSemanticSegmentationModel';
 import { InspectSourceImage } from '@/contexts/projects/application/inspect-source-image/InspectSourceImage';
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
@@ -31,6 +33,7 @@ import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/rende
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
 import { LocalRecipeAdvisor } from '@/contexts/projects/infrastructure/advisors/LocalRecipeAdvisor';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
+import { BrowserSemanticSegmentationModel } from '@/contexts/projects/infrastructure/ai/BrowserSemanticSegmentationModel';
 import { BrowserDevelopmentSettingsClipboard } from '@/contexts/projects/infrastructure/clipboard/BrowserDevelopmentSettingsClipboard';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
@@ -40,9 +43,11 @@ import { BrowserLocalStorageInspector } from '@/shared/infrastructure/storage/Br
 
 export type Application = {
   createProject: CreateProject;
+  createSemanticMask: CreateSemanticMask;
   assessImportCapacity: AssessImportCapacity;
   findProject: FindProject;
   listProjects: ListProjects;
+  manageSemanticSegmentationModel: ManageSemanticSegmentationModel;
   applyEditOperation: ApplyEditOperation;
   changeHistory: ChangeHistory;
   chooseInterfaceMode: ChooseInterfaceMode;
@@ -76,11 +81,14 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const settings = new RawcketSettingsRepository(database);
   const previewRenderer = new CachingPreviewRenderer(new WorkerPreviewRenderer(sourceFiles));
   const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
+  const semanticSegmentationModel = new BrowserSemanticSegmentationModel();
   return {
     createProject: new CreateProject(projects, sourceFiles),
+    createSemanticMask: new CreateSemanticMask(semanticSegmentationModel),
     assessImportCapacity: new AssessImportCapacity(new BrowserLocalStorageInspector()),
     findProject: new FindProject(projects),
     listProjects: new ListProjects(projects),
+    manageSemanticSegmentationModel: new ManageSemanticSegmentationModel(semanticSegmentationModel),
     applyEditOperation: new ApplyEditOperation(),
     changeHistory: new ChangeHistory(),
     chooseInterfaceMode: new ChooseInterfaceMode(),

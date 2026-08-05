@@ -21,7 +21,7 @@ Implemented:
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
 - Versioned schema migrations through version 3.
-- AI-first workspace with local, reviewable recipe proposals, a measurement-backed development tutor, and deterministic positive/negative-point smart masks. Optional cloud AI remains disabled by default.
+- AI-first workspace with local, reviewable recipe proposals, a measurement-backed development tutor, deterministic positive/negative-point smart masks, and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Optional cloud AI remains disabled by default.
 - Optional AES-GCM/PBKDF2 API-key vault whose master password is never stored.
 - Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
 - Interactive curves, before/after, exact geometry, brush/radial/linear/luminance masks, portable development settings, and built-in reversible presets.
@@ -32,7 +32,7 @@ Not implemented yet:
 
 - Full LibRaw/WASM demosaicing and a high-depth linear RAW pipeline. Sony ARW currently uses its embedded JPEG preview while preserving the original `.arw` in storage and bundles.
 - WebGPU/WebGL2 passes for masks and spatial filters, device-loss recovery, and a complete GPU/CPU golden-image parity corpus.
-- Downloadable ONNX segmentation models, semantic categories, and a consented optional cloud provider.
+- A consented optional cloud provider and larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
 - 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.
 - Tags, ratings, collections, sidecars, filesystem links, complete orphan cleanup, and a full WCAG/browser-device audit.
@@ -96,8 +96,8 @@ Import validates the manifest, format version, every hash, and the Zod schema be
 ## Privacy and security
 
 - There is no backend, account, authentication, analytics, or mandatory SaaS.
-- No image or metadata leaves the device without an explicit future consent flow.
-- Local AI-style assistance runs without a network. Optional provider access is disabled by default.
+- No image or metadata leaves the device. Future cloud assistance requires a separate explicit consent flow.
+- Local proposals and point masks require no network. Semantic Select downloads pinned model weights only after consent, verifies each resource, then performs inference on-device. Optional provider access is disabled by default.
 - An API key can remain in session memory or be encrypted with AES-GCM; its decryption key is derived from a master password that is never stored.
 - Keys never become part of projects, bundles, logs, or errors.
 

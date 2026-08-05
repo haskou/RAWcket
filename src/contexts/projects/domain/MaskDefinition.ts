@@ -1,6 +1,7 @@
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from './value-objects/AdjustmentKey';
 import { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
 import { MaskId } from './value-objects/MaskId';
+import type { SemanticMaskCategoryPrimitive } from './value-objects/SemanticMaskCategory';
 
 type PointPrimitive = { x: number; y: number };
 type RectanglePrimitive = PointPrimitive & { width: number; height: number };
@@ -27,6 +28,8 @@ export type AiSegmentationMaskShape = {
   boundingBoxes: RectanglePrimitive[];
   strategy: string;
   version: string;
+  semanticCategory?: SemanticMaskCategoryPrimitive | null;
+  confidence?: number | null;
   rasterCacheKey: string | null;
 };
 export type CompositeMaskShape = {
@@ -115,6 +118,12 @@ export class MaskDefinition {
       boxes.push(...shape.boundingBoxes);
       if (shape.prompt.trim().length === 0 || shape.strategy.trim().length === 0 || shape.version.trim().length === 0) {
         throw new Error('An AI mask must preserve its prompt, strategy, and version.');
+      }
+      if (shape.semanticCategory?.trim().length === 0) {
+        throw new Error('A semantic mask category cannot be empty.');
+      }
+      if (shape.confidence !== undefined && shape.confidence !== null) {
+        MaskDefinition.ensureUnitInterval(shape.confidence, 'confidence');
       }
     }
     points.forEach((point) => this.ensurePoint(point));

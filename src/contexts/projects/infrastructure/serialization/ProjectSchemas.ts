@@ -72,6 +72,8 @@ export const maskSchema: z.ZodType<MaskDefinitionPrimitives> = z.lazy(() =>
         boundingBoxes: z.array(rectangleSchema),
         strategy: z.string().min(1),
         version: z.string().min(1),
+        semanticCategory: z.enum(['sky', 'water', 'vegetation', 'people', 'buildings']).nullable().optional(),
+        confidence: z.number().min(0).max(1).nullable().optional(),
         rasterCacheKey: z.string().nullable()
       }),
       z.object({

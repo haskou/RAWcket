@@ -13,6 +13,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Interactive RGB/R/G/B/luminance curve graph with draggable and exact points.
 - [x] Rendered non-destructive crop/geometry, before/after, masks, histogram, and clipping.
 - [x] Local reviewable AI proposals, measurement-backed tutor, and deterministic smart-point masks.
+- [x] Consented, pinned, integrity-verified ONNX semantic model with removable local storage and WebGPU/WASM execution.
 - [x] JPEG/PNG/TIFF worker export with resize, progress, and cancellation.
 - [x] ARW embedded-preview extraction while preserving the original RAW.
 - [x] Versioned LRU previews, quota preflight, SHA-256 snapshots, and corruption recovery.
@@ -26,7 +27,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 1. Prototype LibRaw/WASM in a worker with a redistributable Sony A6600 ARW fixture.
 2. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
 3. Extend the WebGPU and WebGL2 renderers behind the existing preview boundary to cover masks and spatial stages.
-4. Add consented ONNX model management and semantic segmentation after manual/local deterministic masks.
+4. Extend semantic selection with embedding reuse, model tiers, more categories, and mask composition.
 5. Add optional cloud assistance only after privacy, cost, and structured-output contracts are complete.
 
 ---
@@ -121,7 +122,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented foundation.** Positive/negative points and editable bounding boxes persist as normal AI-mask recipe data. The current `local-spatial-luminance` strategy is deterministic, offline, requires no download, and is labeled honestly rather than presented as SAM.
 
-**Remaining.** Evaluate SAM, SAM 2, or a compatible alternative on ONNX Runtime Web/WebGPU. Download models only after consent into Cache Storage or OPFS; compute one embedding per preview; decode subsequent prompts quickly; offer light/advanced models and manual fallback.
+**Implemented.** An optional pinned SegFormer ONNX model is disclosed before download, stored in a dedicated Cache Storage namespace, and checked against exact byte sizes and SHA-256 hashes. Installation, inference, and removal are explicit; network and active inference are cancellable; WebGPU is preferred with a WASM fallback; the deterministic point-guided and manual paths remain available.
+
+**Remaining.** Evaluate SAM 2 or a compatible promptable alternative; compute one embedding per preview; decode subsequent prompts quickly; offer light/advanced models; and add preview/model-hash cache reuse.
 
 **Acceptance.** Nothing downloads without consent; cancellation stops network and compute; embeddings reuse a preview/model hash; the project preserves prompts/points/boxes/model/version rather than depending on a raster; the model works offline after download; unsupported devices retain manual tools.
 
@@ -131,7 +134,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Create local masks for common photographic categories.
 
-**Scope.** Subject, sky, water, vegetation, people, background, buildings, skin, hair, and clothing; local model; confidence; manual refinement; category composition.
+**Implemented.** The pinned local model exposes sky, water, vegetation, people, and buildings. Results persist category, model identifier, immutable revision, confidence, points, and bounding boxes as editable AI-mask recipe data. Missing or low-confidence regions produce an actionable manual/point-mask fallback instead of a fabricated selection.
+
+**Remaining.** Subject/background, skin, hair, and clothing categories; direct confidence presentation on the mask row; category composition; and deeper vector refinement controls.
 
 **Acceptance.** Available categories are explicitly tied to a model/version; confidence is visible; all results remain refinable and composable; missing categories are not presented as certainty.
 
@@ -213,7 +218,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** The service-worker app shell, offline-ready notice, outdated-cache cleanup, and a new-version prompt that can be postponed rather than auto-activating while editing.
 
-**Remaining.** Downloadable AI models, schema-aware rollback, model size/status, and optional non-intrusive install prompts.
+**Implemented.** The semantic model is downloaded only from an explicit AI control that shows its source, pinned revision, model size, possible compatibility-runtime size, status, terms link, progress, cancellation, and removal.
+
+**Remaining.** Schema-aware rollback and optional non-intrusive PWA install prompts.
 
 **Acceptance.** The library opens offline after first load; incompatible code never activates before data can migrate; updates can be postponed; failed updates recover the previous shell; model size/status is visible; the normal website keeps every capability.
 

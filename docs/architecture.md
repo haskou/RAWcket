@@ -12,6 +12,7 @@ flowchart LR
   BUNDLE[".rawcket bundle"] -. implements .-> PORTS
   RENDER["Cached worker preview renderer"] -. implements .-> PORTS
   ADVISOR["Local advisor + tutor"] -. implements .-> PORTS
+  SEMANTIC["Consented browser semantic model"] -. implements .-> PORTS
   IDB --> ZOD["Zod + migrations"]
   BUNDLE --> ZOD
 ```
@@ -36,6 +37,7 @@ Dependency arrows point toward the application and domain layers. The domain dep
 - OPFS is used only behind `SourceFileRepository`; IndexedDB is the fallback.
 - `PreviewRenderer` isolates worker and image-pipeline concerns from React and the domain.
 - `EditingAdvisor` can return only `EditOperation` proposals and never receives authority to mutate an aggregate.
+- `SemanticSegmentationModel` owns the optional model lifecycle and returns only normalized suggestions. `CreateSemanticMask` converts those suggestions into domain-owned, versioned `MaskDefinition` values.
 - Portable development settings exclude source identity, geometry, masks, and disposable caches; paste and presets use one reversible aggregate operation.
 
 ## Save flow
@@ -62,3 +64,7 @@ sequenceDiagram
 ## Persistence recovery
 
 Each save validates the new aggregate and atomically stores the previous valid record as a SHA-256 snapshot. Five snapshots are retained per project. If the current record cannot migrate, validate, or hydrate, the repository searches newest-first for a snapshot whose checksum and schema both pass. It returns that recovery copy without overwriting the corrupt record, preserving forensic and manual recovery options.
+
+## Local semantic model flow
+
+The browser adapter discloses the model source, immutable revision, expected weight size, compatibility-runtime cost, and model-card link before enabling installation. It downloads no weights without a checked consent control. Every resource is fetched without credentials, checked against a pinned size and SHA-256 digest, and only then placed in a dedicated Cache Storage namespace. Transformers.js is configured to resolve only from that verified cache during inference, with remote model loading disabled. WebGPU is attempted first and ONNX Runtime Web/WASM is the fallback. Removal disposes the active pipeline and deletes the dedicated model cache; manual and deterministic point-guided masks do not depend on it.
