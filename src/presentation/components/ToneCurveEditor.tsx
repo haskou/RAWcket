@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import {
@@ -26,6 +26,7 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
 }): ReactElement {
   const graph = useRef<SVGSVGElement>(null);
   const drag = useRef<DragState | null>(null);
+  const keyboardGroup = useRef<string | null>(null);
   const [channel, setChannel] = useState<CurveChannelPrimitive>('rgb');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const curve = project.getCurve(CurveChannel.fromPrimitives(channel))?.toPrimitives() ?? ToneCurve.identity().toPrimitives();
@@ -106,6 +107,26 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
     setSelectedIndex(null);
   };
 
+  const movePointWithKeyboard = (event: ReactKeyboardEvent<SVGCircleElement>, pointIndex: number): void => {
+    const point = curve.points[pointIndex];
+    if (point === undefined) return;
+    if ((event.key === 'Delete' || event.key === 'Backspace') && pointIndex !== 0 && pointIndex !== curve.points.length - 1) {
+      event.preventDefault();
+      setSelectedIndex(pointIndex);
+      onChange(channel, { ...curve, points: curve.points.filter((_, index) => index !== pointIndex) }, null);
+      setSelectedIndex(null);
+      return;
+    }
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    setSelectedIndex(pointIndex);
+    keyboardGroup.current ??= crypto.randomUUID();
+    const step = event.shiftKey ? 0.01 : 0.001;
+    const x = point.x + (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0);
+    const y = point.y + (event.key === 'ArrowDown' ? -step : event.key === 'ArrowUp' ? step : 0);
+    movePoint(pointIndex, x, y, keyboardGroup.current);
+  };
+
   const changeInterpolation = (interpolation: CurveInterpolationPrimitive): void => onChange(channel, { ...curve, interpolation }, null);
   const reset = (): void => {
     onChange(channel, channel === 'luminance' ? null : ToneCurve.identity().toPrimitives(), null);
@@ -132,10 +153,10 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
         <path className="curve-grid" d="M0 .25H1 M0 .5H1 M0 .75H1 M.25 0V1 M.5 0V1 M.75 0V1" />
         <path className="curve-line-underlay" d={ToneCurvePathProjector.project(curve)} />
         <path className={`curve-line${identity ? ' identity' : ''}`} d={ToneCurvePathProjector.project(curve)} />
-        {!identity && curve.points.map((point, index) => <circle className={index === selectedIndex ? 'selected' : ''} key={index} cx={point.x} cy={1 - point.y} r="0.022" tabIndex={0} aria-label={`Curve point ${index + 1}: x ${point.x}, y ${point.y}`} onPointerDown={(event) => beginDrag(event, index)} onFocus={() => setSelectedIndex(index)} />)}
+        {!identity && curve.points.map((point, index) => <circle className={index === selectedIndex ? 'selected' : ''} key={index} cx={point.x} cy={1 - point.y} r="0.022" tabIndex={0} role="button" aria-describedby="curve-keyboard-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Delete Backspace" aria-label={`Curve point ${index + 1}: x ${point.x}, y ${point.y}`} onPointerDown={(event) => beginDrag(event, index)} onFocus={() => setSelectedIndex(index)} onBlur={() => { keyboardGroup.current = null; }} onKeyDown={(event) => movePointWithKeyboard(event, index)} onKeyUp={() => { keyboardGroup.current = null; }} />)}
       </svg>
       <div className="curve-axis-labels"><span>Output (Y)</span><span>Input (X)</span></div>
-      <p className="curve-interaction-hint">Click or drag on the graph to create and position a control point.</p>
+      <p className="curve-interaction-hint" id="curve-keyboard-help">Click or drag to create a point. Focus one and use the arrow keys for 0.001 steps, Shift + arrow for 0.01, or Delete to remove it.</p>
       <p className="curve-selection-status" aria-live="polite">{selected === undefined ? 'Neutral curve · no control point selected' : `Control point ${selectedIndex === null ? '' : selectedIndex + 1} selected`}</p>
       <div className="curve-point-values">
         <label>X <input aria-label="Curve point X" type="number" min={0} max={1} step={0.001} disabled={selected === undefined || selectedIsEndpoint} value={selected?.x ?? ''} onChange={(event) => { if (selectedIndex !== null) movePoint(selectedIndex, event.currentTarget.valueAsNumber, selected?.y ?? 0, null); }} /></label>

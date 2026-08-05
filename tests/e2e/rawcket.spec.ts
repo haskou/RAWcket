@@ -144,6 +144,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect.poll(async () => Number(await page.getByLabel('Curve point X').inputValue())).toBeLessThan(0.56);
   await page.getByLabel('Curve point Y').fill('0.1');
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
+  await middlePoint.focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await expect(page.getByLabel('Curve point Y')).toHaveValue('0.11');
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
   await page.getByRole('button', { name: 'Rate night 4 stars' }).click();
@@ -171,7 +174,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
   await page.locator('.curve-graph circle').nth(1).click();
-  await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
+  await expect(page.getByLabel('Curve point Y')).toHaveValue('0.11');
   const sidecarDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save sidecar' }).click();
   const sidecarDownload = await sidecarDownloadPromise;
