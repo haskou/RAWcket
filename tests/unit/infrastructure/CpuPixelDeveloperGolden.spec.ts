@@ -32,7 +32,7 @@ function settings(overrides: Partial<CpuDevelopmentSettings> = {}): CpuDevelopme
   };
 }
 
-async function digest(pixels: Uint8ClampedArray): Promise<string> {
+async function digest(pixels: Uint8ClampedArray<ArrayBuffer>): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', pixels);
   return [...new Uint8Array(hash)].map((value) => value.toString(16).padStart(2, '0')).join('');
 }
