@@ -14,6 +14,7 @@ import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
+import { ExportProjectPhotoMessage } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
@@ -29,6 +30,7 @@ import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
 import { AdjustmentControls } from '../components/AdjustmentControls';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { GeometryControls } from '../components/GeometryControls';
+import { ExportPhotoDialog, type PhotoExportSettings } from '../components/ExportPhotoDialog';
 import { MaskControls } from '../components/MaskControls';
 import { ToneCurveEditor } from '../components/ToneCurveEditor';
 import {
@@ -78,6 +80,7 @@ export function EditorPage(): ReactElement {
   const panGesture = useRef<PanGesture | null>(null);
   const brushGesture = useRef<BrushGesture | null>(null);
   const previewSurface = useRef<HTMLDivElement>(null);
+  const exportAbort = useRef<AbortController | null>(null);
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [source, setSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
@@ -93,6 +96,10 @@ export function EditorPage(): ReactElement {
   const [brushSize, setBrushSize] = useState(0.08);
   const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportMessage, setExportMessage] = useState('Choose a photographic format and output size.');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('Give this photograph a refined cinematic look while preserving natural skin tones.');
   const [aiMessage, setAiMessage] = useState('Local Smart Edit is ready. No photograph or metadata will leave this browser.');
@@ -217,6 +224,38 @@ export function EditorPage(): ReactElement {
     await autosave.flush();
     const bundle = await application.projectExporter.exportProject(project.getId());
     downloadBlob(bundle, `${project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-')}.rawcket`);
+  };
+
+  const exportPhoto = async (settings: PhotoExportSettings): Promise<void> => {
+    if (project === null) return;
+    const controller = new AbortController();
+    exportAbort.current = controller;
+    setExportBusy(true);
+    setExportProgress(0);
+    setExportMessage('Preparing full recipe…');
+    try {
+      await autosave.flush();
+      const image = await application.exportProjectPhoto.export(
+        project,
+        new ExportProjectPhotoMessage(projectId, settings.format, settings.quality, settings.maximumEdge),
+        {
+          signal: controller.signal,
+          onProgress: (progress) => {
+            setExportProgress(progress.completed);
+            setExportMessage(`${progress.stage[0]?.toUpperCase() ?? ''}${progress.stage.slice(1)} · ${Math.round(progress.completed * 100)}%`);
+          }
+        }
+      );
+      const safeName = project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'rawcket-photo';
+      downloadBlob(image, `${safeName}.${settings.format === 'jpeg' ? 'jpg' : 'png'}`);
+      setExportMessage('Photo exported successfully.');
+      setExportProgress(1);
+    } catch (error: unknown) {
+      setExportMessage(error instanceof DOMException && error.name === 'AbortError' ? 'Export cancelled.' : error instanceof Error ? error.message : 'The photo could not be exported.');
+    } finally {
+      exportAbort.current = null;
+      setExportBusy(false);
+    }
   };
 
   const rename = (name: string): void => {
@@ -515,7 +554,7 @@ export function EditorPage(): ReactElement {
           <button className="icon-button shortcut-button" type="button" onClick={() => setShortcutsOpen(true)} aria-label="Keyboard shortcuts">⌨</button>
         </div>
         <button className="button ai-header-button" type="button" onClick={() => setActivePanel('ai')}><span aria-hidden="true">✦</span> AI Edit</button>
-        <button className="button primary" type="button" onClick={() => void exportBundle()}>Export project</button>
+        <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
       <section className="editor-workspace">
@@ -628,6 +667,16 @@ export function EditorPage(): ReactElement {
         </aside>
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ExportPhotoDialog
+        open={exportOpen}
+        busy={exportBusy}
+        progress={exportProgress}
+        message={exportMessage}
+        onClose={() => setExportOpen(false)}
+        onExport={(settings) => void exportPhoto(settings)}
+        onExportProject={() => void exportBundle()}
+        onCancel={() => exportAbort.current?.abort()}
+      />
       {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
     </main>
   );

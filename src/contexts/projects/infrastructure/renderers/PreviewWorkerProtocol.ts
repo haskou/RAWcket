@@ -6,7 +6,11 @@ const recipeSchema = photoProjectSchema.shape.recipe;
 export const previewWorkerRequestSchema = z.object({
   id: z.uuid(),
   source: z.instanceof(Blob),
-  maximumEdge: z.int().min(64).max(4096),
+  maximumEdge: z.int().min(64).max(32_768).nullable(),
+  output: z.object({
+    mimeType: z.enum(['image/webp', 'image/jpeg', 'image/png']),
+    quality: z.number().min(0.1).max(1)
+  }),
   development: z.object({
     adjustments: recipeSchema.shape.globalAdjustments,
     curves: recipeSchema.shape.curves,
@@ -25,7 +29,7 @@ export const previewWorkerResponseSchema = z.discriminatedUnion('kind', [
     stage: z.enum(['queued', 'decoding', 'developing', 'encoding']),
     completed: z.number().min(0).max(1)
   }),
-  z.object({ kind: z.literal('completed'), id: z.uuid(), preview: z.instanceof(Blob) }),
+  z.object({ kind: z.literal('completed'), id: z.uuid(), image: z.instanceof(Blob) }),
   z.object({ kind: z.literal('failed'), id: z.uuid(), message: z.string().min(1) })
 ]);
 

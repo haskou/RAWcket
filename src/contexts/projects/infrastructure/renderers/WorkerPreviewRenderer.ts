@@ -49,13 +49,14 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
       id: crypto.randomUUID(),
       source,
       maximumEdge: request.getSize().valueOf(),
-        development: {
-          adjustments: primitives.recipe.globalAdjustments,
-          curves: primitives.recipe.curves,
-          disabledAdjustments: primitives.recipe.disabledGlobalAdjustments,
-          masks: primitives.recipe.masks,
-          viewport: primitives.recipe.viewport
-        }
+      output: { mimeType: 'image/webp', quality: 0.9 },
+      development: {
+        adjustments: primitives.recipe.globalAdjustments,
+        curves: primitives.recipe.curves,
+        disabledAdjustments: primitives.recipe.disabledGlobalAdjustments,
+        masks: primitives.recipe.masks,
+        viewport: primitives.recipe.viewport
+      }
     };
     return new Promise((resolve, reject) => {
       const worker = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });
@@ -81,7 +82,7 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
         }
         cleanup();
         if (response.data.kind === 'failed') reject(new Error(response.data.message));
-        else resolve(response.data.preview);
+        else resolve(response.data.image);
       };
       worker.postMessage(workerRequest);
     });

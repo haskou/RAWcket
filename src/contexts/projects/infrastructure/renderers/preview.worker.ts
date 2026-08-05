@@ -22,7 +22,7 @@ async function render(input: unknown): Promise<void> {
     progress(request.id, 'queued', 0.05);
     const bitmap = await createImageBitmap(request.source);
     progress(request.id, 'decoding', 0.3);
-    const scale = Math.min(1, request.maximumEdge / Math.max(bitmap.width, bitmap.height));
+    const scale = request.maximumEdge === null ? 1 : Math.min(1, request.maximumEdge / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));
     const height = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = new OffscreenCanvas(width, height);
@@ -30,9 +30,9 @@ async function render(input: unknown): Promise<void> {
     if (context === null) throw new Error('The preview context could not be created.');
     context.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
-    const image = context.getImageData(0, 0, width, height);
+    const imageData = context.getImageData(0, 0, width, height);
     const pixels = developer.develop(
-      image.data,
+      imageData.data,
       width,
       height,
       request.development
@@ -43,9 +43,9 @@ async function render(input: unknown): Promise<void> {
     if (outputContext === null) throw new Error('The output preview context could not be created.');
     outputContext.putImageData(new ImageData(transformed.pixels, transformed.width, transformed.height), 0, 0);
     progress(request.id, 'developing', 0.8);
-    const preview = await outputCanvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
+    const image = await outputCanvas.convertToBlob({ type: request.output.mimeType, quality: request.output.quality });
     progress(request.id, 'encoding', 0.95);
-    post({ kind: 'completed', id: request.id, preview });
+    post({ kind: 'completed', id: request.id, image });
   } catch (error: unknown) {
     post({
       kind: 'failed',

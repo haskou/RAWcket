@@ -60,4 +60,10 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByLabel('Format').selectOption('png');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PNG' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('night.png');
 });

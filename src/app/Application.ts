@@ -4,6 +4,7 @@ import { ChooseInterfaceMode } from '@/contexts/projects/application/choose-inte
 import { CreateProject } from '@/contexts/projects/application/create-project/CreateProject';
 import { DeleteProject } from '@/contexts/projects/application/delete-project/DeleteProject';
 import { DuplicateProject } from '@/contexts/projects/application/duplicate-project/DuplicateProject';
+import { ExportProjectPhoto } from '@/contexts/projects/application/export-project-photo/ExportProjectPhoto';
 import { FindProject } from '@/contexts/projects/application/find-project/FindProject';
 import { ListProjects } from '@/contexts/projects/application/list-projects/ListProjects';
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
@@ -19,6 +20,7 @@ import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastruct
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
+import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
 import { LocalRecipeAdvisor } from '@/contexts/projects/infrastructure/advisors/LocalRecipeAdvisor';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
@@ -42,6 +44,7 @@ export type Application = {
   persistentStorage: PersistentStorageRequest;
   renderProjectPreview: RenderProjectPreview;
   requestEditingAdvice: RequestEditingAdvice;
+  exportProjectPhoto: ExportProjectPhoto;
 };
 
 export function createApplication(databaseName = 'rawcket'): Application {
@@ -71,6 +74,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     apiKeyVault: new BrowserApiKeyVault(settings),
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
-    requestEditingAdvice: new RequestEditingAdvice(new LocalRecipeAdvisor())
+    requestEditingAdvice: new RequestEditingAdvice(new LocalRecipeAdvisor()),
+    exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles))
   };
 }

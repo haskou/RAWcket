@@ -2,7 +2,7 @@
   "name": "rawcket",
   "version": "0.1.0",
   "private": true,
-  "description": "Editor fotografico RAW no destructivo, local-first y ejecutado en el navegador.",
+  "description": "A non-destructive, local-first RAW photo editor that runs in the browser.",
   "license": "MIT",
   "type": "module",
   "scripts": {
