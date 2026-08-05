@@ -2,9 +2,18 @@ import { Timestamp } from '@haskou/value-objects';
 import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import { DevelopmentRecipe } from '@/contexts/projects/domain/DevelopmentRecipe';
 import { AdjustmentKey } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
+import { GlobalAdjustmentValue } from '@/contexts/projects/domain/value-objects/GlobalAdjustmentValue';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
 
 describe('Active recipe state', () => {
+  it('recognizes a recipe with no visible development instructions', () => {
+    const recipe = DevelopmentRecipe.neutral();
+
+    expect(recipe.isNeutral()).toBe(true);
+    recipe.changeGlobalAdjustment(AdjustmentKey.EXPOSURE, GlobalAdjustmentValue.for(AdjustmentKey.EXPOSURE, 1));
+    expect(recipe.isNeutral()).toBe(false);
+  });
+
   it('treats reset global values as inactive recipe instructions', () => {
     const project = PhotoProjectMother.create();
 

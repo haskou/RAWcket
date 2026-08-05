@@ -1,5 +1,6 @@
 import type { ProjectId } from '../../domain/value-objects/ProjectId';
 import type { PhotoProject } from '../../domain/PhotoProject';
+import type { DevelopmentRecipe } from '../../domain/DevelopmentRecipe';
 import type { PreviewSize } from '../render-project-preview/PreviewSize';
 
 export type PreviewRenderStage = 'queued' | 'decoding' | 'developing' | 'analyzing' | 'encoding' | 'cached';
@@ -25,7 +26,8 @@ export class PreviewRenderRequest {
   public constructor(
     private readonly projectId: ProjectId,
     private readonly size: PreviewSize,
-    private readonly project: PhotoProject
+    private readonly project: PhotoProject,
+    private readonly recipe: DevelopmentRecipe
   ) {}
 
   public getProjectId(): ProjectId {
@@ -38,6 +40,10 @@ export class PreviewRenderRequest {
 
   public getProject(): PhotoProject {
     return this.project;
+  }
+
+  public getRecipe(): DevelopmentRecipe {
+    return this.recipe;
   }
 }
 

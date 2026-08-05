@@ -11,7 +11,7 @@ type PreviewCacheEntry = {
 };
 
 export class CachingPreviewRenderer implements PreviewRenderer {
-  private static readonly CACHE_FORMAT_VERSION = 3;
+  private static readonly CACHE_FORMAT_VERSION = 4;
   private readonly entries = new Map<string, PreviewCacheEntry>();
   private cachedBytes = 0;
 
@@ -53,7 +53,7 @@ export class CachingPreviewRenderer implements PreviewRenderer {
     const bytes = new TextEncoder().encode(JSON.stringify({
       cacheFormatVersion: CachingPreviewRenderer.CACHE_FORMAT_VERSION,
       source: project.source,
-      recipe: project.recipe,
+      recipe: request.getRecipe().toPrimitives(),
       maximumEdge: request.getSize().valueOf()
     }));
     const digest = await crypto.subtle.digest('SHA-256', bytes);

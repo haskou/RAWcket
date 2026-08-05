@@ -25,6 +25,7 @@ import { CreateRecipePresetMessage } from '@/contexts/projects/application/manag
 import { DeleteRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/DeleteRecipePresetMessage';
 import { ExportRecipePresetMessage, ImportRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/TransferRecipePresetMessage';
 import { UpdateRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/UpdateRecipePresetMessage';
+import { RenderProjectBaselineMessage } from '@/contexts/projects/application/render-project-baseline/messages/RenderProjectBaselineMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RecordAiDevelopmentAdviceMessage } from '@/contexts/projects/application/record-ai-development-advice/messages/RecordAiDevelopmentAdviceMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
@@ -159,6 +160,7 @@ export function EditorPage(): ReactElement {
   const semanticInstallAbort = useRef<AbortController | null>(null);
   const renderSequence = useRef(0);
   const [project, setProject] = useState<PhotoProject | null>(null);
+  const [loadingSource, setLoadingSource] = useState<Blob | null>(null);
   const [beforeSource, setBeforeSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -209,7 +211,7 @@ export function EditorPage(): ReactElement {
   const [horizonBusy, setHorizonBusy] = useState(false);
   const [horizonMessage, setHorizonMessage] = useState('Local edge analysis can estimate a dominant horizon or architectural vertical.');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const sourceUrl = useObjectUrl(showOriginal ? beforeSource : preview ?? beforeSource);
+  const sourceUrl = useObjectUrl(showOriginal ? beforeSource : preview ?? loadingSource);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
   const autosave = useProjectAutosave(project, revision, save);
   const semanticDescriptor = application.manageSemanticSegmentationModel.describe();
@@ -265,12 +267,17 @@ export function EditorPage(): ReactElement {
   useEffect(() => {
     const load = async (): Promise<void> => {
       try {
+        setProject(null);
+        setLoadingSource(null);
+        setBeforeSource(null);
+        setPreview(null);
+        setPreviewAnalysis(null);
+        setShowOriginal(false);
         const loaded = await application.findProject.find(new FindProjectMessage(projectId));
         if (loaded === null) {
           setLoadError('This project does not exist or has been deleted.');
           return;
         }
-        setProject(loaded);
         const savedAdvice = loaded.getAiDevelopmentJournal().advice;
         const latestAdvice = savedAdvice.at(-1);
         if (latestAdvice !== undefined) setAiPrompt(latestAdvice.suggestedIntent);
@@ -284,8 +291,12 @@ export function EditorPage(): ReactElement {
         const original = await application.sourceFiles.find(loaded.getId());
         if (original !== null && loaded.getSource().getSupportedMimeType() === 'image/x-sony-arw') {
           const inspection = await application.inspectSourceImage.inspect(new InspectSourceImageMessage(original, loaded.getSource().getFileName().valueOf()));
-          setBeforeSource(inspection.embeddedPreview);
-        } else setBeforeSource(original);
+          setLoadingSource(inspection.embeddedPreview);
+        } else {
+          setLoadingSource(original);
+          setBeforeSource(original);
+        }
+        setProject(loaded);
       } catch (error: unknown) {
         setLoadError(error instanceof Error ? error.message : 'The project could not be opened.');
       }
@@ -314,6 +325,9 @@ export function EditorPage(): ReactElement {
     ).then((result) => {
       if (result instanceof Blob && sequence === renderSequence.current) {
         setPreview(result);
+        if (project.getSource().getSupportedMimeType() === 'image/x-sony-arw' && project.getRecipe().isNeutral()) {
+          setBeforeSource(result);
+        }
         setRenderProgress('Preview up to date');
       }
     }).catch((error: unknown) => {
@@ -324,6 +338,26 @@ export function EditorPage(): ReactElement {
     });
     return () => controller.abort();
   }, [application, project, projectId, revision]);
+
+  useEffect(() => {
+    if (project === null
+      || beforeSource !== null
+      || project.getSource().getSupportedMimeType() !== 'image/x-sony-arw'
+      || project.getRecipe().isNeutral()) return;
+    const controller = new AbortController();
+    void application.renderProjectBaseline.render(
+      project,
+      new RenderProjectBaselineMessage(projectId, 2560),
+      { signal: controller.signal }
+    ).then((result) => {
+      if (result instanceof Blob) setBeforeSource(result);
+    }).catch((error: unknown) => {
+      if (!(error instanceof DOMException) || error.name !== 'AbortError') {
+        setRenderProgress(error instanceof Error ? `Baseline unavailable. ${error.message}` : 'Baseline unavailable.');
+      }
+    });
+    return () => controller.abort();
+  }, [application, beforeSource, project, projectId]);
 
   useEffect(() => {
     if (project === null || previewAnalysis === null) {
@@ -409,7 +443,7 @@ export function EditorPage(): ReactElement {
       else if (event.key === '3') openPanel('detail');
       else if (event.key === '4') openPanel('curves');
       else if (event.key.toLowerCase() === 'a') openPanel('ai');
-      else if (event.key.toLowerCase() === 'b') setShowOriginal((value) => !value);
+      else if (event.key.toLowerCase() === 'b' && beforeSource !== null) setShowOriginal((value) => !value);
       else if (event.key.toLowerCase() === 'g') setCompositionGuide((current) => compositionGuideSequence[(compositionGuideSequence.indexOf(current) + 1) % compositionGuideSequence.length] ?? 'none');
       else if (event.key.toLowerCase() === 'm') openPanel('masks');
       else if (event.key.toLowerCase() === 'r') setRecipeCollapsed((value) => !value);
@@ -422,7 +456,7 @@ export function EditorPage(): ReactElement {
     };
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [changeHistory, fitPreview, openPanel, settingsOpen]);
+  }, [beforeSource, changeHistory, fitPreview, openPanel, settingsOpen]);
 
   const changeMode = (mode: InterfaceModePrimitive): void => {
     if (project === null) return;
@@ -1133,6 +1167,7 @@ export function EditorPage(): ReactElement {
       ? '8-bit embedded-preview fallback'
       : previewAnalysis === null ? 'Source precision pending' : '8-bit browser source';
   const renderBusy = !renderProgress.startsWith('Preview up to date') && !renderProgress.startsWith('Preview unavailable');
+  const rawSource = project.getSource().getSupportedMimeType() === 'image/x-sony-arw';
 
   return (
     <main className="editor-shell">
@@ -1187,7 +1222,7 @@ export function EditorPage(): ReactElement {
               <option value="none">No guide</option><option value="thirds">Thirds · image</option><option value="grid">Grid · workspace</option><option value="diagonals">Diagonals · workspace</option><option value="golden-ratio">Golden · image</option>
             </select>
             {project.hasMasks() && <button className={maskOverlayVisible ? 'active' : ''} aria-pressed={maskOverlayVisible} type="button" onClick={() => setMaskOverlayVisible((value) => !value)} title="Show or hide the editable mask overlay">Mask</button>}
-            <button className={showOriginal ? 'active' : ''} type="button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
+            <button className={showOriginal ? 'active' : ''} type="button" disabled={beforeSource === null} title={beforeSource === null ? 'Preparing the neutral developed RAW baseline' : 'Compare this recipe with its neutral developed baseline'} onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
           </div>
           {toolWorkspace === 'develop' && activePanel === 'crop' && <div className="contextual-canvas-tools crop-tools" role="toolbar" aria-label="Contextual crop tools">
             <span><strong>Crop</strong><small>Drag corner-to-corner on the photograph</small></span>
@@ -1224,7 +1259,8 @@ export function EditorPage(): ReactElement {
             <div className={`truth-badge ${previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' ? 'source-fallback' : ''}`} title={previewAnalysis?.rawFallbackReason ?? undefined}><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{sourcePrecisionLabel} · {renderProgress}</small></span></div>
             {renderBusy && <div className="render-busy-indicator" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>Updating preview</strong><small>{renderProgress} · previous frame remains visible</small></span></div>}
             {previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' && <div className="raw-fallback-notice" role="status">Embedded RAW preview fallback · open Photo information for the decoder reason</div>}
-            {showOriginal && <div className="comparison-badge">Original · Before</div>}
+            {rawSource && preview === null && loadingSource !== null && <div className="comparison-badge">Camera JPEG preview · developing RAW</div>}
+            {showOriginal && <div className="comparison-badge">{rawSource ? 'Neutral developed RAW' : 'Original'} · Before</div>}
             <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
           </div>
         </div>

@@ -18,7 +18,7 @@ export class RenderProjectPreview {
       throw new Error('The preview request belongs to a different project.');
     }
     return this.renderer.render(
-      new PreviewRenderRequest(message.getProjectId(), message.getSize(), project),
+      new PreviewRenderRequest(message.getProjectId(), message.getSize(), project, project.getRecipe()),
       control
     );
   }

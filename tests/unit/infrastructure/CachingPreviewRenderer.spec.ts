@@ -24,7 +24,7 @@ describe('CachingPreviewRenderer', () => {
     });
     const renderer = new CachingPreviewRenderer({ render });
     const project = PhotoProjectMother.create();
-    const request = new PreviewRenderRequest(project.getId(), new PreviewSize(2048), project);
+    const request = new PreviewRenderRequest(project.getId(), new PreviewSize(2048), project, project.getRecipe());
     const stages: string[] = [];
 
     await renderer.render(request);
@@ -44,9 +44,9 @@ describe('CachingPreviewRenderer', () => {
     const first = PhotoProjectMother.create();
     const second = PhotoProjectMother.create();
 
-    await renderer.render(new PreviewRenderRequest(first.getId(), new PreviewSize(2048), first));
-    await renderer.render(new PreviewRenderRequest(second.getId(), new PreviewSize(2048), second));
-    await renderer.render(new PreviewRenderRequest(first.getId(), new PreviewSize(2048), first));
+    await renderer.render(new PreviewRenderRequest(first.getId(), new PreviewSize(2048), first, first.getRecipe()));
+    await renderer.render(new PreviewRenderRequest(second.getId(), new PreviewSize(2048), second, second.getRecipe()));
+    await renderer.render(new PreviewRenderRequest(first.getId(), new PreviewSize(2048), first, first.getRecipe()));
 
     expect(render).toHaveBeenCalledTimes(3);
   });

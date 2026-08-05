@@ -3,6 +3,7 @@ import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments
 import type { AdjustmentKeyPrimitive } from '../../domain/value-objects/AdjustmentKey';
 import type { MaskDefinitionPrimitives } from '../../domain/MaskDefinition';
 import { CpuMaskEvaluator } from './CpuMaskEvaluator';
+import { RawDisplayToneMapper } from './RawDisplayToneMapper';
 import { ToneCurveLut } from './ToneCurveLut';
 
 export type CpuDevelopmentSettings = {
@@ -18,6 +19,7 @@ type AlphaReader = (pixel: number) => number;
 
 export class CpuPixelDeveloper {
   private readonly masks = new CpuMaskEvaluator();
+  private readonly rawDisplayToneMapper = new RawDisplayToneMapper();
 
   public develop(
     source: Uint8ClampedArray,
@@ -80,7 +82,7 @@ export class CpuPixelDeveloper {
     for (let pixel = 0; pixel < width * height; pixel += 1) {
       const index = pixel * 4;
       const sourcePixel = sourceAt(pixel);
-      const perceptualSourcePixel = sourceIsLinear ? this.toSrgb(sourcePixel) : sourcePixel;
+      const perceptualSourcePixel = sourceIsLinear ? this.rawDisplayToneMapper.map(sourcePixel) : sourcePixel;
       let developed = this.developPixel(sourcePixel, adjustments, sourceIsLinear);
       const x = (pixel % width + 0.5) / width;
       const y = (Math.floor(pixel / width) + 0.5) / height;
@@ -156,14 +158,13 @@ export class CpuPixelDeveloper {
     const pixelX = Math.min(width - 1, Math.max(0, Math.floor(x * width)));
     const pixelY = Math.min(height - 1, Math.max(0, Math.floor(y * height)));
     const source = sourceAt(pixelY * width + pixelX);
-    return this.luminance(sourceIsLinear ? this.toSrgb(source) : source);
+    return this.luminance(sourceIsLinear ? this.rawDisplayToneMapper.map(source) : source);
   }
 
   private developPixel(rgb: Rgb, adjustment: GlobalAdjustmentsPrimitives, sourceIsLinear: boolean): Rgb {
     const exposure = 2 ** adjustment.exposure;
-    let red = sourceIsLinear ? this.linearToSrgb(rgb.red * exposure) : rgb.red * exposure;
-    let green = sourceIsLinear ? this.linearToSrgb(rgb.green * exposure) : rgb.green * exposure;
-    let blue = sourceIsLinear ? this.linearToSrgb(rgb.blue * exposure) : rgb.blue * exposure;
+    const displayRgb = sourceIsLinear ? this.rawDisplayToneMapper.map({ red: rgb.red * exposure, green: rgb.green * exposure, blue: rgb.blue * exposure }) : { red: rgb.red * exposure, green: rgb.green * exposure, blue: rgb.blue * exposure };
+    let { red, green, blue } = displayRgb;
     const temperature = adjustment.temperature / 100;
     const tint = adjustment.tint / 100;
     red += temperature * 0.15 - tint * 0.035;
@@ -278,13 +279,6 @@ export class CpuPixelDeveloper {
   }
 
   private luminance(rgb: Rgb): number { return rgb.red * 0.2126 + rgb.green * 0.7152 + rgb.blue * 0.0722; }
-  private toSrgb(rgb: Rgb): Rgb {
-    return { red: this.linearToSrgb(rgb.red), green: this.linearToSrgb(rgb.green), blue: this.linearToSrgb(rgb.blue) };
-  }
-  private linearToSrgb(value: number): number {
-    const linear = Math.max(0, value);
-    return linear <= 0.003_130_8 ? linear * 12.92 : 1.055 * linear ** (1 / 2.4) - 0.055;
-  }
   private mix(start: Rgb, end: Rgb, amount: number): Rgb {
     return {
       red: start.red + (end.red - start.red) * amount,

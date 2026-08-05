@@ -11,10 +11,19 @@ test('develops an external camera RAW through the 16-bit LibRaw/WASM path', asyn
 
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => crossOriginIsolated)).toBe(true);
+  await page.getByRole('button', { name: 'Import image' }).click();
+  const importDialog = page.getByRole('dialog', { name: 'Import photographs' });
+  await expect(importDialog.getByRole('button', { name: 'Choose photographs' })).toBeEnabled({ timeout: 60_000 });
+  await importDialog.getByRole('button', { name: 'Close import' }).click();
   await page.getByLabel('Select one or more JPEG, PNG, or Sony ARW images').setInputFiles(fixturePath ?? '');
 
   await expect(page.getByLabel('Project name')).toBeVisible();
   await expect(page.getByText(/Preview up to date/)).toBeVisible({ timeout: 60_000 });
+  const preview = page.getByRole('img', { name: /Preview of/ });
+  const neutralDevelopedSource = await preview.getAttribute('src');
+  await page.getByRole('button', { name: 'After · B' }).click();
+  await expect(page.getByText('Neutral developed RAW · Before')).toBeVisible();
+  await expect(preview).toHaveAttribute('src', neutralDevelopedSource ?? '');
   await page.getByRole('button', { name: 'Photo information' }).click();
   const information = page.getByRole('dialog', { name: 'Photo information' });
   await expect(information, browserErrors.join('\n')).toContainText('LibRaw/WASM · linear RGB · 16-bit');

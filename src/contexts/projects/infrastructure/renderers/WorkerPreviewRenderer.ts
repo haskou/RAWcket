@@ -46,11 +46,12 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
   ): Promise<Blob> {
     const source = await this.sources.find(request.getProjectId());
     if (source === null) throw new Error('The project does not have a renderable original.');
-    const primitives = request.getProject().toPrimitives();
+    const project = request.getProject().toPrimitives();
+    const recipe = request.getRecipe().toPrimitives();
     control.onProgress?.({ stage: 'decoding', completed: 0.1 });
     const decodedSource = await this.sourceDecoder.decode(
       source,
-      primitives.source.mimeType,
+      project.source.mimeType,
       request.getSize().valueOf(),
       true
     );
@@ -61,11 +62,11 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
       maximumEdge: request.getSize().valueOf(),
       output: { mimeType: 'image/webp', quality: 0.9, sharpening: 'none', xmpMetadata: null, watermark: null },
       development: {
-        adjustments: primitives.recipe.globalAdjustments,
-        curves: primitives.recipe.curves,
-        disabledAdjustments: primitives.recipe.disabledGlobalAdjustments,
-        masks: primitives.recipe.masks,
-        viewport: primitives.recipe.viewport
+        adjustments: recipe.globalAdjustments,
+        curves: recipe.curves,
+        disabledAdjustments: recipe.disabledGlobalAdjustments,
+        masks: recipe.masks,
+        viewport: recipe.viewport
       }
     };
     return new Promise((resolve, reject) => {
