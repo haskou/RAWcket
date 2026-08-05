@@ -8,6 +8,7 @@ import {
   type CurveInterpolationPrimitive,
   type ToneCurvePrimitives
 } from '@/contexts/projects/domain/ToneCurve';
+import { ToneCurvePathProjector } from '../editor/ToneCurvePathProjector';
 
 type DragState = { pointerId: number; pointIndex: number; groupId: string };
 const channels: Array<{ value: CurveChannelPrimitive; label: string }> = [
@@ -122,7 +123,7 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
       >
         <CurveHistogramBackdrop analysis={analysis} channel={channel} />
         <path className="curve-grid" d="M0 .25H1 M0 .5H1 M0 .75H1 M.25 0V1 M.5 0V1 M.75 0V1" />
-        <polyline className="curve-line" points={curve.points.map((point) => `${point.x},${1 - point.y}`).join(' ')} />
+        <path className="curve-line" d={ToneCurvePathProjector.project(curve)} />
         {curve.points.map((point, index) => <circle className={index === selectedIndex ? 'selected' : ''} key={index} cx={point.x} cy={1 - point.y} r="0.025" tabIndex={0} aria-label={`Curve point ${index + 1}: x ${point.x}, y ${point.y}`} onPointerDown={(event) => beginDrag(event, index)} onFocus={() => setSelectedIndex(index)} />)}
       </svg>
       <div className="curve-axis-labels"><span>Output (Y)</span><span>Input (X)</span></div>

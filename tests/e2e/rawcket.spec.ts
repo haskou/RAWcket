@@ -69,6 +69,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
   await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
   const curveGraph = page.locator('.curve-graph');
+  await expect(curveGraph.locator('path.curve-line')).toHaveAttribute('d', /^M0,1 L/);
   const graphBounds = await curveGraph.boundingBox();
   if (graphBounds === null) throw new Error('The tone curve graph is unavailable.');
   await page.mouse.move(graphBounds.x + graphBounds.width * 0.35, graphBounds.y + graphBounds.height * 0.5);
