@@ -12,7 +12,7 @@ describe('ExportProjectPhoto', () => {
     exportMock.mockResolvedValue(expected);
     const message = new ExportProjectPhotoMessage(project.getId().valueOf(), 'jpeg', 0.92, 2048, 'standard', {
       text: 'RAWcket Studio', opacity: 0.7, sizePercent: 3, position: 'bottom-right'
-    });
+    }, 'capture');
 
     const result = await new ExportProjectPhoto(exporter).export(project, message);
 
@@ -26,5 +26,6 @@ describe('ExportProjectPhoto', () => {
     expect(() => new ExportProjectPhotoMessage(id, 'png', 1, 100)).toThrow(/edge/);
     expect(() => new ExportProjectPhotoMessage(id, 'png', 1, null, 'high', { text: ' ', opacity: 0.7, sizePercent: 3, position: 'bottom-right' })).toThrow(/Watermark text/);
     expect(() => new ExportProjectPhotoMessage(id, 'png', 1, null, 'high', { text: 'Studio', opacity: 0, sizePercent: 3, position: 'bottom-right' })).toThrow(/opacity/);
+    expect(() => new ExportProjectPhotoMessage(id, 'png', 1, null, 'high', null, 'everything' as 'strip')).toThrow(/metadata policy/);
   });
 });

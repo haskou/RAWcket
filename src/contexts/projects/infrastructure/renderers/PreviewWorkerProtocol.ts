@@ -24,6 +24,7 @@ export const previewWorkerRequestSchema = z.object({
     mimeType: z.enum(['image/webp', 'image/jpeg', 'image/png', 'image/tiff']),
     quality: z.number().min(0.1).max(1),
     sharpening: z.enum(['none', 'low', 'standard', 'high']),
+    xmpMetadata: z.string().max(20_000).nullable(),
     watermark: z.object({
       text: z.string().trim().min(1).max(120),
       opacity: z.number().min(0.1).max(1),

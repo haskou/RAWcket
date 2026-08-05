@@ -19,6 +19,20 @@ describe('TiffEncoder', () => {
   it('rejects a buffer that does not match its dimensions', () => {
     expect(() => new TiffEncoder().encode(new Uint8ClampedArray(4), 2, 1)).toThrow(/do not match/);
   });
+
+  it('stores selected XMP metadata in TIFF tag 700', async () => {
+    const blob = new TiffEncoder().encode(new Uint8ClampedArray([20, 30, 40, 255]), 1, 1, '<xmp>camera</xmp>');
+    const bytes = new Uint8Array(await readBlob(blob));
+    const view = new DataView(bytes.buffer);
+    const entryCount = view.getUint16(8, true);
+    const xmpEntry = 8 + 2 + (entryCount - 1) * 12;
+    const xmpOffset = view.getUint32(xmpEntry + 8, true);
+    const xmpLength = view.getUint32(xmpEntry + 4, true);
+
+    expect(entryCount).toBe(11);
+    expect(view.getUint16(xmpEntry, true)).toBe(700);
+    expect(new TextDecoder().decode(bytes.slice(xmpOffset, xmpOffset + xmpLength))).toBe('<xmp>camera</xmp>');
+  });
 });
 
 function readBlob(blob: Blob): Promise<ArrayBuffer> {

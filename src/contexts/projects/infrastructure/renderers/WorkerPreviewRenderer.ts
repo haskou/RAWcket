@@ -59,7 +59,7 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
       id: crypto.randomUUID(),
       source: decodedSource,
       maximumEdge: request.getSize().valueOf(),
-      output: { mimeType: 'image/webp', quality: 0.9, sharpening: 'none', watermark: null },
+      output: { mimeType: 'image/webp', quality: 0.9, sharpening: 'none', xmpMetadata: null, watermark: null },
       development: {
         adjustments: primitives.recipe.globalAdjustments,
         curves: primitives.recipe.curves,

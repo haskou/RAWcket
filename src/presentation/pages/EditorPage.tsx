@@ -414,7 +414,7 @@ export function EditorPage(): ReactElement {
       await autosave.flush();
       const image = await application.exportProjectPhoto.export(
         project,
-        new ExportProjectPhotoMessage(projectId, settings.format, settings.quality, settings.maximumEdge, settings.outputSharpening, settings.watermark),
+        new ExportProjectPhotoMessage(projectId, settings.format, settings.quality, settings.maximumEdge, settings.outputSharpening, settings.watermark, settings.metadataPolicy),
         {
           signal: controller.signal,
           onProgress: (progress) => {

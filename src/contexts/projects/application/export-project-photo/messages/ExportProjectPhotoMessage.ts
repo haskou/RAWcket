@@ -2,6 +2,7 @@ import { ProjectId } from '../../../domain/value-objects/ProjectId';
 
 export type PhotoExportFormat = 'jpeg' | 'png' | 'tiff';
 export type OutputSharpening = 'none' | 'low' | 'standard' | 'high';
+export type PhotoMetadataPolicy = 'strip' | 'capture';
 export type WatermarkPosition = 'bottom-left' | 'bottom-center' | 'bottom-right';
 export type PhotoWatermark = {
   text: string;
@@ -19,7 +20,8 @@ export class ExportProjectPhotoMessage {
     private readonly quality: number,
     private readonly maximumEdge: number | null,
     private readonly outputSharpening: OutputSharpening = 'none',
-    watermark: PhotoWatermark | null = null
+    watermark: PhotoWatermark | null = null,
+    private readonly metadataPolicy: PhotoMetadataPolicy = 'strip'
   ) {
     this.projectId = new ProjectId(projectId);
     if (!Number.isFinite(quality) || quality < 0.1 || quality > 1) {
@@ -29,6 +31,7 @@ export class ExportProjectPhotoMessage {
       throw new Error('The export edge must be between 256 and 16384 pixels.');
     }
     if (!['none', 'low', 'standard', 'high'].includes(outputSharpening)) throw new Error('Output sharpening is not supported.');
+    if (!['strip', 'capture'].includes(metadataPolicy)) throw new Error('The metadata policy is not supported.');
     this.watermark = watermark === null ? null : this.validateWatermark(watermark);
   }
 
@@ -44,6 +47,7 @@ export class ExportProjectPhotoMessage {
   public getMaximumEdge(): number | null { return this.maximumEdge; }
   public getOutputSharpening(): OutputSharpening { return this.outputSharpening; }
   public getWatermark(): PhotoWatermark | null { return this.watermark === null ? null : { ...this.watermark }; }
+  public getMetadataPolicy(): PhotoMetadataPolicy { return this.metadataPolicy; }
 
   private validateWatermark(watermark: PhotoWatermark): PhotoWatermark {
     const text = watermark.text.trim();

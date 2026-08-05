@@ -40,7 +40,7 @@ Not implemented yet:
 - Native GPU vector-mask rasterization and a real-camera/color-target GPU parity corpus. Synthetic CPU goldens and masked-spatial accelerated parity are enforced already; masked local development and spatial filters run on both accelerated paths from deterministic disposable weight rasters, and WebGPU device loss falls back cleanly.
 - Larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, and production-grade denoise/sharpen algorithms. Horizontal and vertical perspective correction are implemented.
-- 16-bit TIFF, ICC profiles, metadata selection, and tiled full-resolution export. RAW sensor development is already high-depth, but current file encoders quantize their output to 8-bit. Output sharpening and configurable text watermarks are available today.
+- 16-bit TIFF, ICC profiles, copyright/contact metadata fields, and tiled full-resolution export. RAW sensor development is already high-depth, but current file encoders quantize their output to 8-bit. Output sharpening, configurable text watermarks, and privacy-first camera/capture XMP selection are available today.
 - Collections, optional filesystem links, and a full WCAG/browser-device audit.
 
 The detailed, actively maintained plan is in [TODO.md](TODO.md).

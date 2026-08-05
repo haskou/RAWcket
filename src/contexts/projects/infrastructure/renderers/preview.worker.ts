@@ -3,6 +3,7 @@ import { CpuPixelDeveloper } from './CpuPixelDeveloper';
 import { CpuViewportTransformer } from './CpuViewportTransformer';
 import { CanvasWatermarkRenderer } from './CanvasWatermarkRenderer';
 import { OutputPixelSharpener } from './OutputPixelSharpener';
+import { EncodedImageMetadataWriter } from './EncodedImageMetadataWriter';
 import { PixelHistogramAnalyzer } from './PixelHistogramAnalyzer';
 import { TiffEncoder } from './TiffEncoder';
 import { WebGl2PixelDeveloper } from './WebGl2PixelDeveloper';
@@ -22,6 +23,7 @@ const webGl2Developer = new WebGl2PixelDeveloper();
 const webGpuDeveloper = new WebGpuPixelDeveloper();
 const outputSharpener = new OutputPixelSharpener();
 const watermarkRenderer = new CanvasWatermarkRenderer();
+const metadataWriter = new EncodedImageMetadataWriter();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -64,9 +66,12 @@ async function render(input: unknown): Promise<void> {
     const analysis = histogram.analyze(transformed.pixels, backend, sourcePrecision, rawFallbackReason);
     progress(request.id, 'analyzing', 0.88);
     const outputPixels = request.output.watermark === null ? finishedPixels : outputContext.getImageData(0, 0, transformed.width, transformed.height).data;
-    const image = request.output.mimeType === 'image/tiff'
-      ? tiff.encode(outputPixels, transformed.width, transformed.height)
+    const encodedImage = request.output.mimeType === 'image/tiff'
+      ? tiff.encode(outputPixels, transformed.width, transformed.height, request.output.xmpMetadata)
       : await outputCanvas.convertToBlob({ type: request.output.mimeType, quality: request.output.quality });
+    const image = request.output.mimeType === 'image/jpeg' || request.output.mimeType === 'image/png'
+      ? await metadataWriter.write(encodedImage, request.output.mimeType, request.output.xmpMetadata)
+      : encodedImage;
     const imageBytes = await image.arrayBuffer();
     progress(request.id, 'encoding', 0.95);
     post({ kind: 'completed', id: request.id, image: imageBytes, mimeType: request.output.mimeType, analysis }, [imageBytes]);

@@ -6,9 +6,11 @@ import type { PhotoProject } from '../../domain/PhotoProject';
 import type { SourceFileRepository } from '../../domain/repositories/SourceFileRepository';
 import { previewWorkerResponseSchema, type PreviewWorkerRequest } from './PreviewWorkerProtocol';
 import type { RenderSourceDecoder } from './RenderSourceDecoder';
+import { XmpCaptureMetadataSerializer } from './XmpCaptureMetadataSerializer';
 
 export class WorkerPhotoExporter implements PhotoExporter {
   private readonly capacity = new Semaphore(1);
+  private readonly metadataSerializer = new XmpCaptureMetadataSerializer();
 
   public constructor(
     private readonly sources: SourceFileRepository,
@@ -45,6 +47,9 @@ export class WorkerPhotoExporter implements PhotoExporter {
     const source = await this.sources.find(project.getId());
     if (source === null) throw new Error('The project does not have an original to export.');
     const recipe = project.toPrimitives().recipe;
+    const xmpMetadata = message.getMetadataPolicy() === 'capture'
+      ? this.metadataSerializer.serialize(project.getCaptureMetadata().toPrimitives())
+      : null;
     control.onProgress?.({ stage: 'decoding', completed: 0.1 });
     const decodedSource = await this.sourceDecoder.decode(
       source,
@@ -59,7 +64,7 @@ export class WorkerPhotoExporter implements PhotoExporter {
       maximumEdge: message.getMaximumEdge(),
       output: {
         mimeType: message.getMimeType(), quality: message.getQuality(),
-        sharpening: message.getOutputSharpening(), watermark: message.getWatermark()
+        sharpening: message.getOutputSharpening(), xmpMetadata, watermark: message.getWatermark()
       },
       development: {
         adjustments: recipe.globalAdjustments,

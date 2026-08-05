@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import type { OutputSharpening, PhotoExportFormat, PhotoWatermark, WatermarkPosition } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
+import type { OutputSharpening, PhotoExportFormat, PhotoMetadataPolicy, PhotoWatermark, WatermarkPosition } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
 
 export type PhotoExportSettings = {
   format: PhotoExportFormat;
@@ -7,6 +7,7 @@ export type PhotoExportSettings = {
   maximumEdge: number | null;
   outputSharpening: OutputSharpening;
   watermark: PhotoWatermark | null;
+  metadataPolicy: PhotoMetadataPolicy;
 };
 
 export function ExportPhotoDialog({ open, busy, progress, message, onClose, onExport, onExportProject, onCancel }: {
@@ -29,6 +30,7 @@ export function ExportPhotoDialog({ open, busy, progress, message, onClose, onEx
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.7);
   const [watermarkSize, setWatermarkSize] = useState(3);
   const [watermarkPosition, setWatermarkPosition] = useState<WatermarkPosition>('bottom-right');
+  const [metadataPolicy, setMetadataPolicy] = useState<PhotoMetadataPolicy>('strip');
 
   if (!open) return null;
   return (
@@ -42,6 +44,9 @@ export function ExportPhotoDialog({ open, busy, progress, message, onClose, onEx
         {resize && <div className="export-edge"><label htmlFor="export-edge">Longest edge</label><input id="export-edge" aria-label="Export longest edge" type="number" min={256} max={16384} step={1} value={maximumEdge} disabled={busy} onChange={(event) => setMaximumEdge(Math.min(16_384, Math.max(256, event.currentTarget.valueAsNumber)))} /><span>px</span></div>}
         <label className="field-label" htmlFor="output-sharpening">Output sharpening</label>
         <select id="output-sharpening" value={outputSharpening} disabled={busy} onChange={(event) => setOutputSharpening(event.target.value as OutputSharpening)}><option value="none">None</option><option value="low">Low · screen</option><option value="standard">Standard · screen</option><option value="high">High · print</option></select>
+        <label className="field-label" htmlFor="export-metadata">Metadata</label>
+        <select id="export-metadata" value={metadataPolicy} disabled={busy} onChange={(event) => setMetadataPolicy(event.target.value as PhotoMetadataPolicy)}><option value="strip">Remove all metadata · private</option><option value="capture">Keep camera &amp; capture settings</option></select>
+        {metadataPolicy === 'capture' && <p className="export-privacy-note">Keeps camera, lens, date, exposure, aperture, ISO, and focal length. Location, editing history, tags, filenames, and internal sensor data are never included.</p>}
         <label className="check-row"><input type="checkbox" checked={watermarkEnabled} disabled={busy} onChange={(event) => setWatermarkEnabled(event.target.checked)} /> Add text watermark</label>
         {watermarkEnabled && <div className="export-watermark">
           <label htmlFor="watermark-text">Watermark text</label><input id="watermark-text" type="text" maxLength={120} value={watermarkText} disabled={busy} onChange={(event) => setWatermarkText(event.target.value)} />
@@ -54,7 +59,7 @@ export function ExportPhotoDialog({ open, busy, progress, message, onClose, onEx
         <p className="status-copy" aria-live="polite">{message}</p>
         <div className="export-actions">
           <button className="button ghost" type="button" onClick={busy ? onCancel : onExportProject}>{busy ? 'Cancel export' : 'Export project bundle'}</button>
-          <button className="button primary" type="button" disabled={busy || (watermarkEnabled && watermarkText.trim().length === 0)} onClick={() => onExport({ format, quality, maximumEdge: resize ? maximumEdge : null, outputSharpening, watermark: watermarkEnabled ? { text: watermarkText, opacity: watermarkOpacity, sizePercent: watermarkSize, position: watermarkPosition } : null })}>{busy ? 'Exporting…' : `Export ${format.toUpperCase()}`}</button>
+          <button className="button primary" type="button" disabled={busy || (watermarkEnabled && watermarkText.trim().length === 0)} onClick={() => onExport({ format, quality, maximumEdge: resize ? maximumEdge : null, outputSharpening, metadataPolicy, watermark: watermarkEnabled ? { text: watermarkText, opacity: watermarkOpacity, sizePercent: watermarkSize, position: watermarkPosition } : null })}>{busy ? 'Exporting…' : `Export ${format.toUpperCase()}`}</button>
         </div>
       </section>
     </div>

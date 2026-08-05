@@ -261,6 +261,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByLabel('Format', { exact: true }).selectOption('png');
   await page.getByLabel('Output sharpening').selectOption('high');
+  await page.getByLabel('Metadata').selectOption('capture');
+  await expect(page.getByText(/Location, editing history, tags, filenames/)).toBeVisible();
   await page.getByLabel('Add text watermark').check();
   await page.getByLabel('Watermark text').fill('RAWcket test');
   await page.getByLabel('Watermark opacity numeric value').fill('63');
