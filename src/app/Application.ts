@@ -35,6 +35,8 @@ import type { ProjectImporter } from '@/contexts/projects/application/ports/Proj
 import type { SourceFileRepository } from '@/contexts/projects/domain/repositories/SourceFileRepository';
 import { RawcketProjectBundle } from '@/contexts/projects/infrastructure/bundles/RawcketProjectBundle';
 import { BrowserSourceImageInspector } from '@/contexts/projects/infrastructure/codecs/BrowserSourceImageInspector';
+import { ArwEmbeddedPreviewExtractor } from '@/contexts/projects/infrastructure/codecs/ArwEmbeddedPreviewExtractor';
+import { LibRawImageDecoder } from '@/contexts/projects/infrastructure/codecs/LibRawImageDecoder';
 import { ProjectMigrator } from '@/contexts/projects/infrastructure/migrations/ProjectMigrator';
 import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionZeroToOneProjectMigration';
 import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
@@ -48,8 +50,10 @@ import { IndexedDbProjectAssetJournal } from '@/contexts/projects/infrastructure
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
 import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/CachingPreviewRenderer';
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
+import { RenderSourceDecoder } from '@/contexts/projects/infrastructure/renderers/RenderSourceDecoder';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
 import { OpenAiEditingAdvisor } from '@/contexts/projects/infrastructure/advisors/OpenAiEditingAdvisor';
+import { OpenAiEditProposalMapper } from '@/contexts/projects/infrastructure/advisors/OpenAiEditProposalMapper';
 import { OpenAiImportCandidateReviewer } from '@/contexts/projects/infrastructure/advisors/OpenAiImportCandidateReviewer';
 import { OpenAiPhotoOpinionAdvisor } from '@/contexts/projects/infrastructure/advisors/OpenAiPhotoOpinionAdvisor';
 import { BrowserSemanticSegmentationModel } from '@/contexts/projects/infrastructure/ai/BrowserSemanticSegmentationModel';
@@ -111,7 +115,15 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const projectAssetQueue = new Queue(QueueOptions.withConcurrency(1));
   const bundle = new RawcketProjectBundle(projects, sourceFiles, migrator, projectAssetJournal, projectAssetQueue);
   const settings = new RawcketSettingsRepository(database);
-  const previewRenderer = new CachingPreviewRenderer(new WorkerPreviewRenderer(sourceFiles));
+  const previewSourceDecoder = new RenderSourceDecoder(
+    new LibRawImageDecoder(undefined, undefined, 90_000),
+    new ArwEmbeddedPreviewExtractor()
+  );
+  const exportSourceDecoder = new RenderSourceDecoder(
+    new LibRawImageDecoder(undefined, undefined, 150_000),
+    new ArwEmbeddedPreviewExtractor()
+  );
+  const previewRenderer = new CachingPreviewRenderer(new WorkerPreviewRenderer(sourceFiles, previewSourceDecoder));
   const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
   const semanticSegmentationModel = new BrowserSemanticSegmentationModel();
   const sourceImageInspector = new BrowserSourceImageInspector();
@@ -143,12 +155,12 @@ export function createApplication(databaseName = 'rawcket'): Application {
     removeAi: new RemoveAi(aiCredentialVault),
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
-    requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi)),
+    requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi, new OpenAiEditProposalMapper())),
     requestPhotoOpinion: new RequestPhotoOpinion(new OpenAiPhotoOpinionAdvisor(openAi)),
     reviewDevelopment: new ReviewDevelopment(new LocalDevelopmentTutor()),
     reviewImportCandidates: new ReviewImportCandidates(sourceImageInspector, new OpenAiImportCandidateReviewer(openAi)),
     reconcileProjectAssets: new ReconcileProjectAssets(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
-    exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles)),
+    exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles, exportSourceDecoder)),
     exportProjectSidecar: new ExportProjectSidecar(projectSidecarCodec),
     inspectSourceImage: new InspectSourceImage(sourceImageInspector)
   };

@@ -12,6 +12,8 @@ export type PreviewAnalysis = {
   shadowClipping: number;
   highlightClipping: number;
   backend: 'webgpu' | 'webgl2' | 'cpu';
+  sourcePrecision: 'standard-8-bit' | 'raw-linear-16-bit' | 'embedded-preview-8-bit';
+  rawFallbackReason: string | null;
 };
 
 export type PreviewRenderProgress = {

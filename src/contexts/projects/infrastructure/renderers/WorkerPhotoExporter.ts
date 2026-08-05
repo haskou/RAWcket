@@ -5,11 +5,15 @@ import type { PreviewRenderControl } from '../../application/ports/PreviewRender
 import type { PhotoProject } from '../../domain/PhotoProject';
 import type { SourceFileRepository } from '../../domain/repositories/SourceFileRepository';
 import { previewWorkerResponseSchema, type PreviewWorkerRequest } from './PreviewWorkerProtocol';
+import type { RenderSourceDecoder } from './RenderSourceDecoder';
 
 export class WorkerPhotoExporter implements PhotoExporter {
   private readonly capacity = new Semaphore(1);
 
-  public constructor(private readonly sources: SourceFileRepository) {}
+  public constructor(
+    private readonly sources: SourceFileRepository,
+    private readonly sourceDecoder: RenderSourceDecoder
+  ) {}
 
   public async export(
     project: PhotoProject,
@@ -41,10 +45,17 @@ export class WorkerPhotoExporter implements PhotoExporter {
     const source = await this.sources.find(project.getId());
     if (source === null) throw new Error('The project does not have an original to export.');
     const recipe = project.toPrimitives().recipe;
+    control.onProgress?.({ stage: 'decoding', completed: 0.1 });
+    const decodedSource = await this.sourceDecoder.decode(
+      source,
+      project.getSource().getSupportedMimeType(),
+      message.getMaximumEdge(),
+      false
+    );
+    control.onProgress?.({ stage: 'decoding', completed: 0.3 });
     const workerRequest: PreviewWorkerRequest = {
       id: crypto.randomUUID(),
-      source,
-      sourceMimeType: project.getSource().getSupportedMimeType(),
+      source: decodedSource,
       maximumEdge: message.getMaximumEdge(),
       output: { mimeType: message.getMimeType(), quality: message.getQuality() },
       development: {
@@ -72,7 +83,10 @@ export class WorkerPhotoExporter implements PhotoExporter {
         if (response.data.kind === 'failed') reject(new Error(response.data.message));
         else resolve(new Blob([response.data.image], { type: response.data.mimeType }));
       };
-      worker.postMessage(workerRequest);
+      const transfer = workerRequest.source.kind === 'raw-linear-16-bit'
+        ? [workerRequest.source.pixels.buffer]
+        : [];
+      worker.postMessage(workerRequest, transfer);
     });
   }
 }

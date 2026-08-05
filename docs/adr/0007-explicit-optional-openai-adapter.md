@@ -14,8 +14,8 @@ RAWcket needs genuine visual reasoning for photographic opinions, editable devel
 - Invoking a cloud action without a session credential opens configuration. A successful configuration resumes the exact pending action.
 - Cloud actions send bounded JPEG previews, never original RAW files. Requests use the Responses API with response storage disabled and strict JSON Schema output.
 - Infrastructure parses the provider envelope. Provider adapters validate the structured payload again with Zod and convert values through domain Value Objects before producing application results.
-- AI proposals use the same `EditOperation` contract and remain unapplied until the photographer accepts selected operations.
-- The API key remains in session memory by default. Persistent storage is optional, password-encrypted, and contains explicit provider/model metadata.
+- AI proposals use the same `EditOperation` contract and remain unapplied until the photographer accepts selected operations. The structured contract supports global adjustments, monotonic tone curves, viewport/crop geometry, and editable radial, linear-gradient, and luminance-range masks.
+- API keys are never persisted unencrypted. Setup defaults to password-encrypted storage with explicit provider/model metadata; the alternative is tab memory explicitly labelled as never saved.
 - Deterministic Auto Enhance, the Development Tutor, point masks, and the installed semantic model remain visibly separate local features.
 
 ## Consequences

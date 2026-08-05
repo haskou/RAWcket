@@ -10,6 +10,7 @@ export class RequestEditingAdvice {
     if (!project.isIdentifiedBy(message.getProjectId())) {
       throw new Error('The AI editing request belongs to a different project.');
     }
+    const recipe = project.toPrimitives().recipe;
     return this.advisor.propose({
       projectName: project.getName().valueOf(),
       intent: message.getIntent(),
@@ -31,7 +32,10 @@ export class RequestEditingAdvice {
         sharpness: project.getGlobalAdjustment(AdjustmentKey.SHARPNESS).valueOf(),
         noiseReduction: project.getGlobalAdjustment(AdjustmentKey.NOISE_REDUCTION).valueOf(),
         vignette: project.getGlobalAdjustment(AdjustmentKey.VIGNETTE).valueOf()
-      }
+      },
+      currentCurves: recipe.curves,
+      currentViewport: recipe.viewport,
+      existingMaskCount: recipe.masks.length
     });
   }
 }

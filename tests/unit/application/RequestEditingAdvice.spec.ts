@@ -18,7 +18,13 @@ describe('RequestEditingAdvice', () => {
       project.getId().valueOf(), 'Keep the portrait natural', preview
     ));
 
-    expect(propose).toHaveBeenCalledWith(expect.objectContaining({ intent: 'Keep the portrait natural', preview }));
+    expect(propose).toHaveBeenCalledWith(expect.objectContaining({
+      intent: 'Keep the portrait natural',
+      preview,
+      currentCurves: before.recipe.curves,
+      currentViewport: before.recipe.viewport,
+      existingMaskCount: 0
+    }));
     expect(proposal.operations).toHaveLength(1);
     expect(project.toPrimitives()).toEqual(before);
   });

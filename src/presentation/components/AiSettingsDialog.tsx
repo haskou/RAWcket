@@ -18,7 +18,7 @@ export function AiSettingsDialog({ open, onClose, onConfigured }: AiSettingsDial
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
   const [password, setPassword] = useState('');
-  const [saveEncrypted, setSaveEncrypted] = useState(false);
+  const [storageMode, setStorageMode] = useState<'encrypted' | 'session'>('encrypted');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('AI Companion needs your own OpenAI API configuration.');
 
@@ -46,7 +46,7 @@ export function AiSettingsDialog({ open, onClose, onConfigured }: AiSettingsDial
     event.preventDefault();
     setBusy(true);
     try {
-      await application.configureAi.configure(new ConfigureAiMessage('openai', model, apiKey, saveEncrypted ? password : null));
+      await application.configureAi.configure(new ConfigureAiMessage('openai', model, apiKey, storageMode === 'encrypted' ? password : null));
       setStatus(await application.inspectAiConfiguration.inspect());
       configured();
     } catch (error: unknown) {
@@ -114,21 +114,28 @@ export function AiSettingsDialog({ open, onClose, onConfigured }: AiSettingsDial
           <small className="muted">The model is explicit and editable so RAWcket never silently chooses one for you.</small>
           <label className="field-label" htmlFor="api-key">OpenAI API key</label>
           <input id="api-key" type="password" required value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" placeholder="sk-… · kept in memory by default" />
-          <label className="check-row">
-            <input type="checkbox" checked={saveEncrypted} onChange={(event) => setSaveEncrypted(event.target.checked)} />
-            Store the key encrypted on this device
-          </label>
-          {saveEncrypted && (
+          <fieldset className="credential-storage-options">
+            <legend>Key storage</legend>
+            <label className="check-row">
+              <input type="radio" name="credential-storage" value="encrypted" checked={storageMode === 'encrypted'} onChange={() => setStorageMode('encrypted')} />
+              Save encrypted on this device (recommended)
+            </label>
+            <label className="check-row">
+              <input type="radio" name="credential-storage" value="session" checked={storageMode === 'session'} onChange={() => setStorageMode('session')} />
+              This tab only · never saved
+            </label>
+          </fieldset>
+          {storageMode === 'encrypted' && (
             <>
               <label className="field-label" htmlFor="master-password">New master password (12 characters minimum)</label>
               <input id="master-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
             </>
           )}
-          <p className="muted">Without encrypted storage, the key exists only in memory until this tab is closed. Encryption uses AES-GCM and PBKDF2-SHA-256; RAWcket never stores the master password.</p>
+          <p className="muted">RAWcket never persists an unencrypted API key. Saved keys use AES-GCM and PBKDF2-SHA-256; RAWcket never stores the master password. Session-only keys remain in memory and disappear when this tab closes.</p>
           <p className="status-copy" aria-live="polite">{message}</p>
           <div className="dialog-actions">
             {(status.ready || status.encrypted) && <button className="button ghost danger" type="button" disabled={busy} onClick={() => void remove()}>Remove configuration</button>}
-            <button className="button primary" type="submit" disabled={busy || model.trim().length === 0 || apiKey.trim().length < 8}>{busy ? 'Configuring…' : 'Use OpenAI API'}</button>
+            <button className="button primary" type="submit" disabled={busy || model.trim().length === 0 || apiKey.trim().length < 8 || (storageMode === 'encrypted' && password.length < 12)}>{busy ? 'Configuring…' : 'Use OpenAI API'}</button>
           </div>
         </form>
       </section>

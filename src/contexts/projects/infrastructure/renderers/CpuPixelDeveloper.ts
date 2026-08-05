@@ -13,6 +13,8 @@ export type CpuDevelopmentSettings = {
 };
 
 type Rgb = { red: number; green: number; blue: number };
+type PixelReader = (pixel: number) => Rgb;
+type AlphaReader = (pixel: number) => number;
 
 export class CpuPixelDeveloper {
   private readonly masks = new CpuMaskEvaluator();
@@ -24,7 +26,48 @@ export class CpuPixelDeveloper {
     settings: CpuDevelopmentSettings
   ): Uint8ClampedArray<ArrayBuffer> {
     if (source.length !== width * height * 4) throw new Error('Image dimensions do not match the pixel buffer.');
-    const working = new Float32Array(source.length);
+    return this.developPixels(
+      width,
+      height,
+      settings,
+      (pixel) => {
+        const index = pixel * 4;
+        return { red: (source[index] ?? 0) / 255, green: (source[index + 1] ?? 0) / 255, blue: (source[index + 2] ?? 0) / 255 };
+      },
+      (pixel) => (source[pixel * 4 + 3] ?? 255) / 255,
+      false
+    );
+  }
+
+  public developHighDepthLinear(
+    source: Uint16Array,
+    width: number,
+    height: number,
+    settings: CpuDevelopmentSettings
+  ): Uint8ClampedArray<ArrayBuffer> {
+    if (source.length !== width * height * 3) throw new Error('High-depth image dimensions do not match the RGB pixel buffer.');
+    return this.developPixels(
+      width,
+      height,
+      settings,
+      (pixel) => {
+        const index = pixel * 3;
+        return { red: (source[index] ?? 0) / 65_535, green: (source[index + 1] ?? 0) / 65_535, blue: (source[index + 2] ?? 0) / 65_535 };
+      },
+      () => 1,
+      true
+    );
+  }
+
+  private developPixels(
+    width: number,
+    height: number,
+    settings: CpuDevelopmentSettings,
+    sourceAt: PixelReader,
+    alphaAt: AlphaReader,
+    sourceIsLinear: boolean
+  ): Uint8ClampedArray<ArrayBuffer> {
+    const working = new Float32Array(width * height * 4);
     const adjustments = this.activeAdjustments(settings);
     const luts = {
       rgb: ToneCurveLut.create(settings.curves.rgb),
@@ -33,24 +76,26 @@ export class CpuPixelDeveloper {
       blue: ToneCurveLut.create(settings.curves.blue),
       luminance: settings.curves.luminance === null ? null : ToneCurveLut.create(settings.curves.luminance)
     };
-    const maskSeeds = new Map(settings.masks.map((mask) => [mask.id, this.maskSeedLuminances(mask, source, width, height)]));
-    for (let index = 0; index < source.length; index += 4) {
-      const sourcePixel = { red: (source[index] ?? 0) / 255, green: (source[index + 1] ?? 0) / 255, blue: (source[index + 2] ?? 0) / 255 };
-      let developed = this.developPixel(sourcePixel, adjustments);
-      const x = (index / 4 % width + 0.5) / width;
-      const y = (Math.floor(index / 4 / width) + 0.5) / height;
+    const maskSeeds = new Map(settings.masks.map((mask) => [mask.id, this.maskSeedLuminances(mask, sourceAt, width, height, sourceIsLinear)]));
+    for (let pixel = 0; pixel < width * height; pixel += 1) {
+      const index = pixel * 4;
+      const sourcePixel = sourceAt(pixel);
+      const perceptualSourcePixel = sourceIsLinear ? this.toSrgb(sourcePixel) : sourcePixel;
+      let developed = this.developPixel(sourcePixel, adjustments, sourceIsLinear);
+      const x = (pixel % width + 0.5) / width;
+      const y = (Math.floor(pixel / width) + 0.5) / height;
       for (const mask of settings.masks) {
         const seeds = maskSeeds.get(mask.id);
         const weight = this.masks.evaluate(mask, {
           x,
           y,
-          luminance: this.luminance(sourcePixel),
+          luminance: this.luminance(perceptualSourcePixel),
           positiveLuminances: seeds?.positive,
           negativeLuminances: seeds?.negative
         });
         if (weight <= 0) continue;
         const local = { ...this.neutralAdjustments(), ...mask.localAdjustments };
-        const locallyDeveloped = this.developPixel(developed, local);
+        const locallyDeveloped = this.developPixel(developed, local, false);
         developed = this.mix(developed, locallyDeveloped, weight);
       }
       const curved = this.applyCurves(developed, luts);
@@ -58,7 +103,7 @@ export class CpuPixelDeveloper {
       working[index] = vignetted.red;
       working[index + 1] = vignetted.green;
       working[index + 2] = vignetted.blue;
-      working[index + 3] = (source[index + 3] ?? 255) / 255;
+      working[index + 3] = alphaAt(pixel);
     }
     const denoised = this.boxBlend(working, width, height, adjustments.noiseReduction / 100);
     const textured = this.sharpen(denoised, width, height, adjustments.texture / 125);
@@ -95,33 +140,30 @@ export class CpuPixelDeveloper {
 
   private maskSeedLuminances(
     mask: MaskDefinitionPrimitives,
-    source: Uint8ClampedArray,
+    sourceAt: PixelReader,
     width: number,
-    height: number
+    height: number,
+    sourceIsLinear: boolean
   ): { positive: number[]; negative: number[] } {
     if (mask.shape.kind !== 'ai-segmentation') return { positive: [], negative: [] };
     return {
-      positive: mask.shape.positivePoints.map((point) => this.sourceLuminanceAt(source, width, height, point.x, point.y)),
-      negative: mask.shape.negativePoints.map((point) => this.sourceLuminanceAt(source, width, height, point.x, point.y))
+      positive: mask.shape.positivePoints.map((point) => this.sourceLuminanceAt(sourceAt, width, height, point.x, point.y, sourceIsLinear)),
+      negative: mask.shape.negativePoints.map((point) => this.sourceLuminanceAt(sourceAt, width, height, point.x, point.y, sourceIsLinear))
     };
   }
 
-  private sourceLuminanceAt(source: Uint8ClampedArray, width: number, height: number, x: number, y: number): number {
+  private sourceLuminanceAt(sourceAt: PixelReader, width: number, height: number, x: number, y: number, sourceIsLinear: boolean): number {
     const pixelX = Math.min(width - 1, Math.max(0, Math.floor(x * width)));
     const pixelY = Math.min(height - 1, Math.max(0, Math.floor(y * height)));
-    const index = (pixelY * width + pixelX) * 4;
-    return this.luminance({
-      red: (source[index] ?? 0) / 255,
-      green: (source[index + 1] ?? 0) / 255,
-      blue: (source[index + 2] ?? 0) / 255
-    });
+    const source = sourceAt(pixelY * width + pixelX);
+    return this.luminance(sourceIsLinear ? this.toSrgb(source) : source);
   }
 
-  private developPixel(rgb: Rgb, adjustment: GlobalAdjustmentsPrimitives): Rgb {
+  private developPixel(rgb: Rgb, adjustment: GlobalAdjustmentsPrimitives, sourceIsLinear: boolean): Rgb {
     const exposure = 2 ** adjustment.exposure;
-    let red = rgb.red * exposure;
-    let green = rgb.green * exposure;
-    let blue = rgb.blue * exposure;
+    let red = sourceIsLinear ? this.linearToSrgb(rgb.red * exposure) : rgb.red * exposure;
+    let green = sourceIsLinear ? this.linearToSrgb(rgb.green * exposure) : rgb.green * exposure;
+    let blue = sourceIsLinear ? this.linearToSrgb(rgb.blue * exposure) : rgb.blue * exposure;
     const temperature = adjustment.temperature / 100;
     const tint = adjustment.tint / 100;
     red += temperature * 0.15 - tint * 0.035;
@@ -236,6 +278,13 @@ export class CpuPixelDeveloper {
   }
 
   private luminance(rgb: Rgb): number { return rgb.red * 0.2126 + rgb.green * 0.7152 + rgb.blue * 0.0722; }
+  private toSrgb(rgb: Rgb): Rgb {
+    return { red: this.linearToSrgb(rgb.red), green: this.linearToSrgb(rgb.green), blue: this.linearToSrgb(rgb.blue) };
+  }
+  private linearToSrgb(value: number): number {
+    const linear = Math.max(0, value);
+    return linear <= 0.003_130_8 ? linear * 12.92 : 1.055 * linear ** (1 / 2.4) - 0.055;
+  }
   private mix(start: Rgb, end: Rgb, amount: number): Rgb {
     return {
       red: start.red + (end.red - start.red) * amount,

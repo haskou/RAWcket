@@ -14,7 +14,7 @@ Implemented:
 - Local library with JPEG/PNG/Sony ARW import, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, quota preflight, and portable project bundles.
 - Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
 - Collapsible, navigable Active Recipe sidebar that lists only non-default instructions, with reversible enable switches and links back to each editor.
-- Adaptive renderer in a cancellable Web Worker: WebGPU compute runs compatible global development and curve LUTs first, a real WebGL2 shader provides the graphics fallback, and the reference CPU backend handles masks and spatial stages. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, and a versioned LRU preview cache share the same boundary.
+- Adaptive renderer with cancellable scheduling: LibRaw/WASM develops supported camera mosaics to linear 16-bit RGB in its isolated browser worker, then a render worker applies the recipe. WebGPU compute runs compatible global development and curve LUTs first, a real WebGL2 shader provides the graphics fallback, and the reference CPU backend handles high-depth RAW input, masks, and spatial stages. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, and a versioned LRU preview cache share the same boundary.
 - Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
@@ -23,8 +23,8 @@ Implemented:
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
 - Versioned schema migrations through version 6.
 - Safe TIFF/EXIF inspection for Sony ARW camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern, with an honest in-editor source-information view.
-- AI-first workspace with real OpenAI vision advice and reviewable slider proposals, a measurement-backed local tutor, deterministic positive/negative-point smart masks, and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Cloud AI remains unconfigured by default.
-- Explicit OpenAI API provider and user-entered model configuration. Missing configuration opens the setup dialog and resumes the pending action after setup; keys can stay in memory or use the optional AES-GCM/PBKDF2 vault whose master password is never stored.
+- AI-first workspace with real OpenAI vision advice and reviewable proposals for sliders, tone curves, crop/geometry, and radial, linear-gradient, or luminance-range masks; a measurement-backed local tutor; deterministic positive/negative-point smart masks; and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Cloud AI remains unconfigured by default.
+- Explicit OpenAI API provider and user-entered model configuration. Missing configuration opens the setup dialog and resumes the pending action after setup. The setup defaults to AES-GCM/PBKDF2 encrypted storage; the only alternative is tab memory that is explicitly never persisted. The master password is never stored.
 - Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
 - Interactive curves, before/after, workspace-relative Fit, a dense fixed composition grid, drag-to-crop with an outside veil and locked ratios, explained masks, portable development settings, and reversible presets.
 - A clearly separated AI Companion and Manual workspace, deterministic no-AI Auto Enhance, OpenAI-authored editable briefs, one-click recipe clearing, and comparative multi-photo review based on post-edit potential with photographer override.
@@ -35,11 +35,11 @@ Implemented:
 
 Not implemented yet:
 
-- Full LibRaw/WASM demosaicing and a high-depth linear RAW pipeline. Sony ARW currently uses its embedded JPEG preview while preserving the original `.arw` in storage and bundles.
+- A legally redistributable Sony A6600 fixture and trusted-reference color/matrix golden corpus. The current external verification fixture is a locally downloaded Sony FX30 ARW and is intentionally not committed because its image license is unclear.
 - WebGPU/WebGL2 passes for masks and spatial filters, device-loss recovery, and a complete GPU/CPU golden-image parity corpus.
 - Larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
-- Full LibRaw mosaic demosaicing, 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.
+- 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking. RAW sensor development is already high-depth, but current file encoders quantize their output to 8-bit.
 - Collections, optional filesystem links, and a full WCAG/browser-device audit.
 
 The detailed, actively maintained plan is in [TODO.md](TODO.md).
@@ -67,6 +67,8 @@ pnpm test:e2e
 ```
 
 `pnpm preview` serves the production build locally.
+
+LibRaw uses shared WebAssembly memory and pthread workers. Any production host must return the COOP/COEP/CORP headers recorded in [`public/_headers`](public/_headers); Vite development and preview already apply the same policy.
 
 ## Architecture
 
@@ -106,7 +108,7 @@ Recipe-only sidecars use the separate `.rawcket.json` format. They contain a ver
 - Manual editing, Auto Enhance, the Development Tutor, point masks, and installed Semantic Select run locally. Semantic Select downloads pinned model weights only after consent, verifies each resource, then performs inference on-device.
 - OpenAI-powered opinions, editable proposals, and multi-photo comparison are optional cloud actions. They send reduced JPEG previews plus the visible task context to the OpenAI Responses API with response storage disabled; originals, RAW files, complete recipes, and API keys are not sent as request content.
 - RAWcket never silently selects an OpenAI model. The provider and user-entered model are visible in setup, which links directly to [OpenAI API key management](https://platform.openai.com/api-keys).
-- An API key can remain in session memory or be encrypted with AES-GCM; its decryption key is derived from a master password that is never stored. Browser-side keys remain exposed to the risks of the active page and installed browser extensions.
+- RAWcket never persists an unencrypted API key. Setup defaults to AES-GCM encrypted storage with a PBKDF2-SHA-256-derived key; the explicit session-only alternative stays in memory and is never saved. The master password is never stored. Browser-side keys remain exposed to the risks of the active page and installed browser extensions.
 - Keys never become part of projects, bundles, logs, or errors.
 
 Storing secrets in a shared browser still carries risk. The threat model and planned hardening are documented in [TODO.md](TODO.md).
@@ -131,13 +133,15 @@ docs/adr/                      architecture decisions
 
 ## Known limitations
 
-- Sony ARW development currently uses the embedded JPEG preview; sensor mosaics are not demosaiced yet.
+- Supported Sony ARW files use LibRaw/WASM 16-bit linear development. If preview decoding fails, RAWcket visibly labels an embedded-JPEG fallback and its reason; final photo export fails rather than silently exporting that fallback.
 - The reference CPU algorithms prioritize deterministic architecture and testability over production photographic quality.
 - OPFS, persistent-storage requests, workers, and PWA behavior depend on browser capabilities and degrade safely.
 - `pagehide` cannot guarantee completion of asynchronous writes when a process terminates abruptly; debouncing reduces the loss window.
 - The vault protects data at rest, not against XSS executing in the same origin.
 - TIFF export is currently uncompressed RGB 8-bit because the reference pipeline is 8-bit.
 - The experience prioritizes desktop while retaining a functional tablet/mobile layout.
+
+Third-party codec licenses and source links are recorded in [docs/third-party-notices.md](docs/third-party-notices.md) and included in production output.
 
 ## Contributing
 

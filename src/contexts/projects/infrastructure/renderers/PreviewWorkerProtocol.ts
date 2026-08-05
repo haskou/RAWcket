@@ -5,8 +5,20 @@ const recipeSchema = photoProjectSchema.shape.recipe;
 
 export const previewWorkerRequestSchema = z.object({
   id: z.uuid(),
-  source: z.instanceof(Blob),
-  sourceMimeType: z.enum(['image/jpeg', 'image/png', 'image/x-sony-arw']),
+  source: z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('bitmap'),
+      image: z.instanceof(Blob),
+      sourcePrecision: z.enum(['standard-8-bit', 'embedded-preview-8-bit']),
+      rawFallbackReason: z.string().max(1_000).nullable()
+    }),
+    z.object({
+      kind: z.literal('raw-linear-16-bit'),
+      width: z.int().positive(),
+      height: z.int().positive(),
+      pixels: z.instanceof(Uint16Array)
+    })
+  ]),
   maximumEdge: z.int().min(64).max(32_768).nullable(),
   output: z.object({
     mimeType: z.enum(['image/webp', 'image/jpeg', 'image/png', 'image/tiff']),
@@ -30,7 +42,9 @@ const histogramSchema = z.object({
   luminance: z.array(z.number().min(0).max(1)).length(64),
   shadowClipping: z.number().min(0).max(1),
   highlightClipping: z.number().min(0).max(1),
-  backend: z.enum(['webgpu', 'webgl2', 'cpu'])
+  backend: z.enum(['webgpu', 'webgl2', 'cpu']),
+  sourcePrecision: z.enum(['standard-8-bit', 'raw-linear-16-bit', 'embedded-preview-8-bit']),
+  rawFallbackReason: z.string().max(1_000).nullable()
 });
 
 export const previewWorkerResponseSchema = z.discriminatedUnion('kind', [

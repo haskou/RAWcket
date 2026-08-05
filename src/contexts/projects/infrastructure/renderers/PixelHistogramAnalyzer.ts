@@ -6,6 +6,8 @@ export type PixelHistogram = {
   shadowClipping: number;
   highlightClipping: number;
   backend: 'webgpu' | 'webgl2' | 'cpu';
+  sourcePrecision: 'standard-8-bit' | 'raw-linear-16-bit' | 'embedded-preview-8-bit';
+  rawFallbackReason: string | null;
 };
 
 export class PixelHistogramAnalyzer {
@@ -15,7 +17,12 @@ export class PixelHistogramAnalyzer {
     }
   }
 
-  public analyze(pixels: Uint8ClampedArray, backend: PixelHistogram['backend'] = 'cpu'): PixelHistogram {
+  public analyze(
+    pixels: Uint8ClampedArray,
+    backend: PixelHistogram['backend'] = 'cpu',
+    sourcePrecision: PixelHistogram['sourcePrecision'] = 'standard-8-bit',
+    rawFallbackReason: string | null = null
+  ): PixelHistogram {
     if (pixels.length === 0 || pixels.length % 4 !== 0) throw new Error('A histogram requires a non-empty RGBA pixel buffer.');
     const red = Array<number>(this.bucketCount).fill(0);
     const green = Array<number>(this.bucketCount).fill(0);
@@ -43,7 +50,9 @@ export class PixelHistogramAnalyzer {
       luminance: this.normalize(luminance),
       shadowClipping: shadows / pixelsCount,
       highlightClipping: highlights / pixelsCount,
-      backend
+      backend,
+      sourcePrecision,
+      rawFallbackReason
     };
   }
 

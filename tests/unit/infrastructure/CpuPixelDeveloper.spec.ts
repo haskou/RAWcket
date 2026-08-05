@@ -13,6 +13,19 @@ function settings(exposure = 0, contrast = 0): CpuDevelopmentSettings {
 }
 
 describe('CpuPixelDeveloper', () => {
+  it('keeps linear 16-bit precision through exposure before display conversion', () => {
+    const developed = new CpuPixelDeveloper().developHighDepthLinear(
+      new Uint16Array([16_384, 16_384, 16_384]),
+      1,
+      1,
+      settings(1)
+    );
+
+    expect(developed[0]).toBeGreaterThanOrEqual(187);
+    expect(developed[0]).toBeLessThanOrEqual(189);
+    expect(developed[3]).toBe(255);
+  });
+
   it('applies real exposure to RGB and preserves alpha', () => {
     const developed = new CpuPixelDeveloper().develop(
       new Uint8ClampedArray([64, 32, 16, 120]),

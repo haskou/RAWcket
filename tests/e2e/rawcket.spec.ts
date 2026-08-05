@@ -64,7 +64,16 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
     const body = route.request().postDataJSON() as { text?: { format?: { name?: string } } };
     const result = body.text?.format?.name === 'rawcket_photo_opinion'
       ? { suggestedIntent: 'Shape a cinematic night portrait while keeping skin believable.', critique: 'The face carries the frame, while the bright edge can be controlled to improve hierarchy.', strengths: ['Clear subject'], opportunities: ['Tighter crop'] }
-      : { explanation: 'A restrained contrast increase gives the subject more separation.', operations: [{ key: 'contrast', value: 14 }, { key: 'highlights', value: -22 }] };
+      : {
+        explanation: 'A restrained tonal curve, tighter frame, and local lift give the subject more separation.',
+        operations: [
+          { kind: 'global-adjustment', key: 'contrast', value: 14 },
+          { kind: 'global-adjustment', key: 'highlights', value: -22 },
+          { kind: 'tone-curve', channel: 'rgb', interpolation: 'monotonic-cubic', points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.2 }, { x: 0.75, y: 0.82 }, { x: 1, y: 1 }] },
+          { kind: 'viewport', cropFrame: { x: 0.05, y: 0.05, width: 0.9, height: 0.9 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
+          { kind: 'radial-mask', center: { x: 0.5, y: 0.45 }, radiusX: 0.2, radiusY: 0.28, rotationDegrees: 0, inverted: false, opacity: 0.8, feather: 0.6, density: 1, localAdjustments: [{ key: 'exposure', value: 0.3 }] }
+        ]
+      };
     await route.fulfill({ status: 200, contentType: 'application/json', body: openAiEnvelope(result) });
   });
   await page.getByRole('button', { name: 'Ask Companion for an opinion' }).click();
@@ -74,14 +83,21 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(aiSettings.getByRole('link', { name: /Create or manage an OpenAI API key/ })).toHaveAttribute('href', 'https://platform.openai.com/api-keys');
   await aiSettings.getByLabel('OpenAI model').fill('test-vision-model');
   await aiSettings.getByLabel('OpenAI API key').fill('sk-e2e-test-key');
+  await aiSettings.getByLabel('This tab only · never saved').check();
   await aiSettings.getByRole('button', { name: 'Use OpenAI API' }).click();
   await expect(page.getByLabel('What should RAWcket create?')).toHaveValue(/cinematic night portrait/);
   await page.getByLabel('What should RAWcket create?').fill('Create a cinematic night treatment');
   await page.getByRole('button', { name: 'Generate editable proposal' }).click();
   await expect(page.getByLabel('AI edit proposal')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Contrast: +14' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Update RGB curve' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Update crop and geometry' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Add local mask' })).toBeChecked();
   await page.getByRole('button', { name: 'Apply selected' }).click();
   await expect(page.getByRole('button', { name: /Contrast \+14/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
   await page.keyboard.press('1');
   await expect(page.getByRole('button', { name: 'Light Shortcut 1' })).toHaveAttribute('aria-expanded', 'true');
   await page.getByLabel('Exposure numeric value').fill('0.25');
@@ -135,10 +151,11 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await page.getByRole('tab', { name: '✦ AI Companion' }).click();
   await page.getByRole('button', { name: 'Create and place points' }).click();
-  await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
   await expect(page.getByText('CPU compatibility preview')).toBeVisible({ timeout: 15_000 });
   await page.keyboard.press('4');
   await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
+  await page.getByRole('button', { name: 'Reset channel' }).click();
   const curveGraph = page.locator('.curve-graph');
   await expect(curveGraph.locator('path.curve-line')).toHaveAttribute('d', /^M0,1 L/);
   await expect(page.getByText('Neutral curve · no control point selected')).toBeVisible();
@@ -193,7 +210,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
   await page.getByRole('button', { name: 'Local Masks', exact: true }).click();
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
   await page.locator('.curve-graph circle').nth(1).click();
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.11');
@@ -270,6 +287,7 @@ test('compares multiple imports by post-edit potential and lets the photographer
   await expect(aiSettings).toBeVisible();
   await aiSettings.getByLabel('OpenAI model').fill('test-vision-model');
   await aiSettings.getByLabel('OpenAI API key').fill('sk-e2e-test-key');
+  await aiSettings.getByLabel('This tab only · never saved').check();
   await aiSettings.getByRole('button', { name: 'Use OpenAI API' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Choose the strongest photograph' });
@@ -325,9 +343,11 @@ test('imports a Sony ARW container and develops its embedded preview locally', a
   await expect(page.getByLabel('Project name')).toHaveValue('a6600-sample');
   await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeVisible();
   await expect(page.getByText(/Preview up to date/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Embedded RAW preview fallback/)).toBeVisible();
   await page.getByRole('button', { name: 'Photo information' }).click();
   await expect(page.getByRole('dialog', { name: 'Photo information' })).toContainText('Sony ARW');
   await expect(page.getByRole('dialog', { name: 'Photo information' })).toContainText('6000 × 4000 px');
-  await expect(page.getByText(/currently develops its embedded JPEG preview/)).toBeVisible();
+  await expect(page.getByText(/Embedded 8-bit preview fallback/)).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Photo information' })).toContainText('Final export will not silently use this fallback.');
   await page.getByRole('button', { name: 'Close photo information' }).click();
 });

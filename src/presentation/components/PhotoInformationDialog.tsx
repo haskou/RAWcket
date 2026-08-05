@@ -1,8 +1,10 @@
 import type { ReactElement } from 'react';
+import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 
-export function PhotoInformationDialog({ project, open, onClose }: {
+export function PhotoInformationDialog({ project, analysis, open, onClose }: {
   project: PhotoProject;
+  analysis: PreviewAnalysis | null;
   open: boolean;
   onClose: () => void;
 }): ReactElement | null {
@@ -26,6 +28,7 @@ export function PhotoInformationDialog({ project, open, onClose }: {
     ['Sensor levels', capture.blackLevel === null || capture.whiteLevel === null ? '' : `${formatNumber(capture.blackLevel)} black · ${formatNumber(capture.whiteLevel)} white`],
     ['Bayer/CFA pattern', capture.cfaPattern ?? '']
   ];
+  if (data.source.mimeType === 'image/x-sony-arw') candidates.splice(3, 0, ['Development source', sourcePrecisionLabel(analysis)]);
   const rows = candidates.filter(([, value]) => value.length > 0);
 
   return <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
@@ -33,9 +36,18 @@ export function PhotoInformationDialog({ project, open, onClose }: {
       <div className="dialog-heading"><div><span className="eyebrow">Source facts</span><h2 id="photo-information-title">Photo information</h2></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close photo information">×</button></div>
       <dl>{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       {capture.cameraMake === null && <p className="muted">This source does not expose camera EXIF through RAWcket’s current safe browser decoder.</p>}
-      {data.source.mimeType === 'image/x-sony-arw' && <p className="notice">The original ARW is preserved. RAWcket currently develops its embedded JPEG preview; full high-depth mosaic demosaicing is still pending and is not represented as complete.</p>}
+      {data.source.mimeType === 'image/x-sony-arw' && analysis?.sourcePrecision === 'raw-linear-16-bit' && <p className="notice">The original ARW sensor mosaic was demosaiced by LibRaw/WASM with camera white balance and its color matrix, then developed from a 16-bit linear RGB buffer. Quantization to 8-bit occurs only when the displayed preview is encoded.</p>}
+      {data.source.mimeType === 'image/x-sony-arw' && analysis?.sourcePrecision === 'embedded-preview-8-bit' && <p className="notice warning"><strong>Embedded 8-bit preview fallback.</strong> The original ARW is preserved, but LibRaw could not complete this interactive decode. {analysis.rawFallbackReason ?? 'No decoder reason was returned.'} Final export will not silently use this fallback.</p>}
+      {data.source.mimeType === 'image/x-sony-arw' && analysis === null && <p className="notice">The original ARW is preserved. RAWcket is still determining whether this frame can use the 16-bit LibRaw pipeline.</p>}
     </section>
   </div>;
+}
+
+function sourcePrecisionLabel(analysis: PreviewAnalysis | null): string {
+  if (analysis === null) return 'Determining source precision…';
+  if (analysis.sourcePrecision === 'raw-linear-16-bit') return 'LibRaw/WASM · linear RGB · 16-bit';
+  if (analysis.sourcePrecision === 'embedded-preview-8-bit') return 'Embedded JPEG fallback · 8-bit';
+  return 'Browser-decoded source · 8-bit';
 }
 
 function formatExposure(seconds: number): string {

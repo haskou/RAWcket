@@ -9,12 +9,14 @@ import {
   previewWorkerResponseSchema,
   type PreviewWorkerRequest
 } from './PreviewWorkerProtocol';
+import type { RenderSourceDecoder } from './RenderSourceDecoder';
 
 export class WorkerPreviewRenderer implements PreviewRenderer {
   private readonly capacity = new Semaphore(2);
 
   public constructor(
-    private readonly sources: SourceFileRepository
+    private readonly sources: SourceFileRepository,
+    private readonly sourceDecoder: RenderSourceDecoder
   ) {}
 
   public async render(
@@ -29,7 +31,7 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
       return await new Flow()
         .task((signal) => this.renderInWorker(request, signal, control))
         .limit(this.capacity)
-        .timeout(45_000)
+        .timeout(120_000)
         .abortable(abortable)
         .run();
     } finally {
@@ -45,10 +47,17 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
     const source = await this.sources.find(request.getProjectId());
     if (source === null) throw new Error('The project does not have a renderable original.');
     const primitives = request.getProject().toPrimitives();
+    control.onProgress?.({ stage: 'decoding', completed: 0.1 });
+    const decodedSource = await this.sourceDecoder.decode(
+      source,
+      primitives.source.mimeType,
+      request.getSize().valueOf(),
+      true
+    );
+    control.onProgress?.({ stage: 'decoding', completed: 0.3 });
     const workerRequest: PreviewWorkerRequest = {
       id: crypto.randomUUID(),
-      source,
-      sourceMimeType: primitives.source.mimeType,
+      source: decodedSource,
       maximumEdge: request.getSize().valueOf(),
       output: { mimeType: 'image/webp', quality: 0.9 },
       development: {
@@ -93,7 +102,10 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
           resolve(new Blob([response.data.image], { type: response.data.mimeType }));
         }
       };
-      worker.postMessage(workerRequest);
+      const transfer = workerRequest.source.kind === 'raw-linear-16-bit'
+        ? [workerRequest.source.pixels.buffer]
+        : [];
+      worker.postMessage(workerRequest, transfer);
     });
   }
 }

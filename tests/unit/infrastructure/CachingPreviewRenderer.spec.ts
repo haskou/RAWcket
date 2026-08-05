@@ -10,7 +10,9 @@ const analysis: PreviewAnalysis = {
   luminance: new Array<number>(64).fill(0),
   shadowClipping: 0,
   highlightClipping: 0,
-  backend: 'cpu'
+  backend: 'cpu',
+  sourcePrecision: 'standard-8-bit',
+  rawFallbackReason: null
 };
 
 describe('CachingPreviewRenderer', () => {

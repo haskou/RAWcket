@@ -968,6 +968,11 @@ export function EditorPage(): ReactElement {
   const mode = project.getInterfaceMode().valueOf();
   const statusLabel = autosave.status === 'saved' ? 'Saved locally' : autosave.status === 'saving' ? 'Saving…' : 'Save failed';
   const transform = `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
+  const sourcePrecisionLabel = previewAnalysis?.sourcePrecision === 'raw-linear-16-bit'
+    ? '16-bit linear LibRaw source'
+    : previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit'
+      ? '8-bit embedded-preview fallback'
+      : previewAnalysis === null ? 'Source precision pending' : '8-bit browser source';
 
   return (
     <main className="editor-shell">
@@ -1038,7 +1043,8 @@ export function EditorPage(): ReactElement {
               <CompositionGuideOverlay guide={compositionGuide} />
               {toolWorkspace === 'develop' && activePanel === 'crop' && <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} />}
             </div>}
-            <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{previewAnalysis?.backend === 'webgpu' || previewAnalysis?.backend === 'webgl2' ? 'GPU global development · CPU geometry' : 'Reference renderer for masks and spatial stages'} · {renderProgress}</small></span></div>
+            <div className={`truth-badge ${previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' ? 'source-fallback' : ''}`} title={previewAnalysis?.rawFallbackReason ?? undefined}><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{sourcePrecisionLabel} · {renderProgress}</small></span></div>
+            {previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' && <div className="raw-fallback-notice" role="status">Embedded RAW preview fallback · open Photo information for the decoder reason</div>}
             {showOriginal && <div className="comparison-badge">Original · Before</div>}
             <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
           </div>
@@ -1163,7 +1169,7 @@ export function EditorPage(): ReactElement {
         </aside>
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onConfigured={continuePendingAiAction} />
-      <PhotoInformationDialog project={project} open={photoInformationOpen} onClose={() => setPhotoInformationOpen(false)} />
+      <PhotoInformationDialog project={project} analysis={previewAnalysis} open={photoInformationOpen} onClose={() => setPhotoInformationOpen(false)} />
       {historyOpen && <HistoryDialog project={project} onClose={() => setHistoryOpen(false)} onUndo={() => changeHistory('undo')} onRedo={() => changeHistory('redo')} />}
       <ExportPhotoDialog
         open={exportOpen}

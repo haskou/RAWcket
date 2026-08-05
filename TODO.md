@@ -17,20 +17,21 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Consented, pinned, integrity-verified ONNX semantic model with removable local storage and WebGPU/WASM execution.
 - [x] JPEG/PNG/TIFF worker export with resize, progress, and cancellation.
 - [x] ARW embedded-preview extraction while preserving the original RAW.
+- [x] LibRaw/WASM mosaic development to linear 16-bit RGB, bounded input/output memory, camera white balance/matrix settings, visible embedded-preview fallback, and no silent export fallback.
 - [x] Bounded TIFF/EXIF extraction and a persisted photo-information view for camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern.
 - [x] Versioned LRU previews, quota preflight, SHA-256 snapshots, and corruption recovery.
 - [x] Safe, postponable PWA updates and a production CSP without `unsafe-eval`.
-- [ ] Full LibRaw/WASM A6600 demosaicing and high-depth linear development.
+- [ ] Sony A6600-specific redistributable fixture and trusted-reference color/matrix golden verification.
 - [x] WebGPU-first global-development/curve compute pipeline, WebGL2 fallback, and explicit CPU fallback for masks and spatial stages.
 - [ ] Complete GPU mask/spatial-stage coverage and the remaining capabilities below.
 
 ## Recommended implementation order
 
-1. Prototype LibRaw/WASM in a worker with a redistributable Sony A6600 ARW fixture.
+1. Secure a redistributable Sony A6600 ARW fixture and establish trusted color/matrix golden references for the working LibRaw path.
 2. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
 3. Extend the WebGPU and WebGL2 renderers behind the existing preview boundary to cover masks and spatial stages.
 4. Extend semantic selection with embedding reuse, model tiers, more categories, and mask composition.
-5. Add optional cloud assistance only after privacy, cost, and structured-output contracts are complete.
+5. Add per-request cost estimates, cancellation, and capability discovery to the implemented optional OpenAI adapter.
 
 ---
 
@@ -38,11 +39,11 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Convert camera originals into a reproducible, high-depth linear image prepared for the development pipeline, starting with Sony A6600 ARW.
 
-**Scope.** Evaluate existing LibRaw wrappers against a first-party build; compile LibRaw to WebAssembly; open A6600 ARW files; extract embedded previews and EXIF; read camera white balance, black/white levels, and Bayer pattern; implement reference demosaicing and high-depth linear output. Keep the codec boundary extensible for other RAW formats and additional JPEG/PNG/TIFF inputs. Run decoding in a worker with progress, cancellation, explicit limits, and careful WASM memory management.
+**Scope.** Evaluate existing LibRaw wrappers against a first-party build; compile LibRaw to WebAssembly; open A6600 ARW files; extract embedded previews and EXIF; read camera white balance, black/white levels, and Bayer pattern; implement reference demosaicing and high-depth linear output. Keep the codec boundary extensible for other RAW formats and additional JPEG/PNG/TIFF inputs. Run decoding through an isolated worker runtime with progress, cancellation, explicit limits, and careful WASM memory management.
 
-**Implemented foundation.** A bounded TIFF reader already extracts the embedded JPEG and validated capture facts without blocking on mosaic development. Schema version 5 persists camera/lens identity, exposure, aperture, ISO, focal length, EXIF orientation, white-balance mode, color-space tag, black/white levels, and CFA pattern. The editor exposes those facts and explicitly labels embedded-preview development.
+**Implemented.** A bounded TIFF reader extracts the embedded JPEG and validated capture facts. Schema version 5 persists camera/lens identity, exposure, aperture, ISO, focal length, EXIF orientation, white-balance mode, color-space tag, black/white levels, and CFA pattern. `libraw-wasm` now develops supported sensor mosaics with camera white balance/matrix data, linear gamma, no automatic brightness, and 16-bit RGB output. Exposure is applied before sRGB companding and preview quantization. Input is capped at 256 MB and developed output at 60 MP. Preview failure uses an explicitly labelled embedded JPEG with the exact reason; final export never silently uses it. Vite keeps the wrapper out of dependency prebundling so its worker/WASM URLs remain valid, and COOP/COEP/CORP headers enable shared WASM memory. An external 31.8 MB Sony FX30 ARW passes Chromium development in roughly two seconds; the fixture is not committed because its photo license is unclear.
 
-**Remaining.** LibRaw/WASM mosaic decoding, camera matrices and as-shot neutral values, verified A6600 fixtures against a trusted reference decoder, high-depth linear buffers, and memory/cancellation profiling for the WASM path.
+**Remaining.** A legally redistributable A6600 fixture, trusted-reference metadata/color/matrix comparisons, explicit as-shot-neutral parity, cancellation wired through the LibRaw worker, and peak-memory profiling across target browsers/devices.
 
 **Dependencies.** The existing `PreviewRenderer` boundary; Emscripten; redistributable RAW fixtures; worker protocol; memory/cache policy; LibRaw and wrapper license review.
 
@@ -170,7 +171,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Propose explainable, bounded edits without giving AI direct authority over a project.
 
-**Implemented.** OpenAI is the first provider adapter. Provider, key, and vision-capable model are configured explicitly; no model is silently selected. Missing configuration opens setup and resumes the pending opinion, proposal, or contact-sheet comparison after success. AI Companion sends a reduced JPEG preview through the Responses API with `store: false`, requests strict structured JSON, validates it again with Zod and domain Value Objects, and returns ordinary reviewable operations. A visual opinion evaluates subject, framing, focus, light, and story before filling the editable brief. Classic Auto Enhance remains clearly labelled deterministic non-AI behavior.
+**Implemented.** OpenAI is the first provider adapter. Provider, key, and vision-capable model are configured explicitly; no model is silently selected. Missing configuration opens setup and resumes the pending opinion, proposal, or contact-sheet comparison after success. AI Companion sends a reduced JPEG preview through the Responses API with `store: false`, requests strict structured JSON, validates it again with Zod and domain Value Objects, and returns ordinary reviewable operations. Proposals can combine global adjustments, monotonic-cubic RGB/channel/luminance curves, crop/translation/scale/rotation/flips/aspect ratio, and editable radial, linear-gradient, or luminance-range masks. A visual opinion evaluates subject, framing, focus, light, and story before filling the editable brief. Classic Auto Enhance remains clearly labelled deterministic non-AI behavior.
 
 **Remaining optional cloud scope.** A future local VLM, per-request cost/token estimates, cancellation, provider/model capability discovery, weaker proposal variants, and selected opt-in EXIF/noise facts. Never send full RAW or log images.
 
@@ -224,7 +225,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Reduce local and optional-integration risk with understandable controls.
 
-**Implemented.** In-memory and password-encrypted API keys, AES-GCM/PBKDF2-SHA-256 with a non-persisted master password, deletion from session/device settings, no analytics, storage transparency, and a production CSP that excludes `unsafe-eval`, external scripts, frames, and objects.
+**Implemented.** API keys are either session-only and never persisted or saved with AES-GCM/PBKDF2-SHA-256 encryption and a non-persisted master password. Encrypted storage is the setup default and no unencrypted persistence path exists. Removal clears session/device settings. RAWcket has no analytics and its production CSP excludes `unsafe-eval`, external scripts, frames, and objects.
 
 **Implemented.** The OpenAI adapter reduces previews to bounded JPEGs, sets API response storage off, keeps the model explicit, schema-validates every result, never reads keys from serializable project state, and returns provider failures without response bodies or secret-bearing errors. The CSP permits only the explicit OpenAI endpoint in addition to pinned local-model hosts.
 

@@ -2,6 +2,12 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const crossOriginIsolationHeaders = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Resource-Policy': 'cross-origin'
+};
+
 export default defineConfig({
   plugins: [
     react(),
@@ -17,12 +23,15 @@ export default defineConfig({
         start_url: '/'
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,webp,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,png,webp,svg,woff2}', 'assets/libraw-*.wasm'],
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html'
       }
     })
   ],
+  server: { headers: crossOriginIsolationHeaders },
+  preview: { headers: crossOriginIsolationHeaders },
+  optimizeDeps: { exclude: ['libraw-wasm'] },
   resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
   build: {
     rollupOptions: {
