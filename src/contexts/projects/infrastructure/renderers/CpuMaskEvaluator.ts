@@ -11,27 +11,29 @@ type MaskSample = {
 export class CpuMaskEvaluator {
   public evaluate(mask: MaskDefinitionPrimitives, sample: MaskSample): number {
     if (!mask.enabled) return 0;
-    const shapeWeight = this.evaluateShape(mask.shape, sample);
+    const shapeWeight = this.evaluateShape(mask.shape, sample, mask.expansion ?? 0);
     const feathered = this.feather(shapeWeight, mask.feather);
     const inverted = mask.inverted ? 1 - feathered : feathered;
     return this.clamp(inverted * mask.opacity * mask.density);
   }
 
-  private evaluateShape(shape: MaskShape, sample: MaskSample): number {
+  private evaluateShape(shape: MaskShape, sample: MaskSample, expansion: number): number {
     if (shape.kind === 'brush') {
       let weight = 0;
       for (const stroke of shape.strokes) {
-        const radius = Math.max(0.000_1, stroke.size / 2);
         for (let index = 0; index < stroke.points.length; index += 1) {
           const point = stroke.points[index];
           if (point === undefined) continue;
           const previous = stroke.points[Math.max(0, index - 1)] ?? point;
+          const pressure = ((previous.pressure ?? 1) + (point.pressure ?? 1)) / 2;
+          const radius = Math.max(0.000_1, stroke.size * Math.max(0.15, pressure) / 2 + expansion);
           const distance = this.distanceToSegment(sample.x, sample.y, previous.x, previous.y, point.x, point.y);
           const hardRadius = radius * stroke.hardness;
           const strokeWeight = distance <= hardRadius
             ? 1
             : 1 - this.smoothstep(hardRadius, radius, distance);
-          weight = Math.max(weight, strokeWeight * stroke.flow);
+          const contribution = strokeWeight * stroke.flow * Math.max(0.15, pressure);
+          weight = stroke.mode === 'erase' ? this.clamp(weight - contribution) : Math.max(weight, contribution);
         }
       }
       return weight;
@@ -41,7 +43,7 @@ export class CpuMaskEvaluator {
       const axisY = shape.end.y - shape.start.y;
       const lengthSquared = axisX * axisX + axisY * axisY;
       if (lengthSquared <= 0.000_001) return 0;
-      return this.clamp(((sample.x - shape.start.x) * axisX + (sample.y - shape.start.y) * axisY) / lengthSquared);
+      return this.clamp(((sample.x - shape.start.x) * axisX + (sample.y - shape.start.y) * axisY) / lengthSquared + expansion);
     }
     if (shape.kind === 'radial') {
       const radians = -shape.rotationDegrees * Math.PI / 180;
@@ -49,24 +51,25 @@ export class CpuMaskEvaluator {
       const offsetY = sample.y - shape.center.y;
       const rotatedX = offsetX * Math.cos(radians) - offsetY * Math.sin(radians);
       const rotatedY = offsetX * Math.sin(radians) + offsetY * Math.cos(radians);
-      const distance = Math.sqrt((rotatedX / shape.radiusX) ** 2 + (rotatedY / shape.radiusY) ** 2);
+      const distance = Math.sqrt((rotatedX / Math.max(0.001, shape.radiusX + expansion)) ** 2 + (rotatedY / Math.max(0.001, shape.radiusY + expansion)) ** 2);
       return 1 - this.smoothstep(0.75, 1, distance);
     }
     if (shape.kind === 'luminance-range') {
-      return sample.luminance >= shape.minimum && sample.luminance <= shape.maximum ? 1 : 0;
+      return sample.luminance >= shape.minimum - expansion && sample.luminance <= shape.maximum + expansion ? 1 : 0;
     }
     if (shape.kind === 'color-range') {
       const nearest = Math.min(...shape.samples.map((point) => Math.hypot(sample.x - point.x, sample.y - point.y)));
-      return 1 - this.smoothstep(shape.tolerance * 0.5, shape.tolerance, nearest);
+      const tolerance = Math.max(0.001, shape.tolerance + expansion);
+      return 1 - this.smoothstep(tolerance * 0.5, tolerance, nearest);
     }
     if (shape.kind === 'ai-segmentation') {
-      const insideBox = shape.boundingBoxes.some((box) => sample.x >= box.x && sample.x <= box.x + box.width && sample.y >= box.y && sample.y <= box.y + box.height);
+      const insideBox = shape.boundingBoxes.some((box) => sample.x >= box.x - expansion && sample.x <= box.x + box.width + expansion && sample.y >= box.y - expansion && sample.y <= box.y + box.height + expansion);
       const positiveDistance = Math.min(...shape.positivePoints.map((point) => Math.hypot(sample.x - point.x, sample.y - point.y)), Number.POSITIVE_INFINITY);
       const negativeDistance = Math.min(...shape.negativePoints.map((point) => Math.hypot(sample.x - point.x, sample.y - point.y)), Number.POSITIVE_INFINITY);
       const positiveLuminanceDistance = Math.min(...(sample.positiveLuminances ?? []).map((value) => Math.abs(sample.luminance - value)), Number.POSITIVE_INFINITY);
       const negativeLuminanceDistance = Math.min(...(sample.negativeLuminances ?? []).map((value) => Math.abs(sample.luminance - value)), Number.POSITIVE_INFINITY);
-      const matchesPositive = positiveLuminanceDistance < 0.16 && positiveDistance < 0.45;
-      const matchesNegative = negativeLuminanceDistance < 0.1 && negativeDistance < 0.3;
+      const matchesPositive = positiveLuminanceDistance < 0.16 + expansion && positiveDistance < 0.45 + expansion;
+      const matchesNegative = negativeLuminanceDistance < 0.1 && negativeDistance < Math.max(0.01, 0.3 - expansion);
       return (insideBox || matchesPositive) && !matchesNegative ? 1 : 0;
     }
     const childWeights = shape.children.map((child) => this.evaluate(child, sample));

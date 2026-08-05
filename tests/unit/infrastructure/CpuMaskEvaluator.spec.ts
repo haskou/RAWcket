@@ -24,6 +24,32 @@ describe('CpuMaskEvaluator', () => {
     expect(evaluator.evaluate(mask, { x: 0, y: 0, luminance: 0.5 })).toBe(0);
   });
 
+  it('subtracts ordered eraser strokes and uses point pressure for brush diameter', () => {
+    const evaluator = new CpuMaskEvaluator();
+    const mask = brushMask({
+      shape: { kind: 'brush', strokes: [
+        { mode: 'add', points: [{ x: 0.5, y: 0.5, pressure: 1 }], size: 0.4, hardness: 1, flow: 1 },
+        { mode: 'erase', points: [{ x: 0.5, y: 0.5, pressure: 1 }], size: 0.1, hardness: 1, flow: 1 }
+      ] }
+    });
+    const lightPressure = brushMask({
+      shape: { kind: 'brush', strokes: [{ mode: 'add', points: [{ x: 0.5, y: 0.5, pressure: 0.25 }], size: 0.4, hardness: 1, flow: 1 }] }
+    });
+
+    expect(evaluator.evaluate(mask, { x: 0.5, y: 0.5, luminance: 0.5 })).toBe(0);
+    expect(evaluator.evaluate(mask, { x: 0.62, y: 0.5, luminance: 0.5 })).toBe(1);
+    expect(evaluator.evaluate(lightPressure, { x: 0.6, y: 0.5, luminance: 0.5 })).toBe(0);
+  });
+
+  it('expands and contracts vector mask coverage deterministically', () => {
+    const evaluator = new CpuMaskEvaluator();
+    const expanded = brushMask({ expansion: 0.1 });
+    const contracted = brushMask({ expansion: -0.15 });
+
+    expect(evaluator.evaluate(expanded, { x: 0.75, y: 0.5, luminance: 0.5 })).toBeGreaterThan(0);
+    expect(evaluator.evaluate(contracted, { x: 0.6, y: 0.5, luminance: 0.5 })).toBe(0);
+  });
+
   it('combines inversion, opacity, and density without mutating the shape', () => {
     const evaluator = new CpuMaskEvaluator();
     const mask = brushMask({ inverted: true, opacity: 0.5, density: 0.5 });

@@ -11,6 +11,7 @@ export function MaskControls({
   aiPointActive,
   aiPointPolarity,
   brushSize,
+  brushMode,
   overlayVisible,
   onSelect,
   onAddBrush,
@@ -23,6 +24,7 @@ export function MaskControls({
   onAiPointActiveChange,
   onAiPointPolarityChange,
   onBrushSizeChange,
+  onBrushModeChange,
   onOverlayVisibleChange
 }: {
   project: PhotoProject;
@@ -31,6 +33,7 @@ export function MaskControls({
   aiPointActive: boolean;
   aiPointPolarity: 'positive' | 'negative';
   brushSize: number;
+  brushMode: 'add' | 'erase';
   overlayVisible: boolean;
   onSelect: (id: string) => void;
   onAddBrush: () => void;
@@ -43,6 +46,7 @@ export function MaskControls({
   onAiPointActiveChange: (active: boolean) => void;
   onAiPointPolarityChange: (polarity: 'positive' | 'negative') => void;
   onBrushSizeChange: (size: number) => void;
+  onBrushModeChange: (mode: 'add' | 'erase') => void;
   onOverlayVisibleChange: (visible: boolean) => void;
 }): ReactElement {
   const groups = useRef(new Map<string, string>());
@@ -61,6 +65,11 @@ export function MaskControls({
       ...selected,
       localAdjustments: { ...selected.localAdjustments, exposure: Math.min(5, Math.max(-5, value)) }
     }, groupId);
+  };
+
+  const updateExpansion = (value: number, groupId: string | null): void => {
+    if (selected === null || !Number.isFinite(value)) return;
+    onUpdate({ ...selected, expansion: Math.min(0.25, Math.max(-0.25, value)) }, groupId);
   };
 
   const updateRadial = (
@@ -153,8 +162,13 @@ export function MaskControls({
           </div>
           {selected.shape.kind === 'brush' && (
             <>
+              <div className="ai-point-polarity" aria-label="Brush stroke mode">
+                <button className={brushMode === 'add' ? 'active' : ''} type="button" aria-pressed={brushMode === 'add'} onClick={() => onBrushModeChange('add')}>Paint</button>
+                <button className={brushMode === 'erase' ? 'active' : ''} type="button" aria-pressed={brushMode === 'erase'} onClick={() => onBrushModeChange('erase')}>Erase</button>
+              </div>
               <button className={`button ${brushActive ? 'ai-primary' : 'ghost'} full`} type="button" onClick={() => onBrushActiveChange(!brushActive)}>{brushActive ? 'Painting · press Escape to stop' : 'Paint on photograph'}</button>
               <MaskNumberControl label="Brush size" value={brushSize} minimum={0.005} maximum={0.5} step={0.005} groupKey="brush-size" groups={groups.current} onChange={(value) => onBrushSizeChange(value)} />
+              <p className="mask-inline-help">A pen uses its pressure for diameter and flow. Mouse strokes remain at full pressure. Erasing subtracts editable stroke coverage and never changes the original.</p>
             </>
           )}
           {selected.shape.kind === 'radial' && (
@@ -208,6 +222,7 @@ export function MaskControls({
           <MaskNumberControl label="Opacity" value={selected.opacity} minimum={0} maximum={1} step={0.01} groupKey="mask-opacity" groups={groups.current} onChange={(value, groupId) => updateUnit('opacity', value, groupId)} />
           <MaskNumberControl label="Feather" value={selected.feather} minimum={0} maximum={1} step={0.01} groupKey="mask-feather" groups={groups.current} onChange={(value, groupId) => updateUnit('feather', value, groupId)} />
           <MaskNumberControl label="Density" value={selected.density} minimum={0} maximum={1} step={0.01} groupKey="mask-density" groups={groups.current} onChange={(value, groupId) => updateUnit('density', value, groupId)} />
+          <MaskNumberControl label="Expand / contract" value={selected.expansion ?? 0} minimum={-0.25} maximum={0.25} step={0.005} groupKey="mask-expansion" groups={groups.current} onChange={updateExpansion} />
           <button className="button ghost danger full" type="button" onClick={() => onRemove(selected.id)}>Delete mask</button>
         </div>
       )}

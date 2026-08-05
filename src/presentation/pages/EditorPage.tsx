@@ -162,6 +162,7 @@ export function EditorPage(): ReactElement {
   const [aiPointActive, setAiPointActive] = useState(false);
   const [aiPointPolarity, setAiPointPolarity] = useState<AiPointPolarity>('positive');
   const [brushSize, setBrushSize] = useState(0.08);
+  const [brushMode, setBrushMode] = useState<'add' | 'erase'>('add');
   const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
   const [toolWorkspace, setToolWorkspace] = useState<ToolWorkspace>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -847,7 +848,13 @@ export function EditorPage(): ReactElement {
       ...selected,
       shape: {
         ...selected.shape,
-        strokes: [...selected.shape.strokes, { points: [point], size: brushSize, hardness: 0.75, flow: 1 }]
+        strokes: [...selected.shape.strokes, {
+          points: [{ ...point, pressure: pointerPressure(event) }],
+          size: brushSize,
+          hardness: 0.75,
+          flow: 1,
+          mode: brushMode
+        }]
       }
     }, groupId);
     brushGesture.current = { pointerId: event.pointerId, maskId: selected.id, groupId };
@@ -879,7 +886,7 @@ export function EditorPage(): ReactElement {
     const current = strokes.at(-1);
     const previous = current?.points.at(-1);
     if (current === undefined || (previous !== undefined && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.002)) return true;
-    strokes[strokes.length - 1] = { ...current, points: [...current.points, point] };
+    strokes[strokes.length - 1] = { ...current, points: [...current.points, { ...point, pressure: pointerPressure(event) }] };
     updateMask({ ...selected, shape: { ...selected.shape, strokes } }, gesture.groupId);
     return true;
   };
@@ -1193,6 +1200,7 @@ export function EditorPage(): ReactElement {
               aiPointActive={aiPointActive}
               aiPointPolarity={aiPointPolarity}
               brushSize={brushSize}
+              brushMode={brushMode}
               overlayVisible={maskOverlayVisible}
               onSelect={selectMask}
               onAddBrush={addBrushMask}
@@ -1205,6 +1213,7 @@ export function EditorPage(): ReactElement {
               onAiPointActiveChange={(active) => { setAiPointActive(active); if (active) setBrushActive(false); }}
               onAiPointPolarityChange={setAiPointPolarity}
               onBrushSizeChange={setBrushSize}
+              onBrushModeChange={setBrushMode}
               onOverlayVisibleChange={setMaskOverlayVisible}
             />
           </ToolSection>
@@ -1276,12 +1285,17 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
   );
 }
 
+function pointerPressure(event: ReactPointerEvent<HTMLElement>): number {
+  if (event.pointerType === 'mouse') return 1;
+  return Math.min(1, Math.max(0.05, event.pressure > 0 ? event.pressure : 1));
+}
+
 function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactElement {
   return (
     <svg className="mask-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Local mask overlay">
       {masks.filter((mask) => mask.enabled).map((mask) => {
         if (mask.shape.kind === 'brush') {
-          return <g key={mask.id}>{mask.shape.strokes.map((stroke, index) => <polyline key={index} points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" strokeWidth={stroke.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
+          return <g key={mask.id}>{mask.shape.strokes.map((stroke, index) => <polyline className={stroke.mode === 'erase' ? 'mask-erase-stroke' : undefined} key={index} points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" strokeWidth={stroke.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
         }
         if (mask.shape.kind === 'radial') {
           return <ellipse key={mask.id} cx={mask.shape.center.x} cy={mask.shape.center.y} rx={mask.shape.radiusX} ry={mask.shape.radiusY} fill="currentColor" transform={`rotate(${mask.shape.rotationDegrees} ${mask.shape.center.x} ${mask.shape.center.y})`} />;

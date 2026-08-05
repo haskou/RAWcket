@@ -21,7 +21,7 @@ Implemented:
 - A persistent cross-store write-ahead journal reconciles interrupted create, duplicate, import, and delete operations and removes only originals proven orphaned.
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
-- Versioned schema migrations through version 7.
+- Versioned schema migrations through version 8.
 - Safe TIFF/EXIF inspection for Sony ARW camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern, with an honest in-editor source-information view.
 - AI-first workspace with real OpenAI vision advice and reviewable proposals for sliders, tone curves, crop/geometry, and radial, linear-gradient, or luminance-range masks; a measurement-backed local tutor; deterministic positive/negative-point smart masks; and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Cloud AI remains unconfigured by default.
 - Explicit OpenAI API provider and user-entered model configuration. Missing configuration opens the setup dialog and resumes the pending action after setup. The setup defaults to AES-GCM/PBKDF2 encrypted storage; the only alternative is tab memory that is explicitly never persisted. The master password is never stored.

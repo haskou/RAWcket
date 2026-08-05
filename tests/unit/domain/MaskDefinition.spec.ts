@@ -31,7 +31,19 @@ describe('MaskDefinition', () => {
     const parsed = maskSchema.parse(primitives);
     const mask = MaskDefinition.fromPrimitives(parsed);
 
-    expect(mask.toPrimitives()).toEqual(primitives);
+    expect(mask.toPrimitives()).toEqual({ ...primitives, expansion: 0 });
+  });
+
+  it('normalizes legacy brush strokes to additive full-pressure recipe data', () => {
+    const legacy: MaskDefinitionPrimitives = {
+      id: crypto.randomUUID(), enabled: true, inverted: false, opacity: 1, feather: 0, density: 1,
+      localAdjustments: {}, shape: { kind: 'brush', strokes: [{ points: [{ x: 0.5, y: 0.5 }], size: 0.1, hardness: 1, flow: 1 }] }
+    };
+
+    expect(MaskDefinition.fromPrimitives(legacy).toPrimitives()).toMatchObject({
+      expansion: 0,
+      shape: { kind: 'brush', strokes: [{ mode: 'add', points: [{ pressure: 1 }] }] }
+    });
   });
 
   it('rejects semantic confidence outside the unit interval', () => {

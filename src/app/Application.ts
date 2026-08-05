@@ -47,6 +47,7 @@ import { VersionThreeToFourProjectMigration } from '@/contexts/projects/infrastr
 import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFourToFiveProjectMigration';
 import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFiveToSixProjectMigration';
 import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSixToSevenProjectMigration';
+import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSevenToEightProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { IndexedDbProjectAssetJournal } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectAssetJournal';
@@ -114,7 +115,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
     new VersionThreeToFourProjectMigration(),
     new VersionFourToFiveProjectMigration(),
     new VersionFiveToSixProjectMigration(),
-    new VersionSixToSevenProjectMigration()
+    new VersionSixToSevenProjectMigration(),
+    new VersionSevenToEightProjectMigration()
   ]);
   const projects = new IndexedDbProjectRepository(database, migrator);
   const sourceFiles = new BrowserSourceFileRepository(database);

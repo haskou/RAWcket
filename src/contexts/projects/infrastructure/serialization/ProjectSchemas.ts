@@ -46,15 +46,17 @@ export const maskSchema: z.ZodType<MaskDefinitionPrimitives> = z.lazy(() =>
     opacity: z.number().min(0).max(1),
     feather: z.number().min(0).max(1),
     density: z.number().min(0).max(1),
+    expansion: z.number().min(-0.25).max(0.25).default(0),
     localAdjustments: localAdjustmentSchema,
     shape: z.discriminatedUnion('kind', [
       z.object({
         kind: z.literal('brush'),
         strokes: z.array(z.object({
-          points: z.array(pointSchema).min(1),
+          points: z.array(pointSchema.extend({ pressure: z.number().min(0).max(1).default(1) })).min(1),
           size: z.number().positive(),
           hardness: z.number().min(0).max(1),
-          flow: z.number().min(0).max(1)
+          flow: z.number().min(0).max(1),
+          mode: z.enum(['add', 'erase']).default('add')
         }))
       }),
       z.object({ kind: z.literal('linear-gradient'), start: pointSchema, end: pointSchema }),

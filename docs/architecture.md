@@ -28,6 +28,8 @@ Schema version 4 introduced `ProjectOrganization`: a bounded zero-to-five `Proje
 
 Schema version 7 adds bounded horizontal and vertical perspective values to `ViewportTransform`. Its migration updates the active recipe plus viewport operations nested in both undo and redo history, keeping old projects and sidecars neutral while preserving future reversibility.
 
+Schema version 8 makes ordered brush paint/erase semantics, per-point pressure, and mask expansion explicit recipe data. Its migration recursively updates brush and composite masks in the active recipe plus add/update/replace operations in both history stacks; old mouse strokes become additive full-pressure strokes.
+
 Schema version 5 adds immutable `CaptureMetadata`. The bounded TIFF reader extracts only validated, size-limited EXIF fields from Sony ARW containers; the aggregate persists those facts separately from editable project state. Missing fields remain explicitly null and the UI distinguishes embedded-preview development from future high-depth RAW demosaicing.
 
 `JsonProjectSidecarCodec` is an infrastructure boundary for recipe-only `.rawcket.json` files. Application messages validate project identity and file size; importing delegates to the aggregate’s `replace-recipe` operation so the entire change is validated, serializable, and undoable without copying source bytes or project identity.

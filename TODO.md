@@ -123,9 +123,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Apply precise local changes from editable vector sources with disposable raster caches.
 
-**Implemented.** Editable brush strokes, radial and linear gradients, luminance ranges, local exposure, opacity, feather, density, invert, overlay, vector persistence, and deterministic CPU rasterization.
+**Implemented.** Editable brush strokes, ordered paint/erase strokes, pen pressure per point, radial and linear gradients, luminance ranges, local exposure, opacity, feather, density, expand/contract, invert, overlay, vector persistence, and deterministic CPU rasterization. Mouse input stays at full pressure; pen pressure changes both diameter and flow. Schema version 8 migrates old strokes to additive full-pressure data and updates masks recorded inside undo/redo history.
 
-**Remaining.** Eraser/pressure interaction, color sampling, expand/contract, local curves, composition UI, disposable raster caches, and GPU rasterization.
+**Remaining.** Color sampling, local curves, composition UI, disposable raster caches, and native GPU vector rasterization.
 
 **Dependencies.** Existing `MaskDefinition`; local render stages; Pointer Events pressure; GPU/CPU rasterizer; versioned caches; curve editor.
 
@@ -211,7 +211,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Five per-project SHA-256 snapshots, newest-valid corruption recovery without overwriting damaged data, portable checksummed bundles, OPFS/IndexedDB original storage, persistent-storage request, quota visibility, and import safety reserve.
 
-**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes. Schema version 6 adds reversible favorites and an indexed favorites-only filter. Schema version 7 adds horizontal/vertical perspective to the viewport and recursively migrates recorded recipe history.
+**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes. Schema version 6 adds reversible favorites and an indexed favorites-only filter. Schema version 7 adds horizontal/vertical perspective to the viewport and recursively migrates recorded recipe history. Schema version 8 adds brush erase mode, pressure, and mask expansion while migrating masks nested in active recipes and history.
 
 **Implemented.** Versioned `.rawcket.json` sidecars export only source dimensions and validated recipe data. They exclude the original, project identity, history, ratings, and tags; applying one is a single undoable aggregate operation with a 5 MB input limit.
 

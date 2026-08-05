@@ -4,11 +4,12 @@ import { MaskId } from './value-objects/MaskId';
 import type { SemanticMaskCategoryPrimitive } from './value-objects/SemanticMaskCategory';
 
 type PointPrimitive = { x: number; y: number };
+type BrushPointPrimitive = PointPrimitive & { pressure?: number };
 type RectanglePrimitive = PointPrimitive & { width: number; height: number };
 
 export type BrushMaskShape = {
   kind: 'brush';
-  strokes: Array<{ points: PointPrimitive[]; size: number; hardness: number; flow: number }>;
+  strokes: Array<{ points: BrushPointPrimitive[]; size: number; hardness: number; flow: number; mode?: 'add' | 'erase' }>;
 };
 export type LinearGradientMaskShape = { kind: 'linear-gradient'; start: PointPrimitive; end: PointPrimitive };
 export type RadialMaskShape = {
@@ -53,6 +54,7 @@ export type MaskDefinitionPrimitives = {
   opacity: number;
   feather: number;
   density: number;
+  expansion?: number;
   localAdjustments: Partial<Record<AdjustmentKeyPrimitive, number>>;
   shape: MaskShape;
 };
@@ -65,6 +67,9 @@ export class MaskDefinition {
     MaskDefinition.ensureUnitInterval(primitives.opacity, 'opacity');
     MaskDefinition.ensureUnitInterval(primitives.feather, 'feather');
     MaskDefinition.ensureUnitInterval(primitives.density, 'density');
+    if (!Number.isFinite(primitives.expansion) || (primitives.expansion ?? 0) < -0.25 || (primitives.expansion ?? 0) > 0.25) {
+      throw new Error('Mask expansion must be between -0.25 and 0.25.');
+    }
     this.ensureLocalAdjustments(primitives.localAdjustments);
     this.ensureShape(primitives.shape);
   }
@@ -76,8 +81,9 @@ export class MaskDefinition {
       opacity: input.opacity,
       feather: input.feather,
       density: input.density,
+      expansion: input.expansion ?? 0,
       localAdjustments: input.localAdjustments,
-      shape: input.shape
+      shape: MaskDefinition.normalizeShape(input.shape)
     }));
   }
 
@@ -109,7 +115,15 @@ export class MaskDefinition {
   private ensureShape(shape: MaskShape): void {
     const points: PointPrimitive[] = [];
     const boxes: RectanglePrimitive[] = [];
-    if (shape.kind === 'brush') points.push(...shape.strokes.flatMap((stroke) => stroke.points));
+    if (shape.kind === 'brush') {
+      points.push(...shape.strokes.flatMap((stroke) => stroke.points));
+      shape.strokes.forEach((stroke) => {
+        if (!Number.isFinite(stroke.size) || stroke.size <= 0 || stroke.size > 1) throw new Error('Brush size must be between 0 and 1.');
+        MaskDefinition.ensureUnitInterval(stroke.hardness, 'brush hardness');
+        MaskDefinition.ensureUnitInterval(stroke.flow, 'brush flow');
+        stroke.points.forEach((point) => MaskDefinition.ensureUnitInterval(point.pressure ?? 1, 'brush pressure'));
+      });
+    }
     if (shape.kind === 'linear-gradient') points.push(shape.start, shape.end);
     if (shape.kind === 'radial') points.push(shape.center);
     if (shape.kind === 'color-range') points.push(...shape.samples);
@@ -147,5 +161,22 @@ export class MaskDefinition {
   private ensurePoint(point: PointPrimitive): void {
     MaskDefinition.ensureUnitInterval(point.x, 'x coordinate');
     MaskDefinition.ensureUnitInterval(point.y, 'y coordinate');
+  }
+
+  private static normalizeShape(shape: MaskShape): MaskShape {
+    if (shape.kind === 'brush') {
+      return {
+        ...structuredClone(shape),
+        strokes: shape.strokes.map((stroke) => ({
+          ...structuredClone(stroke),
+          mode: stroke.mode ?? 'add',
+          points: stroke.points.map((point) => ({ ...point, pressure: point.pressure ?? 1 }))
+        }))
+      };
+    }
+    if (shape.kind === 'composite') {
+      return { ...structuredClone(shape), children: shape.children.map((child) => MaskDefinition.fromPrimitives(child).toPrimitives()) };
+    }
+    return structuredClone(shape);
   }
 }

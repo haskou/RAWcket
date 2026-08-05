@@ -7,6 +7,7 @@ import { VersionThreeToFourProjectMigration } from '@/contexts/projects/infrastr
 import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFourToFiveProjectMigration';
 import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFiveToSixProjectMigration';
 import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSixToSevenProjectMigration';
+import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSevenToEightProjectMigration';
 import { photoProjectSchema } from '@/contexts/projects/infrastructure/serialization/ProjectSchemas';
 
 describe('ProjectMigrator', () => {
@@ -17,7 +18,8 @@ describe('ProjectMigrator', () => {
     new VersionThreeToFourProjectMigration(),
     new VersionFourToFiveProjectMigration(),
     new VersionFiveToSixProjectMigration(),
-    new VersionSixToSevenProjectMigration()
+    new VersionSixToSevenProjectMigration(),
+    new VersionSevenToEightProjectMigration()
   ]);
 
   it('migrates a demo project from schema 0 to the current schema', () => {
@@ -25,7 +27,7 @@ describe('ProjectMigrator', () => {
     const legacy = { ...current, schemaVersion: 0 };
     delete (legacy as Partial<typeof legacy>).uiState;
     const migrated = photoProjectSchema.parse(migrator.migrate(legacy));
-    expect(migrated.schemaVersion).toBe(7);
+    expect(migrated.schemaVersion).toBe(8);
     expect(migrated.uiState.mode).toBe('simple');
     expect(migrated.recipe.disabledGlobalAdjustments).toEqual([]);
     expect(migrated.recipe.globalAdjustments.texture).toBe(0);
@@ -59,5 +61,25 @@ describe('ProjectMigrator', () => {
       kind: 'set-viewport-transform',
       viewport: { horizontalPerspective: 0, verticalPerspective: 0 }
     });
+  });
+
+  it('migrates brush add semantics, full pressure, and neutral expansion from schema 7', () => {
+    const current = PhotoProjectMother.create().toPrimitives();
+    const mask = {
+      id: crypto.randomUUID(), enabled: true, inverted: false, opacity: 1, feather: 0, density: 1,
+      localAdjustments: {}, shape: { kind: 'brush', strokes: [{ points: [{ x: 0.5, y: 0.5 }], size: 0.1, hardness: 1, flow: 1 }] }
+    };
+    const operation = { kind: 'add-mask', mask, groupId: null };
+    const legacy = {
+      ...current,
+      schemaVersion: 7,
+      recipe: { ...current.recipe, masks: [mask] },
+      history: { ...current.history, undo: [{ operation, inverse: { kind: 'remove-mask', maskId: mask.id, groupId: null } }], redo: [] }
+    };
+
+    const migrated = photoProjectSchema.parse(new VersionSevenToEightProjectMigration().migrate(legacy));
+    const brush = migrated.recipe.masks[0];
+    expect(brush).toMatchObject({ expansion: 0, shape: { kind: 'brush', strokes: [{ mode: 'add', points: [{ pressure: 1 }] }] } });
+    expect(migrated.history.undo[0]?.operation).toMatchObject({ kind: 'add-mask', mask: { expansion: 0 } });
   });
 });
