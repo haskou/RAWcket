@@ -148,12 +148,32 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   expect(horizontalCenterDelta).toBeLessThan(2);
   await page.getByRole('button', { name: 'Expand Active Recipe' }).click();
   await page.getByLabel('Editing tools').getByRole('button', { name: /Crop & Geometry/ }).click();
+  await expect(page.getByRole('toolbar', { name: 'Contextual crop tools' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rotate crop left 90 degrees' })).toBeVisible();
   await page.getByRole('button', { name: 'Auto straighten · local' }).click();
   await expect(page.getByText(/Applied [+-]\d+\.\d° from local edge evidence/)).toBeVisible();
   await expect.poll(async () => Math.abs(Number(await page.getByLabel('Rotation numeric value').inputValue()))).toBeGreaterThan(3);
   await page.getByLabel('Geometry composition guide').selectOption('grid');
   await expect(page.getByLabel('Fixed composition grid')).toBeVisible();
   await expect(page.locator('.composition-guide-overlay .grid-minor')).toHaveCount(16);
+  const workspaceGuideAlignment = await page.evaluate(() => {
+    const stage = document.querySelector('.photo-stage')?.getBoundingClientRect();
+    const guide = document.querySelector('.workspace-guide')?.getBoundingClientRect();
+    if (stage === undefined || guide === undefined) return Number.POSITIVE_INFINITY;
+    return Math.max(Math.abs(stage.left - guide.left), Math.abs(stage.top - guide.top), Math.abs(stage.width - guide.width), Math.abs(stage.height - guide.height));
+  });
+  expect(workspaceGuideAlignment).toBeLessThan(2);
+  await page.getByLabel('Geometry composition guide').selectOption('thirds');
+  await page.getByLabel('Preview zoom').fill('1.5');
+  await page.keyboard.press('ArrowRight');
+  const imageGuideAlignment = await page.evaluate(() => {
+    const preview = document.querySelector('.preview-surface')?.getBoundingClientRect();
+    const guide = document.querySelector('.fixed-guide-frame')?.getBoundingClientRect();
+    if (preview === undefined || guide === undefined) return Number.POSITIVE_INFINITY;
+    return Math.max(Math.abs(preview.left - guide.left), Math.abs(preview.top - guide.top), Math.abs(preview.width - guide.width), Math.abs(preview.height - guide.height));
+  });
+  expect(imageGuideAlignment).toBeLessThan(2);
+  await page.getByRole('button', { name: 'Fit', exact: true }).click();
   await page.getByLabel('Crop aspect ratio').selectOption('1:1');
   const cropBounds = await page.locator('.fixed-guide-frame').boundingBox();
   if (cropBounds === null) throw new Error('The direct crop surface is unavailable.');
@@ -187,6 +207,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByText('How local masks work')).toBeVisible();
   await page.getByRole('button', { name: '+ Radial mask' }).click();
   await expect(page.getByText('Radial mask selected')).toBeVisible();
+  await expect(page.getByText(/Editing Radial \d+/)).toBeVisible();
   await page.getByLabel('Local exposure numeric value').fill('1');
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await page.getByRole('button', { name: '+ Brush mask' }).click();
@@ -201,6 +222,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.mouse.up();
   await page.getByRole('button', { name: 'Erase' }).click();
   await expect(page.getByRole('button', { name: 'Erase' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText(/Enabled · Erase mode/)).toBeVisible();
   await page.mouse.move(brushBounds.x + brushBounds.width * 0.42, brushBounds.y + brushBounds.height * 0.48);
   await page.mouse.down();
   await page.mouse.move(brushBounds.x + brushBounds.width * 0.48, brushBounds.y + brushBounds.height * 0.52, { steps: 3 });
@@ -220,6 +242,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(curveGraph.locator('path.curve-line')).toHaveCSS('stroke-width', '2px');
   const graphBounds = await curveGraph.boundingBox();
   if (graphBounds === null) throw new Error('The tone curve graph is unavailable.');
+  await expect(page.getByLabel('Tone ranges from input black to input white')).toContainText('Highlights');
   await page.mouse.move(graphBounds.x + graphBounds.width * 0.35, graphBounds.y + graphBounds.height * 0.5);
   await page.mouse.down();
   await page.mouse.move(graphBounds.x + graphBounds.width * 0.7, graphBounds.y + graphBounds.height * 0.4, { steps: 4 });
@@ -229,9 +252,11 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   const middlePoint = curveGraph.locator('circle').nth(1);
   const pointBounds = await middlePoint.boundingBox();
   if (pointBounds === null) throw new Error('The middle tone-curve point is unavailable.');
+  const movedGraphBounds = await curveGraph.boundingBox();
+  if (movedGraphBounds === null) throw new Error('The moved tone curve graph is unavailable.');
   await page.mouse.move(pointBounds.x + pointBounds.width / 2, pointBounds.y + pointBounds.height / 2);
   await page.mouse.down();
-  await page.mouse.move(graphBounds.x + graphBounds.width * 0.55, graphBounds.y + graphBounds.height * 0.4, { steps: 4 });
+  await page.mouse.move(movedGraphBounds.x + movedGraphBounds.width * 0.55, movedGraphBounds.y + movedGraphBounds.height * 0.4, { steps: 4 });
   await page.mouse.up();
   await expect.poll(async () => Number(await page.getByLabel('Curve point X').inputValue())).toBeLessThan(0.56);
   await page.getByLabel('Curve point Y').fill('0.1');

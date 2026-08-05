@@ -166,6 +166,7 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
         <path className={`curve-line${identity ? ' identity' : ''}`} d={ToneCurvePathProjector.project(curve)} />
         {!identity && curve.points.map((point, index) => <circle className={index === selectedIndex ? 'selected' : ''} key={index} cx={point.x} cy={1 - point.y} r="0.022" tabIndex={0} role="button" aria-describedby="curve-keyboard-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Delete Backspace" aria-label={`Curve point ${index + 1}: x ${point.x}, y ${point.y}`} onPointerDown={(event) => beginDrag(event, index)} onFocus={() => setSelectedIndex(index)} onBlur={() => { keyboardGroup.current = null; }} onKeyDown={(event) => movePointWithKeyboard(event, index)} onKeyUp={() => { keyboardGroup.current = null; }} />)}
       </svg>
+      <div className="curve-tonal-scale" aria-label="Tone ranges from input black to input white"><span>Blacks</span><span>Shadows</span><span>Midtones</span><span>Highlights</span><span>Whites</span></div>
       <div className="curve-axis-labels"><span>Output (Y)</span><span>Input (X)</span></div>
       <p className="curve-interaction-hint" id="curve-keyboard-help">Click or drag to create a point. Focus one and use the arrow keys for 0.001 steps, Shift + arrow for 0.01, or Delete to remove it.</p>
       <p className="curve-selection-status" aria-live="polite">{selected === undefined ? 'Neutral curve · no control point selected' : `Control point ${selectedIndex === null ? '' : selectedIndex + 1} selected`}</p>

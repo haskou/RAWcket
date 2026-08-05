@@ -9,7 +9,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Reference CPU pipeline for every current global adjustment and RGB/luminance tone curves.
 - [x] Sliders, exact numeric entry, reset, grouped history, and per-adjustment enable/disable state.
 - [x] Navigable Active Recipe sidebar, preview pan/zoom, and keyboard shortcuts.
-- [x] Workspace-relative Fit, collapsible recipe column, fixed dense composition guides, contextual mask help, and modified-control indicators.
+- [x] Workspace-relative Fit, collapsible recipe column, image-anchored thirds/golden guides, workspace-wide grid/diagonals, contextual crop and mask status, tone-range curve labels, and modified-control indicators.
 - [x] English UI and user-facing errors.
 - [x] Interactive RGB/R/G/B/luminance curve graph with draggable and exact points.
 - [x] Rendered non-destructive crop/geometry, before/after, masks, histogram, and clipping.
@@ -109,7 +109,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Rule-of-thirds, dense twenty-division grid, diagonal, and golden-ratio overlays are available from both the canvas and geometry panel. The overlay stays fixed while the photograph moves below it, replacing a redundant separate level toggle. Guides are editing-only and excluded from export. Fit recalculates against the live canvas after either sidebar changes size.
 
-**Implemented.** Direct corner-to-corner crop selection, translucent excluded area, free/original/common locked aspect ratios, persistent four-corner resizing after placement, exact numeric alternatives, persistence, and one-step undo. Deterministic on-device Sobel analysis estimates dominant horizontal or architectural vertical edges from a bounded 512 px preview, exposes confidence, refuses weak evidence, and applies a normal reversible rotation without AI or upload. Horizontal and vertical perspective controls apply bounded keystone transforms in the shared preview/export renderer; they persist in schema version 7, migrate recipes and history safely, and are available to validated AI proposals.
+**Implemented.** Direct corner-to-corner crop selection, translucent excluded area, free/original/common locked aspect ratios, persistent four-corner resizing after placement, exact numeric alternatives, persistence, and one-step undo. The crop frame and image-attached guides share the exact preview pan/zoom transform, while the dense grid and diagonals fill the complete workspace. A contextual canvas toolbar exposes crop, 90-degree rotation, local straightening, and clearing as soon as Crop & Geometry opens. Deterministic on-device Sobel analysis estimates dominant horizontal or architectural vertical edges from a bounded 512 px preview, exposes confidence, refuses weak evidence, and applies a normal reversible rotation without AI or upload. Horizontal and vertical perspective controls apply bounded keystone transforms in the shared preview/export renderer; they persist in schema version 7, migrate recipes and history safely, and are available to validated AI proposals.
 
 **Remaining.** Touch gesture polish and future automatic perspective estimation.
 
@@ -123,7 +123,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Apply precise local changes from editable vector sources with disposable raster caches.
 
-**Implemented.** Editable brush strokes, ordered paint/erase strokes, pen pressure per point, radial and linear gradients, luminance ranges, local exposure, opacity, feather, density, expand/contract, invert, overlay, vector persistence, and deterministic CPU rasterization. Mouse input stays at full pressure; pen pressure changes both diameter and flow. Schema version 8 migrates old strokes to additive full-pressure data and updates masks recorded inside undo/redo history.
+**Implemented.** Editable brush strokes, ordered paint/erase strokes, pen pressure per point, radial and linear gradients, luminance ranges, local exposure, opacity, feather, density, expand/contract, invert, overlay, vector persistence, and deterministic CPU rasterization. The selected mask is visually emphasized while other overlays dim, and an on-canvas status names its index, enabled state, and current Paint/Erase or Include/Exclude interaction mode. Mouse input stays at full pressure; pen pressure changes both diameter and flow. Schema version 8 migrates old strokes to additive full-pressure data and updates masks recorded inside undo/redo history.
 
 **Remaining.** Color sampling, local curves, composition UI, disposable raster caches, and native GPU vector rasterization.
 

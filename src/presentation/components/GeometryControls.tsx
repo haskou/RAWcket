@@ -56,14 +56,14 @@ export function GeometryControls({ project, onChange, guide, onGuideChange, hori
     <div className="geometry-controls">
       <details className="context-help" open>
         <summary>Framing and straightening guides</summary>
-        <p>Guides stay fixed while the photograph moves underneath them, so the dense grid can check horizons and converging architecture. Rotation levels the frame; vertical and horizontal perspective reshape opposite edges. Guides never appear in export.</p>
+        <p>Rule of thirds and golden-ratio guides stay attached to the photograph while you pan or zoom. The dense grid and diagonals cover the full workspace so the image can move underneath them. Rotation levels the frame; perspective reshapes opposite edges. Guides never appear in export.</p>
       </details>
       <div className="auto-straighten-control">
         <button className="button ghost full" type="button" disabled={horizonBusy} onClick={onAutoStraighten}>{horizonBusy ? 'Analyzing horizon…' : 'Auto straighten · local'}</button>
         <small aria-live="polite">{horizonMessage}</small>
       </div>
       <div className="composition-guide-controls">
-        <label>Composition overlay<select aria-label="Geometry composition guide" value={guide} onChange={(event) => onGuideChange(event.target.value as CompositionGuide)}><option value="none">None</option><option value="thirds">Rule of thirds</option><option value="grid">Dense fixed grid</option><option value="diagonals">Diagonals</option><option value="golden-ratio">Golden ratio</option></select></label>
+        <label>Composition overlay<select aria-label="Geometry composition guide" value={guide} onChange={(event) => onGuideChange(event.target.value as CompositionGuide)}><option value="none">None</option><option value="thirds">Rule of thirds · image</option><option value="grid">Dense grid · workspace</option><option value="diagonals">Diagonals · workspace</option><option value="golden-ratio">Golden ratio · image</option></select></label>
         <label>Crop aspect ratio<select aria-label="Crop aspect ratio" value={aspectRatioValue(viewport.aspectRatio, originalRatio)} onChange={(event) => onChange({ ...viewport, aspectRatio: ratioFromValue(event.target.value, originalRatio) }, null)}><option value="free">Free</option><option value="original">Original · locked</option><option value="1:1">1:1 · Square</option><option value="3:2">3:2</option><option value="4:3">4:3</option><option value="5:4">5:4</option><option value="16:9">16:9</option></select></label>
       </div>
       <GeometryNumberControl label="Rotation" unit="°" value={viewport.rotationDegrees} modified={viewport.rotationDegrees !== defaults.rotationDegrees} minimum={-180} maximum={180} step={0.1} groupKey="rotation" groups={groups.current} onChange={(value, groupId) => changeNumeric('rotationDegrees', value, groupId)} />

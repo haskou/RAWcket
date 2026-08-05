@@ -845,6 +845,7 @@ export function EditorPage(): ReactElement {
           apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED, key: operation.key, enabled: true, groupId: null });
         }
       }
+      if (operation.kind === EDIT_OPERATION.ADD_MASK) setSelectedMaskId(operation.mask.id);
       apply(operation);
     });
     if (project !== null && aiProposalId !== null) {
@@ -1051,6 +1052,19 @@ export function EditorPage(): ReactElement {
     if (Number.isFinite(value)) setZoom(clampZoom(value));
   };
 
+  const rotateContextualCrop = (delta: number): void => {
+    if (project === null) return;
+    const viewport = project.getViewportTransform().toPrimitives();
+    const next = ((viewport.rotationDegrees + delta + 180) % 360) - 180;
+    changeViewport({ ...viewport, rotationDegrees: next }, null);
+  };
+
+  const clearContextualCrop = (): void => {
+    if (project === null) return;
+    const viewport = project.getViewportTransform().toPrimitives();
+    changeViewport({ ...viewport, cropFrame: { x: 0, y: 0, width: 1, height: 1 }, aspectRatio: null }, null);
+  };
+
   const zoomWithWheel = (event: WheelEvent<HTMLDivElement>): void => {
     event.preventDefault();
     changeZoom(zoom * (event.deltaY < 0 ? 1.1 : 0.9));
@@ -1073,9 +1087,13 @@ export function EditorPage(): ReactElement {
   if (project === null) return <main className="centered-state"><div className="loader" /><p>Opening local project…</p></main>;
 
   const mode = project.getInterfaceMode().valueOf();
+  const projectMasks = project.getMasks().map((mask) => mask.toPrimitives());
+  const selectedMaskIndex = projectMasks.findIndex((mask) => mask.id === selectedMaskId);
+  const selectedMask = selectedMaskIndex < 0 ? null : projectMasks[selectedMaskIndex] ?? null;
   const aiDevelopmentHistory = [...project.getAiDevelopmentJournal().advice].reverse();
   const statusLabel = autosave.status === 'saved' ? 'Saved locally' : autosave.status === 'saving' ? 'Saving…' : 'Save failed';
   const transform = `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
+  const guideTransform = `translate(-50%, -50%) translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
   const sourcePrecisionLabel = previewAnalysis?.sourcePrecision === 'raw-linear-16-bit'
     ? '16-bit linear LibRaw source'
     : previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit'
@@ -1127,11 +1145,18 @@ export function EditorPage(): ReactElement {
             <button type="button" onClick={() => changeZoom(zoom + 0.1)} aria-label="Zoom in">+</button>
             <button type="button" onClick={fitPreview}>Fit</button>
             <select aria-label="Composition guide" value={compositionGuide} onChange={(event) => setCompositionGuide(event.target.value as CompositionGuide)} title="Composition overlay">
-              <option value="none">No guide</option><option value="thirds">Thirds</option><option value="grid">Grid</option><option value="diagonals">Diagonals</option><option value="golden-ratio">Golden ratio</option>
+              <option value="none">No guide</option><option value="thirds">Thirds · image</option><option value="grid">Grid · workspace</option><option value="diagonals">Diagonals · workspace</option><option value="golden-ratio">Golden · image</option>
             </select>
             {project.hasMasks() && <button className={maskOverlayVisible ? 'active' : ''} aria-pressed={maskOverlayVisible} type="button" onClick={() => setMaskOverlayVisible((value) => !value)} title="Show or hide the editable mask overlay">Mask</button>}
             <button className={showOriginal ? 'active' : ''} type="button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
           </div>
+          {toolWorkspace === 'develop' && activePanel === 'crop' && <div className="contextual-canvas-tools crop-tools" role="toolbar" aria-label="Contextual crop tools">
+            <span><strong>Crop</strong><small>Drag corner-to-corner on the photograph</small></span>
+            <button type="button" onClick={() => rotateContextualCrop(-90)} aria-label="Rotate crop left 90 degrees">↶ 90°</button>
+            <button type="button" onClick={() => rotateContextualCrop(90)} aria-label="Rotate crop right 90 degrees">↷ 90°</button>
+            <button type="button" disabled={horizonBusy} onClick={() => void autoStraighten()}>{horizonBusy ? 'Analyzing…' : 'Straighten · local'}</button>
+            <button type="button" onClick={clearContextualCrop}>Clear crop</button>
+          </div>}
           <div
             ref={photoStage}
             className={`photo-stage ${panning ? 'panning' : ''} ${brushActive || aiPointActive || (toolWorkspace === 'develop' && activePanel === 'crop') ? 'painting' : ''}`}
@@ -1145,12 +1170,17 @@ export function EditorPage(): ReactElement {
             {sourceUrl !== null && (
               <div ref={previewSurface} className="preview-surface" style={{ transform, width: fitDimensions?.width, height: fitDimensions?.height, maxWidth: fitDimensions === null ? undefined : 'none', maxHeight: fitDimensions === null ? undefined : 'none' }}>
                 <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => previewLoaded(event.currentTarget)} />
-                {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={project.getMasks().map((mask) => mask.toPrimitives())} />}
+                {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />}
               </div>
             )}
-            {sourceUrl !== null && fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame" style={{ width: fitDimensions.width, height: fitDimensions.height }}>
-              <CompositionGuideOverlay guide={compositionGuide} />
+            <WorkspaceCompositionGuideOverlay guide={compositionGuide} />
+            {sourceUrl !== null && fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame" style={{ width: fitDimensions.width, height: fitDimensions.height, transform: guideTransform }}>
+              <ImageCompositionGuideOverlay guide={compositionGuide} />
               {toolWorkspace === 'develop' && activePanel === 'crop' && <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} />}
+            </div>}
+            {activePanel === 'masks' && <div className={`active-mask-canvas-status${selectedMask === null ? ' empty' : ''}`} role="status" aria-live="polite">
+              <span className="mask-status-swatch" aria-hidden="true" />
+              {selectedMask === null ? <span><strong>No active mask</strong><small>Select or create a mask before painting or placing points.</small></span> : <span><strong>Editing {maskShapeLabel(selectedMask.shape.kind)} {selectedMaskIndex + 1}</strong><small>{selectedMask.enabled ? 'Enabled' : 'Disabled'} · {selectedMask.shape.kind === 'brush' ? `${brushMode === 'add' ? 'Paint' : 'Erase'} mode` : selectedMask.shape.kind === 'ai-segmentation' ? `${aiPointPolarity === 'positive' ? 'Include' : 'Exclude'} point mode` : 'Use the highlighted controls in the Masks panel'}</small></span>}
             </div>}
             <div className={`truth-badge ${previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' ? 'source-fallback' : ''}`} title={previewAnalysis?.rawFallbackReason ?? undefined}><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{sourcePrecisionLabel} · {renderProgress}</small></span></div>
             {renderBusy && <div className="render-busy-indicator" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>Updating preview</strong><small>{renderProgress} · previous frame remains visible</small></span></div>}
@@ -1366,21 +1396,32 @@ function pointerPressure(event: ReactPointerEvent<HTMLElement>): number {
   return Math.min(1, Math.max(0.05, event.pressure > 0 ? event.pressure : 1));
 }
 
-function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactElement {
+function maskShapeLabel(kind: MaskDefinitionPrimitives['shape']['kind']): string {
+  if (kind === 'brush') return 'Brush';
+  if (kind === 'radial') return 'Radial';
+  if (kind === 'linear-gradient') return 'Linear';
+  if (kind === 'luminance-range') return 'Luminance';
+  if (kind === 'color-range') return 'Color';
+  if (kind === 'ai-segmentation') return 'Smart';
+  return 'Composite';
+}
+
+function MaskOverlay({ masks, selectedMaskId }: { masks: MaskDefinitionPrimitives[]; selectedMaskId: string | null }): ReactElement {
   return (
     <svg className="mask-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Local mask overlay">
       {masks.filter((mask) => mask.enabled).map((mask) => {
+        const className = `mask-shape${selectedMaskId === mask.id ? ' selected' : selectedMaskId === null ? '' : ' dimmed'}`;
         if (mask.shape.kind === 'brush') {
-          return <g key={mask.id}>{mask.shape.strokes.map((stroke, index) => <polyline className={stroke.mode === 'erase' ? 'mask-erase-stroke' : undefined} key={index} points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" strokeWidth={stroke.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
+          return <g className={className} key={mask.id}>{mask.shape.strokes.map((stroke, index) => <polyline className={stroke.mode === 'erase' ? 'mask-erase-stroke' : undefined} key={index} points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" strokeWidth={stroke.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
         }
         if (mask.shape.kind === 'radial') {
-          return <ellipse key={mask.id} cx={mask.shape.center.x} cy={mask.shape.center.y} rx={mask.shape.radiusX} ry={mask.shape.radiusY} fill="currentColor" transform={`rotate(${mask.shape.rotationDegrees} ${mask.shape.center.x} ${mask.shape.center.y})`} />;
+          return <g className={className} key={mask.id}><ellipse cx={mask.shape.center.x} cy={mask.shape.center.y} rx={mask.shape.radiusX} ry={mask.shape.radiusY} fill="currentColor" transform={`rotate(${mask.shape.rotationDegrees} ${mask.shape.center.x} ${mask.shape.center.y})`} /></g>;
         }
         if (mask.shape.kind === 'linear-gradient') {
-          return <g key={mask.id}><defs><linearGradient id={`mask-gradient-${mask.id}`} x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y}><stop offset="0" stopOpacity="0" /><stop offset="1" stopOpacity="1" /></linearGradient></defs><rect width="1" height="1" fill={`url(#mask-gradient-${mask.id})`} /><line className="mask-gradient-axis" x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y} /></g>;
+          return <g className={className} key={mask.id}><defs><linearGradient id={`mask-gradient-${mask.id}`} x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y}><stop offset="0" stopOpacity="0" /><stop offset="1" stopOpacity="1" /></linearGradient></defs><rect width="1" height="1" fill={`url(#mask-gradient-${mask.id})`} /><line className="mask-gradient-axis" x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y} /></g>;
         }
         if (mask.shape.kind === 'ai-segmentation') {
-          return <g className="smart-mask-points" key={mask.id}>
+          return <g className={`${className} smart-mask-points`} key={mask.id}>
             {mask.shape.boundingBoxes.map((box, index) => <rect className="smart-mask-box" key={`box-${index}`} x={box.x} y={box.y} width={box.width} height={box.height} />)}
             {mask.shape.positivePoints.map((point, index) => <circle className="positive" key={`positive-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
             {mask.shape.negativePoints.map((point, index) => <circle className="negative" key={`negative-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
@@ -1392,14 +1433,20 @@ function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactEle
   );
 }
 
-function CompositionGuideOverlay({ guide }: { guide: CompositionGuide }): ReactElement | null {
-  if (guide === 'none') return null;
-  const denseGridLines = Array.from({ length: 19 }, (_, index) => (index + 1) / 20);
-  return <svg className="composition-guide-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Fixed composition grid">
+function ImageCompositionGuideOverlay({ guide }: { guide: CompositionGuide }): ReactElement | null {
+  if (guide !== 'thirds' && guide !== 'golden-ratio') return null;
+  return <svg className="composition-guide-overlay image-guide" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Image composition guide">
     {guide === 'thirds' && <path d="M.333 0V1 M.667 0V1 M0 .333H1 M0 .667H1" />}
+    {guide === 'golden-ratio' && <path d="M.382 0V1 M.618 0V1 M0 .382H1 M0 .618H1" />}
+  </svg>;
+}
+
+function WorkspaceCompositionGuideOverlay({ guide }: { guide: CompositionGuide }): ReactElement | null {
+  if (guide !== 'grid' && guide !== 'diagonals') return null;
+  const denseGridLines = Array.from({ length: 19 }, (_, index) => (index + 1) / 20);
+  return <svg className="composition-guide-overlay workspace-guide" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Fixed composition grid">
     {guide === 'grid' && <>{denseGridLines.map((position, index) => <path className={(index + 1) % 5 === 0 ? 'grid-major' : 'grid-minor'} key={`grid-${position}`} d={`M${position} 0V1 M0 ${position}H1`} />)}</>}
     {guide === 'diagonals' && <path d="M0 0L1 1 M1 0L0 1" />}
-    {guide === 'golden-ratio' && <path d="M.382 0V1 M.618 0V1 M0 .382H1 M0 .618H1" />}
   </svg>;
 }
 
