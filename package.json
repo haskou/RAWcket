@@ -9,6 +9,7 @@
     "dev": "vite",
     "start": "vite",
     "build": "tsc -b && vite build",
+    "build:sites": "npm run build && mkdir -p dist/server && cp sites/worker.js dist/server/index.js",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b --pretty false",
