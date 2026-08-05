@@ -4,6 +4,7 @@ import { CpuViewportTransformer } from './CpuViewportTransformer';
 import { CanvasWatermarkRenderer } from './CanvasWatermarkRenderer';
 import { OutputPixelSharpener } from './OutputPixelSharpener';
 import { EncodedImageMetadataWriter } from './EncodedImageMetadataWriter';
+import { DevelopedPixelBufferGuard } from './DevelopedPixelBufferGuard';
 import { PixelHistogramAnalyzer } from './PixelHistogramAnalyzer';
 import { TiffEncoder } from './TiffEncoder';
 import { WebGl2PixelDeveloper } from './WebGl2PixelDeveloper';
@@ -24,6 +25,7 @@ const webGpuDeveloper = new WebGpuPixelDeveloper();
 const outputSharpener = new OutputPixelSharpener();
 const watermarkRenderer = new CanvasWatermarkRenderer();
 const metadataWriter = new EncodedImageMetadataWriter();
+const developedPixelGuard = new DevelopedPixelBufferGuard();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -110,8 +112,10 @@ async function developBitmap(
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
   const imageData = context.getImageData(0, 0, width, height);
-  const webGpuPixels = await webGpuDeveloper.develop(imageData.data, width, height, development);
-  const webGl2Pixels = webGpuPixels === null ? webGl2Developer.develop(imageData.data, width, height, development) : null;
+  const webGpuCandidate = await webGpuDeveloper.develop(imageData.data, width, height, development);
+  const webGpuPixels = webGpuCandidate !== null && !developedPixelGuard.isSuspicious(webGpuCandidate, imageData.data) ? webGpuCandidate : null;
+  const webGl2Candidate = webGpuPixels === null ? webGl2Developer.develop(imageData.data, width, height, development) : null;
+  const webGl2Pixels = webGl2Candidate !== null && !developedPixelGuard.isSuspicious(webGl2Candidate, imageData.data) ? webGl2Candidate : null;
   return {
     width,
     height,

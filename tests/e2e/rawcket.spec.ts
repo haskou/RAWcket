@@ -319,6 +319,37 @@ test('imports a photograph by dropping it into the import dialog', async ({ page
   await dataTransfer.dispose();
 });
 
+test('keeps the preview visible at maximum spatial detail settings', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Explore with a demo/ }).click();
+  await page.getByRole('tab', { name: 'Manual' }).click();
+  await page.getByRole('button', { name: 'Advanced', exact: true }).click();
+  await page.getByLabel('Editing tools').getByRole('button', { name: /Detail/ }).click();
+  const preview = page.locator('.source-preview');
+  await expect(preview).toBeVisible();
+
+  for (const label of ['Texture numeric value', 'Sharpness numeric value', 'Noise Reduction numeric value']) {
+    const previousSource = await preview.getAttribute('src');
+    await page.getByLabel(label).fill('100');
+    await expect.poll(() => preview.getAttribute('src')).not.toBe(previousSource);
+    await expect(preview).toBeVisible();
+    await expect.poll(() => preview.evaluate((image: HTMLImageElement) => image.naturalWidth * image.naturalHeight)).toBeGreaterThan(0);
+    await expect.poll(() => preview.evaluate((image: HTMLImageElement) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 16;
+      const context = canvas.getContext('2d');
+      if (context === null) return 0;
+      context.drawImage(image, 0, 0, 16, 16);
+      const pixels = context.getImageData(0, 0, 16, 16).data;
+      let visible = 0;
+      for (let index = 0; index < pixels.length; index += 4) visible += (pixels[index + 3] ?? 0) > 0 && ((pixels[index] ?? 0) + (pixels[index + 1] ?? 0) + (pixels[index + 2] ?? 0)) > 3 ? 1 : 0;
+      return visible;
+    })).toBeGreaterThan(128);
+  }
+  await expect(page.getByText('Preview up to date')).toBeVisible();
+});
+
 test('compares multiple imports by post-edit potential and lets the photographer override the recommendation', async ({ page }) => {
   await page.goto('/');
   await page.route('https://api.openai.com/v1/responses', async (route) => {

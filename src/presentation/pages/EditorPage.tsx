@@ -1025,6 +1025,7 @@ export function EditorPage(): ReactElement {
     : previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit'
       ? '8-bit embedded-preview fallback'
       : previewAnalysis === null ? 'Source precision pending' : '8-bit browser source';
+  const renderBusy = !renderProgress.startsWith('Preview up to date') && !renderProgress.startsWith('Preview unavailable');
 
   return (
     <main className="editor-shell">
@@ -1096,6 +1097,7 @@ export function EditorPage(): ReactElement {
               {toolWorkspace === 'develop' && activePanel === 'crop' && <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} />}
             </div>}
             <div className={`truth-badge ${previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' ? 'source-fallback' : ''}`} title={previewAnalysis?.rawFallbackReason ?? undefined}><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{sourcePrecisionLabel} · {renderProgress}</small></span></div>
+            {renderBusy && <div className="render-busy-indicator" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>Updating preview</strong><small>{renderProgress} · previous frame remains visible</small></span></div>}
             {previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' && <div className="raw-fallback-notice" role="status">Embedded RAW preview fallback · open Photo information for the decoder reason</div>}
             {showOriginal && <div className="comparison-badge">Original · Before</div>}
             <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
