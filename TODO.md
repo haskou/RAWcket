@@ -15,6 +15,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Rendered non-destructive crop/geometry, before/after, masks, histogram, and clipping.
 - [x] Local reviewable AI proposals, measurement-backed tutor, and deterministic smart-point masks.
 - [x] Consented, pinned, integrity-verified ONNX semantic model with removable local storage and WebGPU/WASM execution.
+- [x] Dedicated import/dropzone dialog with consented on-device semantic tags applied as editable project tags.
 - [x] JPEG/PNG/TIFF worker export with resize, progress, and cancellation.
 - [x] ARW embedded-preview extraction while preserving the original RAW.
 - [x] LibRaw/WASM mosaic development to linear 16-bit RGB, bounded input/output memory, camera white balance/matrix settings, visible embedded-preview fallback, and no silent export fallback.
@@ -22,14 +23,14 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Versioned LRU previews, quota preflight, SHA-256 snapshots, and corruption recovery.
 - [x] Safe, postponable PWA updates and a production CSP without `unsafe-eval`.
 - [ ] Sony A6600-specific redistributable fixture and trusted-reference color/matrix golden verification.
-- [x] WebGPU-first global-development/curve compute pipeline, WebGL2 fallback, and explicit CPU fallback for masks and spatial stages.
-- [ ] Complete GPU mask/spatial-stage coverage and the remaining capabilities below.
+- [x] WebGPU-first global-development/curve/spatial pipeline, WebGL2 fallback, GPU device-loss recovery, and explicit CPU fallback for masks.
+- [ ] Complete GPU mask coverage and the remaining capabilities below.
 
 ## Recommended implementation order
 
 1. Secure a redistributable Sony A6600 ARW fixture and establish trusted color/matrix golden references for the working LibRaw path.
 2. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
-3. Extend the WebGPU and WebGL2 renderers behind the existing preview boundary to cover masks and spatial stages.
+3. Extend the WebGPU and WebGL2 renderers behind the existing preview boundary to cover masks and broaden the current spatial parity corpus.
 4. Extend semantic selection with embedding reuse, model tiers, more categories, and mask composition.
 5. Add per-request cost estimates, cancellation, and capability discovery to the implemented optional OpenAI adapter.
 
@@ -57,9 +58,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Scope.** Use WebGPU first, WebGL2 as the graphics fallback, and CPU/WASM where appropriate. Produce 512 px thumbnails, 2048–3072 px interactive previews, and full resolution only for final export. Add 1024/4096-entry curve LUTs, initial sRGB color management, future Display P3 support, clipping warnings, RGB/luminance histograms, optional scopes, before/after comparison, intelligent caches, and incremental rendering.
 
-**Implemented.** The worker now selects a WebGPU compute shader first for compatible global adjustments, RGB/R/G/B/luminance LUTs, and vignette, then a real WebGL2 fragment shader when WebGPU is unavailable. Recipes with masks, texture, sharpening, or noise reduction deliberately fall back to the reference CPU pipeline and the active backend is visible in the canvas. The same boundary already provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
+**Implemented.** The worker now selects WebGPU compute shaders first for compatible global adjustments, RGB/R/G/B/luminance LUTs, vignette, denoise, texture, and sharpening, then real WebGL2 fragment shaders when WebGPU is unavailable. Spatial passes use the same operation order as the CPU reference and a browser parity test enforces a maximum eight-channel-value delta on the initial golden fixture. Device acquisition or loss returns control to the normal fallback pipeline. Recipes with masks still deliberately use the reference CPU pipeline, and the active backend is visible in the canvas. The same boundary already provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
 
-**Remaining.** WebGPU/WebGL2 mask and spatial-filter passes, formal CPU/GPU golden-image tolerances, device-loss recovery, Display P3/ICC work, optional scopes, and incremental tiled rendering.
+**Remaining.** WebGPU/WebGL2 mask passes, a larger representative CPU/GPU golden-image corpus, Display P3/ICC work, optional scopes, and incremental tiled rendering.
 
 **Dependencies.** Linear RAW engine; capability detection; preview boundary and worker protocol; color fixtures; documented operation order; versioned caches.
 
@@ -149,7 +150,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Create local masks for common photographic categories.
 
-**Implemented.** The pinned local model exposes sky, water, vegetation, people, and buildings. Results persist category, model identifier, immutable revision, confidence, points, and bounding boxes as editable AI-mask recipe data. Missing or low-confidence regions produce an actionable manual/point-mask fallback instead of a fabricated selection.
+**Implemented.** The pinned local model exposes sky, water, vegetation, people, and buildings. Results persist category, model identifier, immutable revision, confidence, points, and bounding boxes as editable AI-mask recipe data. The same single-pass inference can suggest these categories as normalized, editable project tags during import when the photographer has already installed and enabled the model. Missing or low-confidence regions produce no fabricated mask or tag.
 
 **Remaining.** Subject/background, skin, hair, and clothing categories; direct confidence presentation on the mask row; category composition; and deeper vector refinement controls.
 

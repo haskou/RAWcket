@@ -20,6 +20,7 @@ The first semantic adapter uses `Xenova/segformer-b0-finetuned-ade-512-512` at i
 - Installation and inference accept abort signals. Aborting active inference disposes the pipeline.
 - Removal disposes the pipeline and deletes the dedicated model cache.
 - The model returns normalized points, boxes, and confidence. The application service creates a normal `MaskDefinition` containing the semantic category, model identifier, immutable revision, prompts, and geometry. The raster remains disposable.
+- The same installed model can run one semantic pass during import and return only supported categories that meet bounded confidence and image-coverage thresholds. The application validates them as normal editable `ProjectTags`; inference failure never blocks import.
 - Deterministic point-guided and manual masks remain available when storage, WebGPU, WASM, quota, model output, or consent is unavailable.
 
 The first public categories are limited to sky, water, vegetation, people, and buildings. RAWcket does not claim categories the model contract does not expose.

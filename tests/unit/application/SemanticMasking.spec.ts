@@ -1,8 +1,11 @@
 import { CreateSemanticMask } from '@/contexts/projects/application/create-semantic-mask/CreateSemanticMask';
 import { CreateSemanticMaskMessage } from '@/contexts/projects/application/create-semantic-mask/messages/CreateSemanticMaskMessage';
 import { ManageSemanticSegmentationModel } from '@/contexts/projects/application/manage-semantic-segmentation-model/ManageSemanticSegmentationModel';
+import { SuggestPhotoTags } from '@/contexts/projects/application/suggest-photo-tags/SuggestPhotoTags';
+import { SuggestPhotoTagsMessage } from '@/contexts/projects/application/suggest-photo-tags/messages/SuggestPhotoTagsMessage';
 import type {
   SemanticMaskSuggestion,
+  SemanticPhotoTagSuggestion,
   SemanticModelDescriptor,
   SemanticModelStatus,
   SemanticModelTaskOptions,
@@ -43,6 +46,12 @@ class ControllableSemanticModel implements SemanticSegmentationModel {
       boundingBoxes: [{ x: 0.1, y: 0.05, width: 0.8, height: 0.4 }],
       confidence: 0.91
     });
+  }
+
+  public suggestTags(_image: Blob, options: SemanticModelTaskOptions): Promise<SemanticPhotoTagSuggestion[]> {
+    void _image;
+    options.onProgress?.(1);
+    return Promise.resolve([{ category: 'sky', confidence: 0.9, coverage: 0.4 }]);
   }
 }
 
@@ -98,5 +107,14 @@ describe('Semantic masking application services', () => {
     expect(progress).toEqual([1]);
     await manager.remove();
     expect(model.removed).toBe(true);
+  });
+
+  it('turns local semantic detections into validated editable project tags', async () => {
+    const tags = await new SuggestPhotoTags(new ControllableSemanticModel()).suggest(
+      new SuggestPhotoTagsMessage(new Blob(['preview'], { type: 'image/jpeg' })),
+      { signal: new AbortController().signal }
+    );
+
+    expect(tags).toEqual(['sky']);
   });
 });

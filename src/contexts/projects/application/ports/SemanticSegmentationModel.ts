@@ -18,6 +18,12 @@ export type SemanticMaskSuggestion = {
   confidence: number | null;
 };
 
+export type SemanticPhotoTagSuggestion = {
+  category: SemanticMaskCategoryPrimitive;
+  confidence: number | null;
+  coverage: number;
+};
+
 export type SemanticModelTaskOptions = {
   signal: AbortSignal;
   onProgress?: (completed: number) => void;
@@ -29,4 +35,5 @@ export interface SemanticSegmentationModel {
   install(options: SemanticModelTaskOptions): Promise<void>;
   remove(): Promise<void>;
   suggest(image: Blob, category: SemanticMaskCategory, options: SemanticModelTaskOptions): Promise<SemanticMaskSuggestion>;
+  suggestTags(image: Blob, options: SemanticModelTaskOptions): Promise<SemanticPhotoTagSuggestion[]>;
 }

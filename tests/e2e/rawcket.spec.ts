@@ -19,8 +19,13 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
     return canvas.toDataURL('image/png').split(',')[1] ?? '';
   });
   const png = Buffer.from(pngBase64, 'base64');
-  const imageChooser = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Import image' }).click();
+  const importDialog = page.getByRole('dialog', { name: 'Import photographs' });
+  await expect(importDialog).toBeVisible();
+  await expect(importDialog.getByText(/JPEG, PNG, or Sony ARW/)).toBeVisible();
+  await expect(importDialog.getByText(/Nothing is downloaded without your consent/)).toBeVisible();
+  const imageChooser = page.waitForEvent('filechooser');
+  await importDialog.getByRole('button', { name: 'Choose photographs' }).click();
   await (await imageChooser).setFiles({
     name: 'night.png',
     mimeType: 'image/png',
@@ -231,7 +236,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   expect(download.suggestedFilename()).toBe('night.png');
 });
 
-test('imports a photograph by dropping it onto the library', async ({ page }) => {
+test('imports a photograph by dropping it into the import dialog', async ({ page }) => {
   await page.goto('/');
   const dataTransfer = await page.evaluateHandle(async () => {
     const canvas = document.createElement('canvas');
@@ -247,10 +252,12 @@ test('imports a photograph by dropping it onto the library', async ({ page }) =>
     return transfer;
   });
 
-  await page.dispatchEvent('.library-shell', 'dragenter', { dataTransfer });
-  await expect(page.getByText('Drop photographs to import')).toBeVisible();
-  await page.dispatchEvent('.library-shell', 'drop', { dataTransfer });
-  await expect(page.getByText('Drop photographs to import')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Import image' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import photographs' });
+  await expect(dialog).toBeVisible();
+  await dialog.locator('.import-dialog-dropzone').dispatchEvent('dragenter', { dataTransfer });
+  await dialog.locator('.import-dialog-dropzone').dispatchEvent('drop', { dataTransfer });
+  await expect(dialog).toHaveCount(0);
   await expect(page.getByLabel('Project name')).toHaveValue('dropped');
   await dataTransfer.dispose();
 });

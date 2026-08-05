@@ -447,6 +447,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .credential-storage-options { display: grid; gap: 2px; margin: 14px 0 4px; padding: 12px; border: 1px solid #3b403c; border-radius: 10px; }
 .credential-storage-options legend { padding: 0 6px; color: #d5dbd6; font-size: .72rem; font-weight: 700; }
 .credential-storage-options .check-row { margin-top: 5px; }
+.import-photos-dialog { width: min(720px, calc(100vw - 28px)); }
+.import-dialog-dropzone { display: grid; justify-items: center; gap: 9px; min-height: 250px; padding: 30px; border: 1px dashed #566052; border-radius: 14px; background: radial-gradient(circle at 50% 20%, rgba(201,240,107,.08), transparent 58%), #101410; text-align: center; transition: border-color .15s ease, background .15s ease; }
+.import-dialog-dropzone.active { border-color: var(--accent); background-color: #182011; }
+.import-dialog-dropzone .drop-target-icon { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid #59664d; border-radius: 50%; color: var(--accent); font-size: 1.5rem; }
+.import-dialog-dropzone strong { color: #edf3e8; font-size: 1.05rem; }
+.import-dialog-dropzone p { max-width: 520px; margin: 0; color: #aab2ab; line-height: 1.55; }
+.import-dialog-dropzone small { color: #747d76; }
+.local-tagging-card { display: grid; gap: 8px; margin-top: 14px; padding: 14px; border: 1px solid #394238; border-radius: 12px; background: #111612; }
+.local-tagging-card > div { display: flex; justify-content: space-between; gap: 12px; }
+.local-tagging-card strong { color: #dce8d6; }
+.local-tagging-card small, .local-tagging-card p { color: #89938b; font-size: .68rem; line-height: 1.5; }
+.local-tagging-card p { margin: 0; }
+.local-tagging-card progress { width: 100%; accent-color: var(--accent); }
 .status-copy { min-height: 36px; color: #adb3ae; font-size: .75rem; line-height: 1.5; }
 .dialog-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
 .centered-state { min-height: 100vh; display: grid; place-content: center; justify-items: center; text-align: center; padding: 20px; }

@@ -7,7 +7,7 @@ component "Infrastructure / IndexedDB snapshots + OPFS" as Persistence
 component "Infrastructure / .rawcket bundles" as Bundles
 component "Infrastructure / Local advisor + tutor" as Advisor
 component "Infrastructure / Cached worker renderer" as Renderer
-component "Infrastructure / Consented semantic model" as Semantic
+component "Infrastructure / Consented semantic masks + tags" as Semantic
 
 Presentation --> Application
 Application --> Domain

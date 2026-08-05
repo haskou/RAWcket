@@ -11,8 +11,10 @@ import { FindProjectMessage } from '@/contexts/projects/application/find-project
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { ListProjectsMessage } from '@/contexts/projects/application/list-projects/messages/ListProjectsMessage';
 import { ReviewImportCandidatesMessage } from '@/contexts/projects/application/review-import-candidates/messages/ReviewImportCandidatesMessage';
+import { SuggestPhotoTagsMessage } from '@/contexts/projects/application/suggest-photo-tags/messages/SuggestPhotoTagsMessage';
 import type { ReviewedImportCandidate } from '@/contexts/projects/application/review-import-candidates/ReviewImportCandidates';
 import type { SourceImageInspection } from '@/contexts/projects/application/ports/SourceImageInspector';
+import type { SemanticModelStatus } from '@/contexts/projects/application/ports/SemanticSegmentationModel';
 import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import type { PhotoProjectSummary } from '@/contexts/projects/domain/PhotoProjectSummary';
 import { useApplication } from '../ApplicationContext';
@@ -20,6 +22,7 @@ import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { ProjectThumbnail } from '../components/ProjectThumbnail';
 import { ProjectOrganizationControls } from '../components/ProjectOrganizationControls';
 import { ImportSelectionDialog } from '../components/ImportSelectionDialog';
+import { ImportPhotosDialog } from '../components/ImportPhotosDialog';
 import { PwaInstallButton } from '../components/PwaInstallButton';
 import { createDemoImageBlob, downloadBlob } from '../lib/browserImages';
 
@@ -29,6 +32,7 @@ export function LibraryPage(): ReactElement {
   const imageInput = useRef<HTMLInputElement>(null);
   const bundleInput = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
+  const modelInstallAbort = useRef<AbortController | null>(null);
   const [projectMutationQueue] = useState(() => new Queue(QueueOptions.withConcurrency(1)));
   const [projects, setProjects] = useState<PhotoProjectSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,6 +47,13 @@ export function LibraryPage(): ReactElement {
   const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
   const [imageDropActive, setImageDropActive] = useState(false);
   const [pendingImportFiles, setPendingImportFiles] = useState<File[] | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [automaticTags, setAutomaticTags] = useState(true);
+  const [tagModelStatus, setTagModelStatus] = useState<SemanticModelStatus>('not-installed');
+  const [installingTagModel, setInstallingTagModel] = useState(false);
+  const [tagModelProgress, setTagModelProgress] = useState(0);
+  const [tagModelMessage, setTagModelMessage] = useState('Automatic tags never upload the photograph.');
+  const tagModel = application.manageSemanticSegmentationModel.describe();
   const projectFilter = useMemo(() => new ListProjectsMessage(searchQuery, minimumRating, favoritesOnly), [favoritesOnly, minimumRating, searchQuery]);
   const filteredProjects = useMemo(() => projects.filter((project) => project.matches(
     projectFilter.getQuery(),
@@ -63,6 +74,8 @@ export function LibraryPage(): ReactElement {
     void application.assessImportCapacity.assess(new AssessImportCapacityMessage(1)).then(setStorageCapacity);
   }, [application, refresh]);
 
+  useEffect(() => () => modelInstallAbort.current?.abort(), []);
+
   const persistImportedFile = async (file: File, inspection: SourceImageInspection): Promise<void> => {
       const capacity = await application.assessImportCapacity.assess(new AssessImportCapacityMessage(file.size));
       setStorageCapacity(capacity);
@@ -70,10 +83,32 @@ export function LibraryPage(): ReactElement {
         throw new Error(`This original needs ${formatBytes(file.size)}, but RAWcket is preserving ${formatBytes(capacity.safetyReserveBytes)} as a safety reserve. Free browser storage or export and remove older projects first.`);
       }
       const normalizedFile = new File([file], file.name, { type: inspection.mimeType });
+      let suggestedTags: string[] = [];
+      if (automaticTags && await application.manageSemanticSegmentationModel.inspect() === 'installed') {
+        setTagModelMessage('Analyzing the selected photograph locally…');
+        const controller = new AbortController();
+        try {
+          suggestedTags = await application.suggestPhotoTags.suggest(
+            new SuggestPhotoTagsMessage(inspection.embeddedPreview ?? normalizedFile),
+            { signal: controller.signal, onProgress: setTagModelProgress }
+          );
+          setTagModelMessage(suggestedTags.length === 0 ? 'No supported local tags were found.' : `Local tags: ${suggestedTags.join(', ')}.`);
+        } catch (caught: unknown) {
+          setTagModelMessage(caught instanceof Error ? `Imported without automatic tags: ${caught.message}` : 'Imported without automatic tags.');
+        }
+      }
       const name = file.name.replace(/\.(jpe?g|png|arw)$/i, '') || 'Untitled project';
       const project = await application.createProject.create(
         new CreateProjectMessage(name, normalizedFile, file.name, inspection.width, inspection.height, inspection.captureMetadata)
       );
+      if (suggestedTags.length > 0) {
+        application.applyEditOperation.apply(project, new ApplyEditOperationMessage(project.getId().valueOf(), {
+          kind: EDIT_OPERATION.SET_PROJECT_TAGS,
+          tags: suggestedTags,
+          groupId: null
+        }));
+        await application.saveProject.save(project);
+      }
       void application.persistentStorage.request();
       await refresh();
       void navigate(`/editor/${project.getId().valueOf()}`);
@@ -92,14 +127,44 @@ export function LibraryPage(): ReactElement {
   };
 
   const onImage = (event: ChangeEvent<HTMLInputElement>): void => {
+    setImportDialogOpen(false);
     importImages([...event.target.files ?? []]);
     event.target.value = '';
   };
 
   const importImages = (files: File[]): void => {
     if (files.length === 0) return;
+    setImportDialogOpen(false);
     if (files.length === 1 && files[0] !== undefined) void createFromFile(files[0]);
     if (files.length > 1) void reviewImportCandidates(files);
+  };
+
+  const openImportDialog = (): void => {
+    setImportDialogOpen(true);
+    setTagModelMessage('Automatic tags never upload the photograph.');
+    void application.manageSemanticSegmentationModel.inspect().then(setTagModelStatus).catch(() => setTagModelStatus('unavailable'));
+  };
+
+  const installTagModel = async (): Promise<void> => {
+    modelInstallAbort.current?.abort();
+    const controller = new AbortController();
+    modelInstallAbort.current = controller;
+    setInstallingTagModel(true);
+    setTagModelProgress(0);
+    setTagModelMessage('Downloading and verifying the pinned local model…');
+    try {
+      await application.manageSemanticSegmentationModel.install({ signal: controller.signal, onProgress: setTagModelProgress });
+      setTagModelStatus('installed');
+      setAutomaticTags(true);
+      setTagModelMessage('Local model ready. New imports will be tagged automatically.');
+    } catch (caught: unknown) {
+      setTagModelMessage(caught instanceof DOMException && caught.name === 'AbortError'
+        ? 'Local model installation cancelled.'
+        : caught instanceof Error ? caught.message : 'The local tag model could not be installed.');
+    } finally {
+      modelInstallAbort.current = null;
+      setInstallingTagModel(false);
+    }
   };
 
   const dragImagesIntoLibrary = (event: DragEvent<HTMLElement>): void => {
@@ -289,7 +354,7 @@ export function LibraryPage(): ReactElement {
           <PwaInstallButton />
           <button className="button ai-header-button" type="button" onClick={() => setSettingsOpen(true)}>✦ AI Companion</button>
           <button className="button ghost" type="button" onClick={() => bundleInput.current?.click()}>Import .rawcket</button>
-          <button className="button primary" type="button" onClick={() => imageInput.current?.click()} disabled={busy}>{busy ? 'Importing…' : 'Import image'}</button>
+          <button className="button primary" type="button" onClick={openImportDialog} disabled={busy}>{busy ? 'Importing…' : 'Import image'}</button>
         </div>
       </header>
       <input ref={imageInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,.arw,image/x-sony-arw" onChange={onImage} aria-label="Select one or more JPEG, PNG, or Sony ARW images" />
@@ -332,7 +397,7 @@ export function LibraryPage(): ReactElement {
             <div className="empty-icon" aria-hidden="true">+</div>
             <h3>Start with a photograph</h3>
             <p>Click Choose image or drop JPEG, PNG, or Sony ARW files here. The original remains untouched and local.</p>
-            <button className="button primary" type="button" onClick={() => imageInput.current?.click()}>Choose image</button>
+            <button className="button primary" type="button" onClick={openImportDialog}>Choose image</button>
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="empty-state compact">
@@ -365,6 +430,21 @@ export function LibraryPage(): ReactElement {
         )}
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onConfigured={continuePendingImport} />
+      <ImportPhotosDialog
+        open={importDialogOpen}
+        busy={busy}
+        automaticTags={automaticTags}
+        model={tagModel}
+        modelStatus={tagModelStatus}
+        installingModel={installingTagModel}
+        modelProgress={tagModelProgress}
+        modelMessage={tagModelMessage}
+        onClose={() => { modelInstallAbort.current?.abort(); setImportDialogOpen(false); }}
+        onBrowse={() => imageInput.current?.click()}
+        onFiles={importImages}
+        onAutomaticTagsChange={setAutomaticTags}
+        onInstallModel={() => void installTagModel()}
+      />
       {importCandidates !== null && <ImportSelectionDialog candidates={importCandidates} selected={selectedCandidate} onSelect={setSelectedCandidate} onCancel={() => setImportCandidates(null)} onContinue={continueWithCandidate} />}
     </main>
   );

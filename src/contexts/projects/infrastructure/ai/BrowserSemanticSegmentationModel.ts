@@ -4,6 +4,7 @@ import type {
 } from '@huggingface/transformers';
 import type {
   SemanticMaskSuggestion,
+  SemanticPhotoTagSuggestion,
   SemanticModelDescriptor,
   SemanticModelStatus,
   SemanticModelTaskOptions,
@@ -138,29 +139,61 @@ export class BrowserSemanticSegmentationModel implements SemanticSegmentationMod
     category: SemanticMaskCategory,
     options: SemanticModelTaskOptions
   ): Promise<SemanticMaskSuggestion> {
-    if (await this.inspect() !== 'installed') throw new Error('Download the local semantic model before creating a semantic mask.');
+    const output = await this.infer(image, options);
+    const suggestion = this.toSuggestion(output, category.valueOf(), options.signal);
+    options.onProgress?.(1);
+    return suggestion;
+  }
+
+  public async suggestTags(image: Blob, options: SemanticModelTaskOptions): Promise<SemanticPhotoTagSuggestion[]> {
+    const output = await this.infer(image, options);
+    const suggestions = this.describeCategories(output, options.signal);
+    options.onProgress?.(1);
+    return suggestions;
+  }
+
+  private async infer(image: Blob, options: SemanticModelTaskOptions): Promise<ImageSegmentationPipelineOutput[]> {
+    if (await this.inspect() !== 'installed') throw new Error('Download the local semantic model before using semantic analysis.');
     this.throwIfAborted(options.signal);
     const pipeline = await this.pipeline(options);
     this.throwIfAborted(options.signal);
     options.onProgress?.(0.55);
-    this.throwIfAborted(options.signal);
     const cancelInference = (): void => {
       if (this.activePipeline !== pipeline) return;
       this.activePipeline = null;
       void pipeline.dispose();
     };
     options.signal.addEventListener('abort', cancelInference, { once: true });
-    let output: ImageSegmentationPipelineOutput[];
     try {
-      output = await pipeline(image, { subtask: 'semantic' });
+      const output = await pipeline(image, { subtask: 'semantic' });
+      this.throwIfAborted(options.signal);
+      options.onProgress?.(0.9);
+      return output;
     } finally {
       options.signal.removeEventListener('abort', cancelInference);
     }
-    this.throwIfAborted(options.signal);
-    options.onProgress?.(0.9);
-    const suggestion = this.toSuggestion(output, category.valueOf(), options.signal);
-    options.onProgress?.(1);
-    return suggestion;
+  }
+
+  private describeCategories(output: ImageSegmentationPipelineOutput[], signal: AbortSignal): SemanticPhotoTagSuggestion[] {
+    return (Object.keys(categoryLabels) as SemanticMaskCategoryPrimitive[]).flatMap((category) => {
+      const accepted = categoryLabels[category];
+      const segments = output.filter((segment) => segment.label !== null && accepted.includes(segment.label.toLowerCase()));
+      const first = segments[0];
+      if (first === undefined) return [];
+      const pixels = first.mask.width * first.mask.height;
+      let selectedPixels = 0;
+      for (const segment of segments) {
+        for (let index = 0; index < segment.mask.data.length; index += 1) {
+          if (index % 65_536 === 0) this.throwIfAborted(signal);
+          if ((segment.mask.data[index] ?? 0) > 0) selectedPixels += 1;
+        }
+      }
+      const coverage = Math.min(1, selectedPixels / pixels);
+      const scores = segments.flatMap((segment) => segment.score === null ? [] : [segment.score]);
+      const confidence = scores.length === 0 ? null : scores.reduce((total, score) => total + score, 0) / scores.length;
+      if (coverage < 0.002 || (confidence !== null && confidence < 0.25)) return [];
+      return [{ category, confidence, coverage }];
+    });
   }
 
   private async pipeline(options: SemanticModelTaskOptions): Promise<ImageSegmentationPipelineType> {

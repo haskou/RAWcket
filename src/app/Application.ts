@@ -23,6 +23,7 @@ import { ListProjects } from '@/contexts/projects/application/list-projects/List
 import { ManageSemanticSegmentationModel } from '@/contexts/projects/application/manage-semantic-segmentation-model/ManageSemanticSegmentationModel';
 import { InspectSourceImage } from '@/contexts/projects/application/inspect-source-image/InspectSourceImage';
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
+import { SuggestPhotoTags } from '@/contexts/projects/application/suggest-photo-tags/SuggestPhotoTags';
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
 import { RequestPhotoOpinion } from '@/contexts/projects/application/request-photo-opinion/RequestPhotoOpinion';
@@ -78,6 +79,7 @@ export type Application = {
   copyDevelopmentSettings: CopyDevelopmentSettings;
   pasteDevelopmentSettings: PasteDevelopmentSettings;
   saveProject: SaveProject;
+  suggestPhotoTags: SuggestPhotoTags;
   deleteProject: DeleteProject;
   duplicateProject: DuplicateProject;
   sourceFiles: SourceFileRepository;
@@ -144,6 +146,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     copyDevelopmentSettings: new CopyDevelopmentSettings(developmentSettingsClipboard),
     pasteDevelopmentSettings: new PasteDevelopmentSettings(developmentSettingsClipboard),
     saveProject: new SaveProject(projects),
+    suggestPhotoTags: new SuggestPhotoTags(semanticSegmentationModel),
     deleteProject: new DeleteProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     duplicateProject: new DuplicateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     sourceFiles,

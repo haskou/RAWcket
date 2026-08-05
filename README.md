@@ -11,10 +11,10 @@ The original is never modified. Every human, preset, or AI change becomes a seri
 Implemented:
 
 - Strict TypeScript React/Vite application with responsive, accessible foundations.
-- Local library with JPEG/PNG/Sony ARW import, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, quota preflight, and portable project bundles.
+- Local library with a dedicated JPEG/PNG/Sony ARW dropzone dialog, direct library drag and drop, multi-photo selection, optional on-device automatic tags, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, quota preflight, and portable project bundles.
 - Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
 - Collapsible, navigable Active Recipe sidebar that lists only non-default instructions, with reversible enable switches and links back to each editor.
-- Adaptive renderer with cancellable scheduling: LibRaw/WASM develops supported camera mosaics to linear 16-bit RGB in its isolated browser worker, then a render worker applies the recipe. WebGPU compute runs compatible global development and curve LUTs first, a real WebGL2 shader provides the graphics fallback, and the reference CPU backend handles high-depth RAW input, masks, and spatial stages. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, and a versioned LRU preview cache share the same boundary.
+- Adaptive renderer with cancellable scheduling: LibRaw/WASM develops supported camera mosaics to linear 16-bit RGB in its isolated browser worker, then a render worker applies the recipe. WebGPU compute runs compatible global development, curve LUTs, denoise, texture, and sharpening; real WebGL2 shaders provide the graphics fallback; and the reference CPU backend handles high-depth RAW input and masks. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, device-loss fallback, and a versioned LRU preview cache share the same boundary.
 - Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
@@ -28,7 +28,7 @@ Implemented:
 - Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
 - Interactive curves, before/after, workspace-relative Fit, a dense fixed composition grid, drag-to-crop with an outside veil and locked ratios, explained masks, portable development settings, and reversible presets.
 - A clearly separated AI Companion and Manual workspace, deterministic no-AI Auto Enhance, OpenAI-authored editable briefs, one-click recipe clearing, and comparative multi-photo review based on post-edit potential with photographer override.
-- Local library search across names and tags, validated comma-separated tags, and reversible zero-to-five-star ratings.
+- Local library search across names and tags, optional semantic tags derived from the installed pinned local model, validated editable comma-separated tags, and reversible zero-to-five-star ratings.
 - Persistent favorites with instant filtering and a visual editor history derived from real undo/redo operations.
 - Optional, browser-gated PWA installation from the library header, an offline app shell after first load, and user-controlled update activation.
 - Unit, integration, and Chromium E2E coverage; CI for lint, typecheck, tests, build, and E2E.
@@ -36,7 +36,7 @@ Implemented:
 Not implemented yet:
 
 - A legally redistributable Sony A6600 fixture and trusted-reference color/matrix golden corpus. The current external verification fixture is a locally downloaded Sony FX30 ARW and is intentionally not committed because its image license is unclear.
-- WebGPU/WebGL2 passes for masks and spatial filters, device-loss recovery, and a complete GPU/CPU golden-image parity corpus.
+- WebGPU/WebGL2 passes for masks and a broader GPU/CPU golden-image parity corpus. Spatial filters now run on both accelerated paths and WebGPU device loss falls back cleanly.
 - Larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
 - 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking. RAW sensor development is already high-depth, but current file encoders quantize their output to 8-bit.
@@ -105,7 +105,7 @@ Recipe-only sidecars use the separate `.rawcket.json` format. They contain a ver
 ## Privacy and security
 
 - There is no backend, account, authentication, analytics, or mandatory SaaS.
-- Manual editing, Auto Enhance, the Development Tutor, point masks, and installed Semantic Select run locally. Semantic Select downloads pinned model weights only after consent, verifies each resource, then performs inference on-device.
+- Manual editing, Auto Enhance, the Development Tutor, point masks, installed Semantic Select, and automatic import tags run locally. The semantic model downloads pinned weights only after consent, verifies each resource, then performs inference on-device; automatic import tags are skipped unless that model is already installed and enabled.
 - OpenAI-powered opinions, editable proposals, and multi-photo comparison are optional cloud actions. They send reduced JPEG previews plus the visible task context to the OpenAI Responses API with response storage disabled; originals, RAW files, complete recipes, and API keys are not sent as request content.
 - RAWcket never silently selects an OpenAI model. The provider and user-entered model are visible in setup, which links directly to [OpenAI API key management](https://platform.openai.com/api-keys).
 - RAWcket never persists an unencrypted API key. Setup defaults to AES-GCM encrypted storage with a PBKDF2-SHA-256-derived key; the explicit session-only alternative stays in memory and is never saved. The master password is never stored. Browser-side keys remain exposed to the risks of the active page and installed browser extensions.
