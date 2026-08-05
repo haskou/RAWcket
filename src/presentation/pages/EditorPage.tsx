@@ -19,11 +19,13 @@ import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/E
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
 import type { ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
+import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import type { AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { useApplication } from '../ApplicationContext';
 import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
 import { AdjustmentControls } from '../components/AdjustmentControls';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
+import { GeometryControls } from '../components/GeometryControls';
 import {
   adjustmentDefinitions,
   type AdjustmentSection
@@ -71,6 +73,7 @@ export function EditorPage(): ReactElement {
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [source, setSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
   const [renderProgress, setRenderProgress] = useState('Preparing preview');
   const [revision, setRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -82,7 +85,7 @@ export function EditorPage(): ReactElement {
   const [aiPrompt, setAiPrompt] = useState('Give this photograph a refined cinematic look while preserving natural skin tones.');
   const [aiMessage, setAiMessage] = useState('AI is private and opt-in. Connect a provider to generate editable proposals.');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const sourceUrl = useObjectUrl(preview ?? source);
+  const sourceUrl = useObjectUrl(showOriginal ? source : preview ?? source);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
   const autosave = useProjectAutosave(project, revision, save);
 
@@ -172,6 +175,7 @@ export function EditorPage(): ReactElement {
       else if (event.key === '3') setActivePanel('detail');
       else if (event.key === '4') setActivePanel('curves');
       else if (event.key.toLowerCase() === 'a') setActivePanel('ai');
+      else if (event.key.toLowerCase() === 'b') setShowOriginal((value) => !value);
       else if (event.key === '?') setShortcutsOpen((value) => !value);
       else return;
       event.preventDefault();
@@ -228,6 +232,10 @@ export function EditorPage(): ReactElement {
       curve: curvePresets[name],
       groupId: null
     });
+  };
+
+  const changeViewport = (viewport: ViewportTransformPrimitives, groupId: string | null): void => {
+    apply({ kind: EDIT_OPERATION.SET_VIEWPORT_TRANSFORM, viewport, groupId });
   };
 
   const startPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -290,7 +298,7 @@ export function EditorPage(): ReactElement {
       </header>
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
       <section className="editor-workspace">
-        <ActiveRecipePanel project={project} onNavigate={showAdjustment} onToggle={toggleAdjustment} />
+        <ActiveRecipePanel project={project} onNavigate={showAdjustment} onToggle={toggleAdjustment} onNavigateTool={setActivePanel} />
         <div className="canvas-area">
           <div className="canvas-toolbar" aria-label="Preview controls">
             <button type="button" onClick={() => changeZoom(zoom - 0.1)} aria-label="Zoom out">−</button>
@@ -298,6 +306,7 @@ export function EditorPage(): ReactElement {
             <label><span className="visually-hidden">Zoom percentage</span><input type="number" min={10} max={800} step={1} value={Math.round(zoom * 100)} onChange={(event) => changeZoom(event.currentTarget.valueAsNumber / 100)} />%</label>
             <button type="button" onClick={() => changeZoom(zoom + 0.1)} aria-label="Zoom in">+</button>
             <button type="button" onClick={fitPreview}>Fit</button>
+            <button className={showOriginal ? 'active' : ''} type="button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
           </div>
           <div
             className={`photo-stage ${panning ? 'panning' : ''}`}
@@ -310,6 +319,7 @@ export function EditorPage(): ReactElement {
           >
             {sourceUrl !== null && <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} style={{ transform }} />}
             <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>Reference CPU preview</strong><small>Full global recipe and curves · {renderProgress}</small></span></div>
+            {showOriginal && <div className="comparison-badge">Original · Before</div>}
             <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
           </div>
         </div>
@@ -348,9 +358,10 @@ export function EditorPage(): ReactElement {
               {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
             </div>
           </ToolSection>
-          {mode === 'advanced' && <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel} badge="Coming next">
-            <p>The non-destructive model supports crop frame, translation, zoom, rotation, flip, and aspect ratio. Canvas editing is next.</p>
-          </ToolSection>}
+          <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel} badge="Rendered">
+            <p>Crop, image position, scale, rotation, and flips are persisted, undoable, and rendered by the reference pipeline.</p>
+            <GeometryControls project={project} onChange={changeViewport} />
+          </ToolSection>
           <ToolSection id="masks" title="Masks" active={activePanel === 'masks'} onToggle={setActivePanel} badge="AI ready">
             <p>Brushes, gradients, range masks, AI segmentation, and add/subtract/intersect composition are represented in the recipe.</p>
           </ToolSection>
@@ -389,6 +400,7 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
     ['Light / Color / Detail', '1 · 2 · 3'],
     ['Tone Curve', '4'],
     ['AI Studio', 'A'],
+    ['Before / after', 'B'],
     ['Shortcut guide', '?']
   ];
   return (

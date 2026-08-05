@@ -49,11 +49,12 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
       id: crypto.randomUUID(),
       source,
       maximumEdge: request.getSize().valueOf(),
-      development: {
-        adjustments: primitives.recipe.globalAdjustments,
-        curves: primitives.recipe.curves,
-        disabledAdjustments: primitives.recipe.disabledGlobalAdjustments
-      }
+        development: {
+          adjustments: primitives.recipe.globalAdjustments,
+          curves: primitives.recipe.curves,
+          disabledAdjustments: primitives.recipe.disabledGlobalAdjustments,
+          viewport: primitives.recipe.viewport
+        }
     };
     return new Promise((resolve, reject) => {
       const worker = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' });

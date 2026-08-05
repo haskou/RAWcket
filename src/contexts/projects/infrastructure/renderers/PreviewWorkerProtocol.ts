@@ -10,7 +10,8 @@ export const previewWorkerRequestSchema = z.object({
   development: z.object({
     adjustments: recipeSchema.shape.globalAdjustments,
     curves: recipeSchema.shape.curves,
-    disabledAdjustments: recipeSchema.shape.disabledGlobalAdjustments
+    disabledAdjustments: recipeSchema.shape.disabledGlobalAdjustments,
+    viewport: recipeSchema.shape.viewport
   })
 });
 

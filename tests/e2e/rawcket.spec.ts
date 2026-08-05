@@ -29,8 +29,16 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Exposure numeric value')).toBeDisabled();
   await page.getByLabel('Exposure enabled').check();
   await expect(page.getByLabel('Exposure numeric value')).toHaveValue('0.25');
+  await page.getByRole('button', { name: 'After · B' }).click();
+  await expect(page.getByText('Original · Before')).toBeVisible();
+  await page.getByRole('button', { name: 'Before · B' }).click();
+  await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
+  await page.getByLabel('Rotation numeric value').fill('10');
+  await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
   await page.getByRole('button', { name: 'Open night' }).click();
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
+  await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
 });

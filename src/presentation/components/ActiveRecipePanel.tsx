@@ -3,10 +3,11 @@ import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { adjustmentDefinitions, type AdjustmentSection } from '../editor/adjustmentDefinitions';
 
-export function ActiveRecipePanel({ project, onNavigate, onToggle }: {
+export function ActiveRecipePanel({ project, onNavigate, onToggle, onNavigateTool }: {
   project: PhotoProject;
   onNavigate: (section: AdjustmentSection) => void;
   onToggle: (key: AdjustmentKeyPrimitive, enabled: boolean) => void;
+  onNavigateTool?: (tool: 'curves' | 'crop' | 'masks') => void;
 }): ReactElement {
   return (
     <aside className="recipe-panel" aria-label="Active Recipe">
@@ -33,6 +34,16 @@ export function ActiveRecipePanel({ project, onNavigate, onToggle }: {
             </div>
           );
         })}
+        <div className="recipe-blocks-heading">Recipe blocks</div>
+        {([
+          ['curves', 'Tone Curve'],
+          ['crop', 'Crop & Geometry'],
+          ['masks', 'Local Masks']
+        ] as const).map(([tool, label]) => (
+          <button className="recipe-block" type="button" key={tool} onClick={() => onNavigateTool?.(tool)}>
+            <span>{label}</span><span aria-hidden="true">→</span>
+          </button>
+        ))}
       </div>
     </aside>
   );

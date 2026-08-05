@@ -145,6 +145,10 @@ export class PhotoProject {
     return this.recipe.isGlobalAdjustmentEnabled(key);
   }
 
+  public getViewportTransform(): ViewportTransform {
+    return ViewportTransform.fromPrimitives(this.recipe.getViewport().toPrimitives());
+  }
+
   public getInterfaceMode(): InterfaceMode {
     return this.uiState.getMode();
   }

@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import { CpuPixelDeveloper } from './CpuPixelDeveloper';
+import { CpuViewportTransformer } from './CpuViewportTransformer';
 import {
   previewWorkerRequestSchema,
   type PreviewWorkerResponse
@@ -7,6 +8,7 @@ import {
 
 const worker = self as DedicatedWorkerGlobalScope;
 const developer = new CpuPixelDeveloper();
+const viewportTransformer = new CpuViewportTransformer();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -35,9 +37,13 @@ async function render(input: unknown): Promise<void> {
       height,
       request.development
     );
-    context.putImageData(new ImageData(pixels, width, height), 0, 0);
+    const transformed = viewportTransformer.transform(pixels, width, height, request.development.viewport);
+    const outputCanvas = new OffscreenCanvas(transformed.width, transformed.height);
+    const outputContext = outputCanvas.getContext('2d', { alpha: false });
+    if (outputContext === null) throw new Error('The output preview context could not be created.');
+    outputContext.putImageData(new ImageData(transformed.pixels, transformed.width, transformed.height), 0, 0);
     progress(request.id, 'developing', 0.8);
-    const preview = await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
+    const preview = await outputCanvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
     progress(request.id, 'encoding', 0.95);
     post({ kind: 'completed', id: request.id, preview });
   } catch (error: unknown) {
