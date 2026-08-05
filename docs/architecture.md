@@ -31,6 +31,8 @@ Schema version 5 adds immutable `CaptureMetadata`. The bounded TIFF reader extra
 
 `EditHistory.getTimeline()` returns cloned applied and redo operations. The visual history renders those same operations, so it cannot drift from actual undo/redo state or mutate recorded history through presentation references.
 
+Project/source mutations cross IndexedDB and OPFS, so `projectAssetJournal` records create/delete intent before either store changes. Create, duplicate, bundle import, delete, and startup reconciliation share one FIFO queue. Recovery removes a source only when a persisted create/delete mutation plus the absence of its project proves it is orphaned; referenced originals are never swept heuristically.
+
 `DevelopmentRecipe` contains:
 
 - `GlobalAdjustments`: sixteen adjustments with concept-specific ranges and independent enabled state.

@@ -19,6 +19,7 @@ import { RenderProjectPreview } from '@/contexts/projects/application/render-pro
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
 import { ReviewDevelopment } from '@/contexts/projects/application/review-development/ReviewDevelopment';
 import { ReviewImportCandidates } from '@/contexts/projects/application/review-import-candidates/ReviewImportCandidates';
+import { ReconcileProjectAssets } from '@/contexts/projects/application/reconcile-project-assets/ReconcileProjectAssets';
 import { PasteDevelopmentSettings } from '@/contexts/projects/application/paste-development-settings/PasteDevelopmentSettings';
 import type { ProjectExporter } from '@/contexts/projects/application/ports/ProjectExporter';
 import type { ProjectImporter } from '@/contexts/projects/application/ports/ProjectImporter';
@@ -34,6 +35,7 @@ import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastru
 import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFiveToSixProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
+import { IndexedDbProjectAssetJournal } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectAssetJournal';
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
 import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/CachingPreviewRenderer';
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
@@ -74,6 +76,7 @@ export type Application = {
   requestEditingAdvice: RequestEditingAdvice;
   reviewDevelopment: ReviewDevelopment;
   reviewImportCandidates: ReviewImportCandidates;
+  reconcileProjectAssets: ReconcileProjectAssets;
   exportProjectPhoto: ExportProjectPhoto;
   exportProjectSidecar: ExportProjectSidecar;
   inspectSourceImage: InspectSourceImage;
@@ -91,7 +94,9 @@ export function createApplication(databaseName = 'rawcket'): Application {
   ]);
   const projects = new IndexedDbProjectRepository(database, migrator);
   const sourceFiles = new BrowserSourceFileRepository(database);
-  const bundle = new RawcketProjectBundle(projects, sourceFiles, migrator);
+  const projectAssetJournal = new IndexedDbProjectAssetJournal(database);
+  const projectAssetQueue = new Queue(QueueOptions.withConcurrency(1));
+  const bundle = new RawcketProjectBundle(projects, sourceFiles, migrator, projectAssetJournal, projectAssetQueue);
   const settings = new RawcketSettingsRepository(database);
   const previewRenderer = new CachingPreviewRenderer(new WorkerPreviewRenderer(sourceFiles));
   const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
@@ -99,7 +104,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const sourceImageInspector = new BrowserSourceImageInspector();
   const projectSidecarCodec = new JsonProjectSidecarCodec();
   return {
-    createProject: new CreateProject(projects, sourceFiles),
+    createProject: new CreateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     createSemanticMask: new CreateSemanticMask(semanticSegmentationModel),
     assessImportCapacity: new AssessImportCapacity(new BrowserLocalStorageInspector()),
     findProject: new FindProject(projects),
@@ -112,8 +117,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
     copyDevelopmentSettings: new CopyDevelopmentSettings(developmentSettingsClipboard),
     pasteDevelopmentSettings: new PasteDevelopmentSettings(developmentSettingsClipboard),
     saveProject: new SaveProject(projects),
-    deleteProject: new DeleteProject(projects, sourceFiles),
-    duplicateProject: new DuplicateProject(projects, sourceFiles),
+    deleteProject: new DeleteProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
+    duplicateProject: new DuplicateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     sourceFiles,
     projectExporter: bundle,
     projectImporter: bundle,
@@ -123,8 +128,10 @@ export function createApplication(databaseName = 'rawcket'): Application {
     requestEditingAdvice: new RequestEditingAdvice(new LocalRecipeAdvisor()),
     reviewDevelopment: new ReviewDevelopment(new LocalDevelopmentTutor()),
     reviewImportCandidates: new ReviewImportCandidates(sourceImageInspector, new BrowserImportCandidateReviewer()),
+    reconcileProjectAssets: new ReconcileProjectAssets(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles)),
     exportProjectSidecar: new ExportProjectSidecar(projectSidecarCodec),
     inspectSourceImage: new InspectSourceImage(sourceImageInspector)
   };
 }
+import { Queue, QueueOptions } from '@haskou/flow';

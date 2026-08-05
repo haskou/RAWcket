@@ -38,6 +38,7 @@ export function LibraryPage(): ReactElement {
   const [storageCapacity, setStorageCapacity] = useState<ImportCapacityAssessment | null>(null);
   const [importCandidates, setImportCandidates] = useState<ReviewedImportCandidate[] | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState(0);
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
   const projectFilter = useMemo(() => new ListProjectsMessage(searchQuery, minimumRating, favoritesOnly), [favoritesOnly, minimumRating, searchQuery]);
   const filteredProjects = useMemo(() => projects.filter((project) => project.matches(
     projectFilter.getQuery(),
@@ -50,7 +51,11 @@ export function LibraryPage(): ReactElement {
   }, [application]);
 
   useEffect(() => {
-    void refresh();
+    void application.reconcileProjectAssets.reconcile().then(async (result) => {
+      await refresh();
+      if (result.recoveredMutations > 0) setRecoveryMessage(`Recovered ${result.recoveredMutations} interrupted local ${result.recoveredMutations === 1 ? 'operation' : 'operations'}${result.removedOrphanedSources > 0 ? ` and removed ${result.removedOrphanedSources} orphaned original ${result.removedOrphanedSources === 1 ? 'file' : 'files'}` : ''}.`);
+      if (result.missingReferencedSources > 0) setError(`${result.missingReferencedSources} project ${result.missingReferencedSources === 1 ? 'references a missing original' : 'reference missing originals'}. Export its recipe and restore the source from backup.`);
+    }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Interrupted local operations could not be reconciled.'));
     void application.assessImportCapacity.assess(new AssessImportCapacityMessage(1)).then(setStorageCapacity);
   }, [application, refresh]);
 
@@ -241,6 +246,7 @@ export function LibraryPage(): ReactElement {
         {storageCapacity?.supported === true && <span> · {formatBytes(storageCapacity.usageBytes)} used of {formatBytes(storageCapacity.quotaBytes)} · {storageCapacity.persistent ? 'persistent storage granted' : 'storage may be reclaimed by the browser'}</span>}
       </p>
       {error !== null && <p className="notice error" role="alert">{error}</p>}
+      {recoveryMessage !== null && <p className="notice" role="status">{recoveryMessage}</p>}
       <section aria-labelledby="projects-title">
         <div className="section-heading"><h2 id="projects-title">Recent projects</h2><span>{filteredProjects.length} of {projects.length} {projects.length === 1 ? 'project' : 'projects'}</span></div>
         {projects.length > 0 && <div className="library-filters" role="search">

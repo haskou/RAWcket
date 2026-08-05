@@ -18,6 +18,7 @@ Implemented:
 - Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
+- A persistent cross-store write-ahead journal reconciles interrupted create, duplicate, import, and delete operations and removes only originals proven orphaned.
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
 - Versioned schema migrations through version 6.
@@ -39,7 +40,7 @@ Not implemented yet:
 - A consented optional cloud provider and larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
 - Full LibRaw mosaic demosaicing, 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.
-- Collections, filesystem links, complete orphan cleanup, and a full WCAG/browser-device audit.
+- Collections, optional filesystem links, and a full WCAG/browser-device audit.
 
 The detailed, actively maintained plan is in [TODO.md](TODO.md).
 

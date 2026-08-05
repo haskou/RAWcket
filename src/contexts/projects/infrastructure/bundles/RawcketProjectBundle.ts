@@ -1,6 +1,9 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import { Timestamp } from '@haskou/value-objects';
+import type { Queue } from '@haskou/flow';
 import type { ProjectExporter } from '../../application/ports/ProjectExporter';
 import type { ProjectImporter } from '../../application/ports/ProjectImporter';
+import { ProjectAssetMutationKind, type ProjectAssetJournal } from '../../application/ports/ProjectAssetJournal';
 import { PhotoProject, type PhotoProjectPrimitives } from '../../domain/PhotoProject';
 import type { ProjectRepository } from '../../domain/repositories/ProjectRepository';
 import type { SourceFileRepository } from '../../domain/repositories/SourceFileRepository';
@@ -15,7 +18,9 @@ export class RawcketProjectBundle implements ProjectExporter, ProjectImporter {
   public constructor(
     private readonly projects: ProjectRepository,
     private readonly sourceFiles: SourceFileRepository,
-    private readonly migrator: ProjectMigrator
+    private readonly migrator: ProjectMigrator,
+    private readonly journal: ProjectAssetJournal,
+    private readonly queue: Queue
   ) {}
 
   public async exportProject(projectId: ProjectId): Promise<Blob> {
@@ -75,14 +80,28 @@ export class RawcketProjectBundle implements ProjectExporter, ProjectImporter {
     const id = (await this.projects.findById(requestedId)) === null ? requestedId : new ProjectId(crypto.randomUUID());
     const mimeType = sourceEntry.endsWith('.png') ? 'image/png' : sourceEntry.endsWith('.arw') ? 'image/x-sony-arw' : 'image/jpeg';
     const source = new Blob([this.toArrayBuffer(sourceBytes)], { type: mimeType });
-    const stored = await this.sourceFiles.save(id, source);
-    const importable: PhotoProjectPrimitives = {
-      ...parsed,
-      id: id.valueOf(),
-      source: { ...parsed.source, mimeType, size: source.size, storageKey: stored.getStorageKey().valueOf() }
-    };
-    await this.projects.save(PhotoProject.fromPrimitives(importable));
-    return id;
+    return this.queue.run(async () => {
+      await this.journal.begin(id, ProjectAssetMutationKind.CREATE, Timestamp.now());
+      let sourceWasSaved = false;
+      try {
+        const stored = await this.sourceFiles.save(id, source);
+        sourceWasSaved = true;
+        const importable: PhotoProjectPrimitives = {
+          ...parsed,
+          id: id.valueOf(),
+          source: { ...parsed.source, mimeType, size: source.size, storageKey: stored.getStorageKey().valueOf() }
+        };
+        await this.projects.save(PhotoProject.fromPrimitives(importable));
+        try { await this.journal.complete(id); } catch { /* Reconciliation completes the committed import. */ }
+        return id;
+      } catch (error: unknown) {
+        try {
+          if (sourceWasSaved) await this.sourceFiles.delete(id);
+          await this.journal.complete(id);
+        } catch { /* Keep the journal entry for startup reconciliation. */ }
+        throw error;
+      }
+    });
   }
 
   private async sha256(bytes: Uint8Array): Promise<string> {

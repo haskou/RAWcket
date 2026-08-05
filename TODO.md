@@ -208,7 +208,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Versioned `.rawcket.json` sidecars export only source dimensions and validated recipe data. They exclude the original, project identity, history, ratings, and tags; applying one is a single undoable aggregate operation with a 5 MB input limit.
 
-**Remaining.** Write-ahead journaling across IndexedDB/OPFS, optional File System Access links, orphan cleanup, and future collections.
+**Implemented.** A persistent write-ahead journal covers create, duplicate, bundle import, and delete across IndexedDB/OPFS. All mutations and startup reconciliation share one FIFO queue. Recovery completes interrupted deletes and removes only sources proven orphaned by journal state; missing referenced originals produce an actionable warning instead of deletion.
+
+**Remaining.** Optional File System Access links and future collections.
 
 **Acceptance.** Interrupted saves recover the last consistent snapshot; corruption never overwrites the backup; cleanup never deletes a referenced original; quota errors are explained early; sidecars and bundles migrate by version; revoked file permissions fall back to OPFS.
 

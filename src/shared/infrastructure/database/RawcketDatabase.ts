@@ -17,10 +17,17 @@ export type ProjectSnapshotRecord = {
   sha256: string;
 };
 
+export type ProjectAssetJournalRecord = {
+  projectId: string;
+  kind: 'create' | 'delete';
+  startedAt: number;
+};
+
 interface RawcketSchema extends DBSchema {
   projects: { key: string; value: unknown };
   projectIndex: { key: string; value: ProjectIndexRecord; indexes: { 'by-updatedAt': number } };
   projectSnapshots: { key: [string, number]; value: ProjectSnapshotRecord; indexes: { 'by-project': string } };
+  projectAssetJournal: { key: string; value: ProjectAssetJournalRecord };
   sources: { key: string; value: Blob };
   settings: { key: string; value: unknown };
 }
@@ -29,7 +36,7 @@ export type RawcketDatabaseConnection = IDBPDatabase<RawcketSchema>;
 
 export class RawcketDatabase {
   public static open(name = 'rawcket'): Promise<RawcketDatabaseConnection> {
-    return openDB<RawcketSchema>(name, 2, {
+    return openDB<RawcketSchema>(name, 3, {
       upgrade(database): void {
         if (!database.objectStoreNames.contains('projects')) database.createObjectStore('projects');
         if (!database.objectStoreNames.contains('sources')) database.createObjectStore('sources');
@@ -42,6 +49,7 @@ export class RawcketDatabase {
           const snapshots = database.createObjectStore('projectSnapshots', { keyPath: ['projectId', 'createdAt'] });
           snapshots.createIndex('by-project', 'projectId');
         }
+        if (!database.objectStoreNames.contains('projectAssetJournal')) database.createObjectStore('projectAssetJournal', { keyPath: 'projectId' });
       }
     });
   }

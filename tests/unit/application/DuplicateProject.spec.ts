@@ -1,4 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
+import { Queue, QueueOptions } from '@haskou/flow';
+import type { ProjectAssetJournal } from '@/contexts/projects/application/ports/ProjectAssetJournal';
 import { DuplicateProject } from '@/contexts/projects/application/duplicate-project/DuplicateProject';
 import { DuplicateProjectMessage } from '@/contexts/projects/application/duplicate-project/messages/DuplicateProjectMessage';
 import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
@@ -18,7 +20,8 @@ describe('DuplicateProject', () => {
     await projects.save(original);
     await sources.save(original.getId(), new Blob(['raw'], { type: 'image/jpeg' }));
 
-    const duplicate = await new DuplicateProject(projects, sources).duplicate(new DuplicateProjectMessage(original.getId().valueOf()));
+    const journal: ProjectAssetJournal = { begin: vi.fn(() => Promise.resolve()), complete: vi.fn(() => Promise.resolve()), findPending: vi.fn(() => Promise.resolve([])) };
+    const duplicate = await new DuplicateProject(projects, sources, journal, new Queue(QueueOptions.withConcurrency(1))).duplicate(new DuplicateProjectMessage(original.getId().valueOf()));
 
     expect(duplicate.isIdentifiedBy(original.getId())).toBe(false);
     expect(duplicate.getName().valueOf()).toBe('Test project (copy)');
