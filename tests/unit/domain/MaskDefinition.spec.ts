@@ -54,4 +54,16 @@ describe('MaskDefinition', () => {
     expect(() => MaskDefinition.fromPrimitives(primitives)).toThrow(/confidence must be between 0 and 1/);
     expect(() => maskSchema.parse(primitives)).toThrow();
   });
+
+  it('requires a bounded tolerance and at least one source point for color sampling', () => {
+    const primitives: MaskDefinitionPrimitives = {
+      id: crypto.randomUUID(), enabled: true, inverted: false, opacity: 1, feather: 0, density: 1,
+      localAdjustments: {}, shape: { kind: 'color-range', samples: [], tolerance: 0.2 }
+    };
+
+    expect(() => MaskDefinition.fromPrimitives(primitives)).toThrow(/at least one sample/);
+    expect(() => maskSchema.parse(primitives)).toThrow();
+    primitives.shape = { kind: 'color-range', samples: [{ x: 0.5, y: 0.5 }], tolerance: 1.1 };
+    expect(() => MaskDefinition.fromPrimitives(primitives)).toThrow(/color tolerance must be between 0 and 1/);
+  });
 });

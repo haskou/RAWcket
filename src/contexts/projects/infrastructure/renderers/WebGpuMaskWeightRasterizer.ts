@@ -113,6 +113,10 @@ fn sourceLuminance(point: vec2f) -> f32 {
   let coordinate = min(parameters.dimensions - vec2u(1u), vec2u(floor(clamp(point, vec2f(0.0), vec2f(1.0)) * vec2f(parameters.dimensions))));
   return luminance(unpack(source[coordinate.y * parameters.dimensions.x + coordinate.x]).rgb);
 }
+fn sourceColor(point: vec2f) -> vec3f {
+  let coordinate = min(parameters.dimensions - vec2u(1u), vec2u(floor(clamp(point, vec2f(0.0), vec2f(1.0)) * vec2f(parameters.dimensions))));
+  return unpack(source[coordinate.y * parameters.dimensions.x + coordinate.x]).rgb;
+}
 fn distanceToSegment(point: vec2f, start: vec2f, end: vec2f) -> f32 {
   let axis = end - start;
   let lengthSquared = dot(axis, axis);
@@ -120,7 +124,7 @@ fn distanceToSegment(point: vec2f, start: vec2f, end: vec2f) -> f32 {
   let position = clamp(dot(point - start, axis) / lengthSquared, 0.0, 1.0);
   return distance(point, start + position * axis);
 }
-fn primitiveWeight(kind: u32, header: vec4f, first: vec4f, second: vec4f, point: vec2f, light: f32) -> f32 {
+fn primitiveWeight(kind: u32, header: vec4f, first: vec4f, second: vec4f, point: vec2f, color: vec3f, light: f32) -> f32 {
   let offset = u32(header.y);
   let count = u32(header.z);
   if (kind == 1u) {
@@ -153,8 +157,8 @@ fn primitiveWeight(kind: u32, header: vec4f, first: vec4f, second: vec4f, point:
   }
   if (kind == 4u) { return select(0.0, 1.0, light >= first.x - first.z && light <= first.y + first.z); }
   if (kind == 5u) {
-    var nearest = 1.414214;
-    for (var item = 0u; item < count; item += 1u) { nearest = min(nearest, distance(point, data[offset + item].xy)); }
+    var nearest = 1.0;
+    for (var item = 0u; item < count; item += 1u) { nearest = min(nearest, distance(color, sourceColor(data[offset + item].xy)) / sqrt(3.0)); }
     let tolerance = max(0.001, first.x + first.y);
     return 1.0 - smoothstep(tolerance * 0.5, tolerance, nearest);
   }
@@ -194,7 +198,8 @@ fn rasterize(@builtin(global_invocation_id) invocation: vec3u) {
   let index = invocation.y * parameters.dimensions.x + invocation.x;
   let pixelCount = parameters.dimensions.x * parameters.dimensions.y;
   let point = (vec2f(invocation.xy) + vec2f(0.5)) / vec2f(parameters.dimensions);
-  let light = luminance(unpack(source[index]).rgb);
+  let color = unpack(source[index]).rgb;
+  let light = luminance(color);
   var weights: array<f32, 256>;
   for (var node = 0u; node < parameters.nodeCount; node += 1u) {
     let header = nodes[node * 3u];
@@ -202,7 +207,7 @@ fn rasterize(@builtin(global_invocation_id) invocation: vec3u) {
     let second = nodes[node * 3u + 2u];
     let kind = u32(header.x);
     if (kind <= 6u) {
-      weights[node] = primitiveWeight(kind, header, first, second, point, light);
+      weights[node] = primitiveWeight(kind, header, first, second, point, color, light);
     } else if (kind <= 9u) {
       let offset = u32(header.y);
       let count = u32(header.z);

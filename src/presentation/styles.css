@@ -171,6 +171,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .mask-overlay .smart-mask-points circle { stroke: #11150d; stroke-width: .004; vector-effect: non-scaling-stroke; }
 .mask-overlay .smart-mask-points circle.positive { fill: var(--accent); }
 .mask-overlay .smart-mask-points circle.negative { fill: #ff766c; }
+.mask-overlay .color-mask-samples circle { fill: rgba(16,19,17,.8); stroke: #fff; stroke-width: .004; }
+.mask-overlay .color-mask-samples path { fill: none; stroke: var(--accent); stroke-width: .004; vector-effect: non-scaling-stroke; }
 .smart-mask-box { fill: rgba(201,240,107,.08); stroke: var(--accent); stroke-width: .004; stroke-dasharray: .018 .012; vector-effect: non-scaling-stroke; }
 .truth-badge { position: absolute; left: 22px; bottom: 19px; display: flex; gap: 9px; align-items: center; padding: 9px 12px; border: 1px solid #393d3a; border-radius: 9px; background: rgba(16,18,17,.88); backdrop-filter: blur(10px); }
 .active-mask-canvas-status { position: absolute; z-index: 7; left: 22px; bottom: 78px; display: flex; align-items: center; gap: 9px; max-width: 330px; padding: 9px 11px; border: 1px solid #65764d; border-radius: 9px; background: rgba(15,20,13,.93); box-shadow: 0 8px 25px rgba(0,0,0,.28); backdrop-filter: blur(10px); pointer-events: none; }
@@ -391,6 +393,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .mask-number-control > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; color: #c7ccc8; font-size: .69rem; }
 .mask-number-control input[type='number'] { width: 68px; height: 27px; padding: 0 5px; border: 1px solid #343935; border-radius: 6px; background: #0d0f0e; color: var(--accent); text-align: right; font-size: .67rem; }
 .mask-number-control > input[type='range'] { width: 100%; accent-color: var(--accent); }
+.mask-sample-fields { display: grid; gap: 10px; margin: 0; padding: 10px; border: 1px solid #343a35; border-radius: 8px; }
+.mask-sample-fields legend { padding: 0 5px; color: #8e978f; font-size: .58rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .local-ai-note { padding: 10px; border: 1px solid #465636; border-radius: 8px; background: #12170f; color: #9eaa97; }
 .local-ai-note strong { display: block; color: var(--accent); }
 .ai-point-polarity { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }

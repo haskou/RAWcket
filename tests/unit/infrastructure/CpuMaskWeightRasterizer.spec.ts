@@ -47,4 +47,21 @@ describe('CpuMaskWeightRasterizer', () => {
 
     expect([...weights]).toEqual([1, 1, 0]);
   });
+
+  it('selects matching sampled colors across the frame instead of selecting by distance', () => {
+    const source = new Uint8ClampedArray([
+      250, 10, 10, 255,
+      8, 245, 12, 255,
+      245, 8, 8, 255
+    ]);
+    const weights = new CpuMaskWeightRasterizer().rasterize(source, 3, 1, [mask({
+      kind: 'color-range',
+      samples: [{ x: 0.1, y: 0.5 }],
+      tolerance: 0.12
+    })]);
+
+    expect(weights[0]).toBeGreaterThan(0.95);
+    expect(weights[1]).toBe(0);
+    expect(weights[2]).toBeGreaterThan(0.95);
+  });
 });

@@ -7,7 +7,7 @@ describe('WebGl2MaskWeightRasterizer', () => {
 
     const result = new WebGl2MaskWeightRasterizer().rasterize(
       {} as WebGL2RenderingContext,
-      {} as WebGLTexture,
+      {},
       1,
       1,
       masks

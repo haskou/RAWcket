@@ -4,8 +4,9 @@ type MaskSample = {
   x: number;
   y: number;
   luminance: number;
-  positiveLuminances?: number[];
-  negativeLuminances?: number[];
+  color?: readonly [number, number, number];
+  sourceColorAt?: (point: { x: number; y: number }) => readonly [number, number, number];
+  sourceLuminanceAt?: (point: { x: number; y: number }) => number;
 };
 
 export class CpuMaskEvaluator {
@@ -58,7 +59,10 @@ export class CpuMaskEvaluator {
       return sample.luminance >= shape.minimum - expansion && sample.luminance <= shape.maximum + expansion ? 1 : 0;
     }
     if (shape.kind === 'color-range') {
-      const nearest = Math.min(...shape.samples.map((point) => Math.hypot(sample.x - point.x, sample.y - point.y)));
+      if (sample.color === undefined || sample.sourceColorAt === undefined) return 0;
+      const color = sample.color;
+      const sourceColorAt = sample.sourceColorAt;
+      const nearest = Math.min(...shape.samples.map((point) => this.colorDistance(color, sourceColorAt(point))));
       const tolerance = Math.max(0.001, shape.tolerance + expansion);
       return 1 - this.smoothstep(tolerance * 0.5, tolerance, nearest);
     }
@@ -66,8 +70,8 @@ export class CpuMaskEvaluator {
       const insideBox = shape.boundingBoxes.some((box) => sample.x >= box.x - expansion && sample.x <= box.x + box.width + expansion && sample.y >= box.y - expansion && sample.y <= box.y + box.height + expansion);
       const positiveDistance = Math.min(...shape.positivePoints.map((point) => Math.hypot(sample.x - point.x, sample.y - point.y)), Number.POSITIVE_INFINITY);
       const negativeDistance = Math.min(...shape.negativePoints.map((point) => Math.hypot(sample.x - point.x, sample.y - point.y)), Number.POSITIVE_INFINITY);
-      const positiveLuminanceDistance = Math.min(...(sample.positiveLuminances ?? []).map((value) => Math.abs(sample.luminance - value)), Number.POSITIVE_INFINITY);
-      const negativeLuminanceDistance = Math.min(...(sample.negativeLuminances ?? []).map((value) => Math.abs(sample.luminance - value)), Number.POSITIVE_INFINITY);
+      const positiveLuminanceDistance = Math.min(...shape.positivePoints.map((point) => Math.abs(sample.luminance - (sample.sourceLuminanceAt?.(point) ?? Number.POSITIVE_INFINITY))), Number.POSITIVE_INFINITY);
+      const negativeLuminanceDistance = Math.min(...shape.negativePoints.map((point) => Math.abs(sample.luminance - (sample.sourceLuminanceAt?.(point) ?? Number.POSITIVE_INFINITY))), Number.POSITIVE_INFINITY);
       const matchesPositive = positiveLuminanceDistance < 0.16 + expansion && positiveDistance < 0.45 + expansion;
       const matchesNegative = negativeLuminanceDistance < 0.1 && negativeDistance < Math.max(0.01, 0.3 - expansion);
       return (insideBox || matchesPositive) && !matchesNegative ? 1 : 0;
@@ -104,6 +108,10 @@ export class CpuMaskEvaluator {
     if (start === end) return value < start ? 0 : 1;
     const normalized = this.clamp((value - start) / (end - start));
     return normalized * normalized * (3 - 2 * normalized);
+  }
+
+  private colorDistance(first: readonly [number, number, number], second: readonly [number, number, number]): number {
+    return Math.hypot(first[0] - second[0], first[1] - second[1], first[2] - second[2]) / Math.sqrt(3);
   }
 
   private clamp(value: number): number { return Math.min(1, Math.max(0, value)); }

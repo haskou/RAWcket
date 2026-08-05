@@ -153,6 +153,10 @@ float sourceLuminance(vec2 point) {
   ivec2 coordinate = min(ivec2(uDimensions) - ivec2(1), ivec2(floor(clamp(point, 0.0, 1.0) * uDimensions)));
   return luminance(texelFetch(uSource, coordinate, 0).rgb);
 }
+vec3 sourceColor(vec2 point) {
+  ivec2 coordinate = min(ivec2(uDimensions) - ivec2(1), ivec2(floor(clamp(point, 0.0, 1.0) * uDimensions)));
+  return texelFetch(uSource, coordinate, 0).rgb;
+}
 float distanceToSegment(vec2 point, vec2 start, vec2 end) {
   vec2 axis = end - start;
   float lengthSquared = dot(axis, axis);
@@ -160,7 +164,7 @@ float distanceToSegment(vec2 point, vec2 start, vec2 end) {
   float position = clamp(dot(point - start, axis) / lengthSquared, 0.0, 1.0);
   return distance(point, start + position * axis);
 }
-float primitiveWeight(int kind, vec4 header, vec4 first, vec4 second, vec2 point, float light) {
+float primitiveWeight(int kind, vec4 header, vec4 first, vec4 second, vec2 point, vec3 color, float light) {
   int offset = int(round(header.y));
   int count = int(round(header.z));
   if (kind == 1) {
@@ -193,8 +197,8 @@ float primitiveWeight(int kind, vec4 header, vec4 first, vec4 second, vec2 point
   }
   if (kind == 4) return light >= first.x - first.z && light <= first.y + first.z ? 1.0 : 0.0;
   if (kind == 5) {
-    float nearest = 1.414214;
-    for (int item = 0; item < count; item += 1) nearest = min(nearest, distance(point, dataAt(offset + item).xy));
+    float nearest = 1.0;
+    for (int item = 0; item < count; item += 1) nearest = min(nearest, distance(color, sourceColor(dataAt(offset + item).xy)) / sqrt(3.0));
     float tolerance = max(0.001, first.x + first.y);
     return 1.0 - smoothstep(tolerance * 0.5, tolerance, nearest);
   }
@@ -231,7 +235,8 @@ float primitiveWeight(int kind, vec4 header, vec4 first, vec4 second, vec2 point
 void main() {
   ivec2 pixel = ivec2(gl_FragCoord.xy - vec2(0.5));
   vec2 point = gl_FragCoord.xy / uDimensions;
-  float light = luminance(texelFetch(uSource, pixel, 0).rgb);
+  vec3 color = texelFetch(uSource, pixel, 0).rgb;
+  float light = luminance(color);
   float weights[256];
   for (int node = 0; node < 256; node += 1) {
     if (node >= uNodeCount) break;
@@ -240,7 +245,7 @@ void main() {
     vec4 second = nodeAt(node, 2);
     int kind = int(round(header.x));
     if (kind <= 6) {
-      weights[node] = primitiveWeight(kind, header, first, second, point, light);
+      weights[node] = primitiveWeight(kind, header, first, second, point, color, light);
     } else if (kind <= 9) {
       int offset = int(round(header.y));
       int count = int(round(header.z));

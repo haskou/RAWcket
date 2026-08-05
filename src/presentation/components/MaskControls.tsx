@@ -8,6 +8,7 @@ export function MaskControls({
   project,
   selectedId,
   brushActive,
+  colorPointActive,
   aiPointActive,
   aiPointPolarity,
   brushSize,
@@ -18,9 +19,11 @@ export function MaskControls({
   onAddRadial,
   onAddLinear,
   onAddLuminance,
+  onAddColor,
   onUpdate,
   onRemove,
   onBrushActiveChange,
+  onColorPointActiveChange,
   onAiPointActiveChange,
   onAiPointPolarityChange,
   onBrushSizeChange,
@@ -30,6 +33,7 @@ export function MaskControls({
   project: PhotoProject;
   selectedId: string | null;
   brushActive: boolean;
+  colorPointActive: boolean;
   aiPointActive: boolean;
   aiPointPolarity: 'positive' | 'negative';
   brushSize: number;
@@ -40,9 +44,11 @@ export function MaskControls({
   onAddRadial: () => void;
   onAddLinear: () => void;
   onAddLuminance: () => void;
+  onAddColor: () => void;
   onUpdate: (mask: MaskDefinitionPrimitives, groupId: string | null) => void;
   onRemove: (id: string) => void;
   onBrushActiveChange: (active: boolean) => void;
+  onColorPointActiveChange: (active: boolean) => void;
   onAiPointActiveChange: (active: boolean) => void;
   onAiPointPolarityChange: (polarity: 'positive' | 'negative') => void;
   onBrushSizeChange: (size: number) => void;
@@ -53,6 +59,7 @@ export function MaskControls({
   const masks = project.getMasks().map((mask) => mask.toPrimitives());
   const selected = masks.find((mask) => mask.id === selectedId) ?? null;
   const selectedAiBoundingBox = selected?.shape.kind === 'ai-segmentation' ? selected.shape.boundingBoxes[0] : undefined;
+  const selectedColorSamples = selected?.shape.kind === 'color-range' ? selected.shape.samples : [];
 
   const updateUnit = (field: UnitField, value: number, groupId: string | null): void => {
     if (selected === null || !Number.isFinite(value)) return;
@@ -104,6 +111,25 @@ export function MaskControls({
     onUpdate({ ...selected, shape }, groupId);
   };
 
+  const updateColorTolerance = (value: number, groupId: string | null): void => {
+    if (selected?.shape.kind !== 'color-range' || !Number.isFinite(value)) return;
+    onUpdate({ ...selected, shape: { ...selected.shape, tolerance: Math.min(1, Math.max(0, value)) } }, groupId);
+  };
+
+  const updateColorSample = (index: number, axis: 'x' | 'y', value: number, groupId: string | null): void => {
+    if (selected?.shape.kind !== 'color-range' || !Number.isFinite(value)) return;
+    const current = selected.shape.samples[index];
+    if (current === undefined) return;
+    const samples = [...selected.shape.samples];
+    samples[index] = { ...current, [axis]: Math.min(1, Math.max(0, value)) };
+    onUpdate({ ...selected, shape: { ...selected.shape, samples } }, groupId);
+  };
+
+  const removeColorSample = (index: number): void => {
+    if (selected?.shape.kind !== 'color-range' || selected.shape.samples.length <= 1) return;
+    onUpdate({ ...selected, shape: { ...selected.shape, samples: selected.shape.samples.filter((_, sampleIndex) => sampleIndex !== index) } }, null);
+  };
+
   const addAiBoundingBox = (): void => {
     if (selected?.shape.kind !== 'ai-segmentation') return;
     onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes: [{ x: 0.2, y: 0.2, width: 0.6, height: 0.6 }] } }, null);
@@ -143,12 +169,13 @@ export function MaskControls({
         <button type="button" aria-label="+ Radial mask" title="An editable ellipse for faces, objects, and vignettes" onClick={onAddRadial}><strong>+ Radial</strong><small>Ellipse or spotlight</small></button>
         <button type="button" aria-label="+ Linear gradient" title="A gradual transition between two editable points" onClick={onAddLinear}><strong>+ Linear</strong><small>Graduated transition</small></button>
         <button type="button" aria-label="+ Luminance range" title="Select pixels by rendered brightness, regardless of position" onClick={onAddLuminance}><strong>+ Luminance</strong><small>Select by brightness</small></button>
+        <button type="button" aria-label="+ Color range" title="Sample colors from the unchanged photograph, regardless of position" onClick={onAddColor}><strong>+ Color</strong><small>Match sampled colors</small></button>
       </div>
       {masks.length === 0 && <p className="mask-empty">Create a local mask, then paint or position it directly over the photograph.</p>}
       <div className="mask-list">
         {masks.map((mask, index) => (
           <button className={mask.id === selectedId ? 'active' : ''} type="button" key={mask.id} onClick={() => onSelect(mask.id)}>
-            <span>{mask.shape.kind === 'brush' ? 'Brush' : mask.shape.kind === 'radial' ? 'Radial' : mask.shape.kind === 'linear-gradient' ? 'Linear' : mask.shape.kind === 'luminance-range' ? 'Luminance' : mask.shape.kind === 'ai-segmentation' ? 'Smart' : 'Mask'} {index + 1}</span>
+            <span>{mask.shape.kind === 'brush' ? 'Brush' : mask.shape.kind === 'radial' ? 'Radial' : mask.shape.kind === 'linear-gradient' ? 'Linear' : mask.shape.kind === 'luminance-range' ? 'Luminance' : mask.shape.kind === 'color-range' ? 'Color' : mask.shape.kind === 'ai-segmentation' ? 'Smart' : 'Mask'} {index + 1}</span>
             <small>{mask.enabled ? `On · ${maskVisualizationStatus(mask.shape.kind)}` : 'Off'}</small>
           </button>
         ))}
@@ -196,6 +223,20 @@ export function MaskControls({
               <p className="mask-inline-help"><strong>Visualization limitation:</strong> luminance coverage is rendered into the photograph, but a per-pixel green overlay is not available yet. Adjust Local exposure temporarily to confirm the selected range.</p>
               <MaskNumberControl label="Minimum" value={selected.shape.minimum} minimum={0} maximum={1} step={0.01} groupKey="luminance-minimum" groups={groups.current} onChange={(value, groupId) => updateLuminance('minimum', value, groupId)} />
               <MaskNumberControl label="Maximum" value={selected.shape.maximum} minimum={0} maximum={1} step={0.01} groupKey="luminance-maximum" groups={groups.current} onChange={(value, groupId) => updateLuminance('maximum', value, groupId)} />
+            </>
+          )}
+          {selected.shape.kind === 'color-range' && (
+            <>
+              <div className="geometry-grid-heading">Source color samples</div>
+              <p className="mask-inline-help">Samples are read from the unchanged source, so later exposure or color edits cannot move the selection. Matching colors are selected anywhere in the photograph.</p>
+              <button className={`button ${colorPointActive ? 'ai-primary' : 'ghost'} full`} type="button" onClick={() => onColorPointActiveChange(!colorPointActive)}>{colorPointActive ? 'Sampling colors · press Escape to stop' : 'Add sample on photograph'}</button>
+              <MaskNumberControl label="Color tolerance" value={selected.shape.tolerance} minimum={0} maximum={1} step={0.005} groupKey="color-tolerance" groups={groups.current} onChange={updateColorTolerance} />
+              {selectedColorSamples.map((sample, index) => <fieldset className="mask-sample-fields" key={index}>
+                <legend>Sample {index + 1}</legend>
+                <MaskNumberControl label={`Sample ${index + 1} X`} value={sample.x} minimum={0} maximum={1} step={0.001} groupKey={`color-sample-${index}-x`} groups={groups.current} onChange={(value, groupId) => updateColorSample(index, 'x', value, groupId)} />
+                <MaskNumberControl label={`Sample ${index + 1} Y`} value={sample.y} minimum={0} maximum={1} step={0.001} groupKey={`color-sample-${index}-y`} groups={groups.current} onChange={(value, groupId) => updateColorSample(index, 'y', value, groupId)} />
+                <button className="button ghost full" type="button" disabled={selectedColorSamples.length <= 1} onClick={() => removeColorSample(index)}>Remove sample</button>
+              </fieldset>)}
             </>
           )}
           {selected.shape.kind === 'ai-segmentation' && (
@@ -257,7 +298,8 @@ function maskKindExplanation(kind: MaskDefinitionPrimitives['shape']['kind']): s
 }
 
 function maskVisualizationStatus(kind: MaskDefinitionPrimitives['shape']['kind']): string {
-  if (kind === 'luminance-range' || kind === 'color-range') return 'effect only';
+  if (kind === 'luminance-range') return 'effect only';
+  if (kind === 'color-range') return 'source samples';
   if (kind === 'ai-segmentation') return 'points + box';
   if (kind === 'composite') return 'combined';
   return 'overlay';

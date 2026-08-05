@@ -185,6 +185,7 @@ export function EditorPage(): ReactElement {
   const [maskOverlayVisible, setMaskOverlayVisible] = useState(true);
   const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
   const [brushActive, setBrushActive] = useState(false);
+  const [colorPointActive, setColorPointActive] = useState(false);
   const [aiPointActive, setAiPointActive] = useState(false);
   const [aiPointPolarity, setAiPointPolarity] = useState<AiPointPolarity>('positive');
   const [brushSize, setBrushSize] = useState(0.08);
@@ -481,7 +482,7 @@ export function EditorPage(): ReactElement {
       else if (event.key.toLowerCase() === 'r') setRecipeCollapsed((value) => !value);
       else if (event.key.toLowerCase() === 'i') setPhotoInformationOpen(true);
       else if (event.key.toLowerCase() === 'h') setHistoryOpen(true);
-      else if (event.key === 'Escape') { setBrushActive(false); setAiPointActive(false); }
+      else if (event.key === 'Escape') { setBrushActive(false); setColorPointActive(false); setAiPointActive(false); }
       else if (event.key === '?') setShortcutsOpen((value) => !value);
       else return;
       event.preventDefault();
@@ -715,6 +716,7 @@ export function EditorPage(): ReactElement {
     });
     setSelectedMaskId(id);
     setBrushActive(true);
+    setColorPointActive(false);
     setAiPointActive(false);
   };
 
@@ -736,6 +738,7 @@ export function EditorPage(): ReactElement {
     });
     setSelectedMaskId(id);
     setBrushActive(false);
+    setColorPointActive(false);
     setAiPointActive(false);
   };
 
@@ -757,6 +760,7 @@ export function EditorPage(): ReactElement {
     });
     setSelectedMaskId(id);
     setBrushActive(false);
+    setColorPointActive(false);
     setAiPointActive(false);
   };
 
@@ -778,6 +782,29 @@ export function EditorPage(): ReactElement {
     });
     setSelectedMaskId(id);
     setBrushActive(false);
+    setColorPointActive(false);
+    setAiPointActive(false);
+  };
+
+  const addColorMask = (): void => {
+    const id = crypto.randomUUID();
+    apply({
+      kind: EDIT_OPERATION.ADD_MASK,
+      groupId: null,
+      mask: {
+        id,
+        enabled: true,
+        inverted: false,
+        opacity: 1,
+        feather: 0.2,
+        density: 1,
+        localAdjustments: { exposure: 0.5 },
+        shape: { kind: 'color-range', samples: [{ x: 0.5, y: 0.5 }], tolerance: 0.12 }
+      }
+    });
+    setSelectedMaskId(id);
+    setBrushActive(false);
+    setColorPointActive(true);
     setAiPointActive(false);
   };
 
@@ -808,6 +835,7 @@ export function EditorPage(): ReactElement {
     });
     setSelectedMaskId(id);
     setBrushActive(false);
+    setColorPointActive(false);
     setAiPointActive(true);
   };
 
@@ -840,6 +868,7 @@ export function EditorPage(): ReactElement {
       apply({ kind: EDIT_OPERATION.ADD_MASK, mask: mask.toPrimitives(), groupId: null });
       setSelectedMaskId(maskId);
       setBrushActive(false);
+      setColorPointActive(false);
       setAiPointActive(false);
       setSemanticProgress(1);
       setSemanticMessage(`${semanticCategory[0]?.toUpperCase() ?? ''}${semanticCategory.slice(1)} mask created as editable recipe data.`);
@@ -857,6 +886,7 @@ export function EditorPage(): ReactElement {
   const selectMask = (id: string): void => {
     setSelectedMaskId(id);
     setBrushActive(false);
+    setColorPointActive(false);
     setAiPointActive(false);
   };
 
@@ -981,6 +1011,7 @@ export function EditorPage(): ReactElement {
     apply({ kind: EDIT_OPERATION.REMOVE_MASK, maskId: id, groupId: null });
     setSelectedMaskId(null);
     setBrushActive(false);
+    setColorPointActive(false);
     setAiPointActive(false);
   };
 
@@ -1028,6 +1059,16 @@ export function EditorPage(): ReactElement {
         ? { ...selected.shape, positivePoints: [...selected.shape.positivePoints, point] }
         : { ...selected.shape, negativePoints: [...selected.shape.negativePoints, point] }
     }, null);
+    return true;
+  };
+
+  const addColorPoint = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
+    if (!colorPointActive || selectedMaskId === null) return false;
+    const selected = project?.getMasks().find((mask) => mask.getId().valueOf() === selectedMaskId)?.toPrimitives();
+    const point = pointOnPreview(event);
+    if (selected?.shape.kind !== 'color-range' || point === null) return true;
+    if (selected.shape.samples.some((sample) => Math.hypot(sample.x - point.x, sample.y - point.y) < 0.002)) return true;
+    updateMask({ ...selected, shape: { ...selected.shape, samples: [...selected.shape.samples, point] } }, null);
     return true;
   };
 
@@ -1105,6 +1146,7 @@ export function EditorPage(): ReactElement {
   const startPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button !== 0) return;
     if (beginCrop(event)) return;
+    if (addColorPoint(event)) return;
     if (addAiPoint(event)) return;
     if (beginBrushStroke(event)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1265,7 +1307,7 @@ export function EditorPage(): ReactElement {
           </div>}
           <div
             ref={photoStage}
-            className={`photo-stage ${panning ? 'panning' : ''} ${brushActive || aiPointActive || (toolWorkspace === 'develop' && activePanel === 'crop') ? 'painting' : ''}`}
+            className={`photo-stage ${panning ? 'panning' : ''} ${brushActive || colorPointActive || aiPointActive || (toolWorkspace === 'develop' && activePanel === 'crop') ? 'painting' : ''}`}
             onPointerDown={startPan}
             onPointerMove={movePan}
             onPointerUp={endPan}
@@ -1276,7 +1318,7 @@ export function EditorPage(): ReactElement {
             {sourceUrl !== null && (
               <div ref={previewSurface} className="preview-surface" style={{ transform, width: fitDimensions?.width, height: fitDimensions?.height, maxWidth: fitDimensions === null ? undefined : 'none', maxHeight: fitDimensions === null ? undefined : 'none' }}>
                 <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => previewLoaded(event.currentTarget)} />
-                {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />}
+                {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || colorPointActive || aiPointActive) && <MaskOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />}
                 {fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame">
                   <ImageCompositionGuideOverlay guide={compositionGuide} />
                   {toolWorkspace === 'develop' && activePanel === 'crop' && <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} />}
@@ -1286,7 +1328,7 @@ export function EditorPage(): ReactElement {
             <WorkspaceCompositionGuideOverlay guide={compositionGuide} />
             {activePanel === 'masks' && <div className={`active-mask-canvas-status${selectedMask === null ? ' empty' : ''}`} role="status" aria-live="polite">
               <span className="mask-status-swatch" aria-hidden="true" />
-              {selectedMask === null ? <span><strong>No active mask</strong><small>Select or create a mask before painting or placing points.</small></span> : <span><strong>Editing {maskShapeLabel(selectedMask.shape.kind)} {selectedMaskIndex + 1}</strong><small>{selectedMask.enabled ? 'Enabled' : 'Disabled'} · {selectedMask.shape.kind === 'brush' ? `${brushMode === 'add' ? 'Paint' : 'Erase'} mode` : selectedMask.shape.kind === 'ai-segmentation' ? `${aiPointPolarity === 'positive' ? 'Include' : 'Exclude'} point mode` : 'Use the highlighted controls in the Masks panel'}</small></span>}
+              {selectedMask === null ? <span><strong>No active mask</strong><small>Select or create a mask before painting or placing points.</small></span> : <span><strong>Editing {maskShapeLabel(selectedMask.shape.kind)} {selectedMaskIndex + 1}</strong><small>{selectedMask.enabled ? 'Enabled' : 'Disabled'} · {selectedMask.shape.kind === 'brush' ? `${brushMode === 'add' ? 'Paint' : 'Erase'} mode` : selectedMask.shape.kind === 'color-range' ? `${colorPointActive ? 'Add source sample' : 'Sample editing'} mode` : selectedMask.shape.kind === 'ai-segmentation' ? `${aiPointPolarity === 'positive' ? 'Include' : 'Exclude'} point mode` : 'Use the highlighted controls in the Masks panel'}</small></span>}
             </div>}
             <div className={`truth-badge ${previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' ? 'source-fallback' : ''}`} title={previewAnalysis?.rawFallbackReason ?? undefined}><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{sourcePrecisionLabel} · {renderProgress}</small></span></div>
             {renderBusy && <div className="render-busy-indicator" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>Updating preview</strong><small>{renderProgress} · previous frame remains visible</small></span></div>}
@@ -1412,6 +1454,7 @@ export function EditorPage(): ReactElement {
               project={project}
               selectedId={selectedMaskId}
               brushActive={brushActive}
+              colorPointActive={colorPointActive}
               aiPointActive={aiPointActive}
               aiPointPolarity={aiPointPolarity}
               brushSize={brushSize}
@@ -1422,10 +1465,12 @@ export function EditorPage(): ReactElement {
               onAddRadial={addRadialMask}
               onAddLinear={addLinearMask}
               onAddLuminance={addLuminanceMask}
+              onAddColor={addColorMask}
               onUpdate={updateMask}
               onRemove={removeMask}
-              onBrushActiveChange={(active) => { setBrushActive(active); if (active) setAiPointActive(false); }}
-              onAiPointActiveChange={(active) => { setAiPointActive(active); if (active) setBrushActive(false); }}
+              onBrushActiveChange={(active) => { setBrushActive(active); if (active) { setColorPointActive(false); setAiPointActive(false); } }}
+              onColorPointActiveChange={(active) => { setColorPointActive(active); if (active) { setBrushActive(false); setAiPointActive(false); } }}
+              onAiPointActiveChange={(active) => { setAiPointActive(active); if (active) { setBrushActive(false); setColorPointActive(false); } }}
               onAiPointPolarityChange={setAiPointPolarity}
               onBrushSizeChange={setBrushSize}
               onBrushModeChange={setBrushMode}
@@ -1529,6 +1574,9 @@ function MaskOverlay({ masks, selectedMaskId }: { masks: MaskDefinitionPrimitive
         }
         if (mask.shape.kind === 'linear-gradient') {
           return <g className={className} key={mask.id}><defs><linearGradient id={`mask-gradient-${mask.id}`} x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y}><stop offset="0" stopOpacity="0" /><stop offset="1" stopOpacity="1" /></linearGradient></defs><rect width="1" height="1" fill={`url(#mask-gradient-${mask.id})`} /><line className="mask-gradient-axis" x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y} /></g>;
+        }
+        if (mask.shape.kind === 'color-range') {
+          return <g className={`${className} color-mask-samples`} key={mask.id}>{mask.shape.samples.map((point, index) => <g key={index} transform={`translate(${point.x} ${point.y})`}><circle r="0.016" /><path d="M-.024 0H.024 M0-.024V.024" /></g>)}</g>;
         }
         if (mask.shape.kind === 'ai-segmentation') {
           return <g className={`${className} smart-mask-points`} key={mask.id}>

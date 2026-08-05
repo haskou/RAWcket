@@ -232,6 +232,16 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.mouse.move(brushBounds.x + brushBounds.width * 0.48, brushBounds.y + brushBounds.height * 0.52, { steps: 3 });
   await page.mouse.up();
   await expect(page.locator('.mask-erase-stroke')).toHaveCount(1);
+  await page.getByRole('button', { name: '+ Color range' }).click();
+  await expect(page.getByText('Color range mask selected')).toBeVisible();
+  await expect(page.getByText(/Enabled · Add source sample mode/)).toBeVisible();
+  await page.getByLabel('Color tolerance numeric value').fill('0.15');
+  await page.getByLabel('Sample 1 X numeric value').fill('0.3');
+  await page.getByLabel('Sample 1 Y numeric value').fill('0.4');
+  await page.mouse.click(brushBounds.x + brushBounds.width * 0.75, brushBounds.y + brushBounds.height * 0.25);
+  await expect(page.locator('.color-mask-samples > g')).toHaveCount(2);
+  await expect(page.getByLabel('Sample 2 X numeric value')).toHaveValue('0.75');
+  await expect(page.getByLabel('Sample 2 Y numeric value')).toHaveValue('0.25');
   await page.getByRole('tab', { name: '✦ AI Companion' }).click();
   await page.getByRole('button', { name: 'Create and place points' }).click();
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
@@ -308,6 +318,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await page.getByRole('button', { name: /Brush \d+ On/ }).click();
   await expect(page.getByLabel('Expand / contract numeric value')).toHaveValue('0.05');
+  await page.getByRole('button', { name: /Color \d+ On/ }).click();
+  await expect(page.getByLabel('Color tolerance numeric value')).toHaveValue('0.15');
+  await expect(page.getByLabel('Sample 2 X numeric value')).toHaveValue('0.75');
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
   await page.locator('.curve-graph circle').nth(1).click();

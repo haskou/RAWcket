@@ -126,7 +126,11 @@ export class MaskDefinition {
     }
     if (shape.kind === 'linear-gradient') points.push(shape.start, shape.end);
     if (shape.kind === 'radial') points.push(shape.center);
-    if (shape.kind === 'color-range') points.push(...shape.samples);
+    if (shape.kind === 'color-range') {
+      points.push(...shape.samples);
+      if (shape.samples.length === 0) throw new Error('A color range needs at least one sample.');
+      MaskDefinition.ensureUnitInterval(shape.tolerance, 'color tolerance');
+    }
     if (shape.kind === 'ai-segmentation') {
       points.push(...shape.positivePoints, ...shape.negativePoints);
       boxes.push(...shape.boundingBoxes);

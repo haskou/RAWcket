@@ -78,7 +78,18 @@ export class CpuPixelDeveloper {
       blue: ToneCurveLut.create(settings.curves.blue),
       luminance: settings.curves.luminance === null ? null : ToneCurveLut.create(settings.curves.luminance)
     };
-    const maskSeeds = new Map(settings.masks.map((mask) => [mask.id, this.maskSeedLuminances(mask, sourceAt, width, height, sourceIsLinear)]));
+    const sourceSamples = new Map<string, Rgb>();
+    settings.masks.flatMap((mask) => this.maskSourcePoints(mask)).forEach((point) => {
+      const key = this.pointKey(point);
+      if (!sourceSamples.has(key)) sourceSamples.set(key, this.sourceAtPoint(sourceAt, width, height, point.x, point.y, sourceIsLinear));
+    });
+    const sourcePerceptualAt = (point: { x: number; y: number }): Rgb => sourceSamples.get(this.pointKey(point))
+      ?? this.sourceAtPoint(sourceAt, width, height, point.x, point.y, sourceIsLinear);
+    const sourceColorAt = (point: { x: number; y: number }): readonly [number, number, number] => {
+      const source = sourcePerceptualAt(point);
+      return [source.red, source.green, source.blue];
+    };
+    const sourceLuminanceAt = (point: { x: number; y: number }): number => this.luminance(sourcePerceptualAt(point));
     for (let pixel = 0; pixel < width * height; pixel += 1) {
       const index = pixel * 4;
       const sourcePixel = sourceAt(pixel);
@@ -87,13 +98,13 @@ export class CpuPixelDeveloper {
       const x = (pixel % width + 0.5) / width;
       const y = (Math.floor(pixel / width) + 0.5) / height;
       for (const mask of settings.masks) {
-        const seeds = maskSeeds.get(mask.id);
         const weight = this.masks.evaluate(mask, {
           x,
           y,
           luminance: this.luminance(perceptualSourcePixel),
-          positiveLuminances: seeds?.positive,
-          negativeLuminances: seeds?.negative
+          color: [perceptualSourcePixel.red, perceptualSourcePixel.green, perceptualSourcePixel.blue],
+          sourceColorAt,
+          sourceLuminanceAt
         });
         if (weight <= 0) continue;
         const local = { ...this.neutralAdjustments(), ...mask.localAdjustments };
@@ -140,25 +151,22 @@ export class CpuPixelDeveloper {
     };
   }
 
-  private maskSeedLuminances(
-    mask: MaskDefinitionPrimitives,
-    sourceAt: PixelReader,
-    width: number,
-    height: number,
-    sourceIsLinear: boolean
-  ): { positive: number[]; negative: number[] } {
-    if (mask.shape.kind !== 'ai-segmentation') return { positive: [], negative: [] };
-    return {
-      positive: mask.shape.positivePoints.map((point) => this.sourceLuminanceAt(sourceAt, width, height, point.x, point.y, sourceIsLinear)),
-      negative: mask.shape.negativePoints.map((point) => this.sourceLuminanceAt(sourceAt, width, height, point.x, point.y, sourceIsLinear))
-    };
-  }
-
-  private sourceLuminanceAt(sourceAt: PixelReader, width: number, height: number, x: number, y: number, sourceIsLinear: boolean): number {
+  private sourceAtPoint(sourceAt: PixelReader, width: number, height: number, x: number, y: number, sourceIsLinear: boolean): Rgb {
     const pixelX = Math.min(width - 1, Math.max(0, Math.floor(x * width)));
     const pixelY = Math.min(height - 1, Math.max(0, Math.floor(y * height)));
     const source = sourceAt(pixelY * width + pixelX);
-    return this.luminance(sourceIsLinear ? this.rawDisplayToneMapper.map(source) : source);
+    return sourceIsLinear ? this.rawDisplayToneMapper.map(source) : source;
+  }
+
+  private maskSourcePoints(mask: MaskDefinitionPrimitives): Array<{ x: number; y: number }> {
+    if (mask.shape.kind === 'color-range') return mask.shape.samples;
+    if (mask.shape.kind === 'ai-segmentation') return [...mask.shape.positivePoints, ...mask.shape.negativePoints];
+    if (mask.shape.kind === 'composite') return mask.shape.children.flatMap((child) => this.maskSourcePoints(child));
+    return [];
+  }
+
+  private pointKey(point: { x: number; y: number }): string {
+    return `${point.x}:${point.y}`;
   }
 
   private developPixel(rgb: Rgb, adjustment: GlobalAdjustmentsPrimitives, sourceIsLinear: boolean): Rgb {

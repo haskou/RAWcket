@@ -73,8 +73,8 @@ describe('CpuMaskEvaluator', () => {
       }
     });
 
-    expect(evaluator.evaluate(mask, { x: 0.6, y: 0.5, luminance: 0.52, positiveLuminances: [0.5] })).toBe(1);
-    expect(evaluator.evaluate(mask, { x: 0.6, y: 0.5, luminance: 0.9, positiveLuminances: [0.5] })).toBe(0);
+    expect(evaluator.evaluate(mask, { x: 0.6, y: 0.5, luminance: 0.52, sourceLuminanceAt: () => 0.5 })).toBe(1);
+    expect(evaluator.evaluate(mask, { x: 0.6, y: 0.5, luminance: 0.9, sourceLuminanceAt: () => 0.5 })).toBe(0);
   });
 
   it('renders editable linear gradients and luminance ranges', () => {
@@ -104,6 +104,15 @@ describe('CpuMaskEvaluator', () => {
     });
 
     expect(evaluator.evaluate(mask, { x: 0.2, y: 0.2, luminance: 0.9 })).toBe(1);
-    expect(evaluator.evaluate(mask, { x: 0.6, y: 0.5, luminance: 0.5, positiveLuminances: [0.5], negativeLuminances: [0.5] })).toBe(0);
+    expect(evaluator.evaluate(mask, { x: 0.6, y: 0.5, luminance: 0.5, sourceLuminanceAt: () => 0.5 })).toBe(0);
+  });
+
+  it('matches sampled source colors independently of pixel position', () => {
+    const evaluator = new CpuMaskEvaluator();
+    const mask = brushMask({ shape: { kind: 'color-range', samples: [{ x: 0.1, y: 0.1 }], tolerance: 0.12 } });
+    const sampledRed = (): readonly [number, number, number] => [1, 0, 0];
+
+    expect(evaluator.evaluate(mask, { x: 0.9, y: 0.9, luminance: 0.2, color: [0.98, 0.01, 0.01], sourceColorAt: sampledRed })).toBeGreaterThan(0.9);
+    expect(evaluator.evaluate(mask, { x: 0.1, y: 0.1, luminance: 0.7, color: [0, 1, 0], sourceColorAt: sampledRed })).toBe(0);
   });
 });

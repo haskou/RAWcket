@@ -89,6 +89,26 @@ describe('CpuPixelDeveloper', () => {
     expect([...developed]).toEqual([128, 128, 128, 255, 64, 64, 64, 255]);
   });
 
+  it('applies a color-range adjustment to matching colors anywhere in a high-depth source', () => {
+    const source = new Uint16Array([
+      42_000, 4_000, 4_000,
+      4_000, 42_000, 4_000,
+      41_000, 4_500, 4_500
+    ]);
+    const baseline = new CpuPixelDeveloper().developHighDepthLinear(source, 3, 1, settings());
+    const developed = new CpuPixelDeveloper().developHighDepthLinear(source, 3, 1, {
+      ...settings(),
+      masks: [{
+        id: crypto.randomUUID(), enabled: true, inverted: false, opacity: 1, feather: 0, density: 1,
+        localAdjustments: { exposure: 0.5 }, shape: { kind: 'color-range', samples: [{ x: 0.1, y: 0.5 }], tolerance: 0.12 }
+      }]
+    });
+
+    expect(developed[0]).toBeGreaterThan(baseline[0] ?? 0);
+    expect(developed[4]).toBe(baseline[4]);
+    expect(developed[8]).toBeGreaterThan(baseline[8] ?? 0);
+  });
+
   it('applies a non-destructive edge vignette while preserving the center', () => {
     const adjustments = { ...GlobalAdjustments.neutral().toPrimitives(), vignette: -100 };
     const source = new Uint8ClampedArray(5 * 5 * 4).fill(255);
