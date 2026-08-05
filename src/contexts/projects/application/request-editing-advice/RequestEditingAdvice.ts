@@ -25,9 +25,11 @@ export class RequestEditingAdvice {
         saturation: project.getGlobalAdjustment(AdjustmentKey.SATURATION).valueOf(),
         vibrance: project.getGlobalAdjustment(AdjustmentKey.VIBRANCE).valueOf(),
         clarity: project.getGlobalAdjustment(AdjustmentKey.CLARITY).valueOf(),
+        texture: project.getGlobalAdjustment(AdjustmentKey.TEXTURE).valueOf(),
         dehaze: project.getGlobalAdjustment(AdjustmentKey.DEHAZE).valueOf(),
         sharpness: project.getGlobalAdjustment(AdjustmentKey.SHARPNESS).valueOf(),
-        noiseReduction: project.getGlobalAdjustment(AdjustmentKey.NOISE_REDUCTION).valueOf()
+        noiseReduction: project.getGlobalAdjustment(AdjustmentKey.NOISE_REDUCTION).valueOf(),
+        vignette: project.getGlobalAdjustment(AdjustmentKey.VIGNETTE).valueOf()
       }
     });
   }

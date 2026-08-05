@@ -54,13 +54,15 @@ export class CpuPixelDeveloper {
         developed = this.mix(developed, locallyDeveloped, weight);
       }
       const curved = this.applyCurves(developed, luts);
-      working[index] = curved.red;
-      working[index + 1] = curved.green;
-      working[index + 2] = curved.blue;
+      const vignetted = this.applyVignette(curved, x, y, adjustments.vignette);
+      working[index] = vignetted.red;
+      working[index + 1] = vignetted.green;
+      working[index + 2] = vignetted.blue;
       working[index + 3] = (source[index + 3] ?? 255) / 255;
     }
     const denoised = this.boxBlend(working, width, height, adjustments.noiseReduction / 100);
-    const sharpened = this.sharpen(denoised, width, height, adjustments.sharpness / 100);
+    const textured = this.sharpen(denoised, width, height, adjustments.texture / 125);
+    const sharpened = this.sharpen(textured, width, height, adjustments.sharpness / 100);
     return this.toBytes(sharpened);
   }
 
@@ -83,9 +85,11 @@ export class CpuPixelDeveloper {
       saturation: 0,
       vibrance: 0,
       clarity: 0,
+      texture: 0,
       dehaze: 0,
       sharpness: 0,
-      noiseReduction: 0
+      noiseReduction: 0,
+      vignette: 0
     };
   }
 
@@ -171,6 +175,19 @@ export class CpuPixelDeveloper {
       result = { red: result.red * ratio, green: result.green * ratio, blue: result.blue * ratio };
     }
     return { red: this.clamp(result.red), green: this.clamp(result.green), blue: this.clamp(result.blue) };
+  }
+
+  private applyVignette(rgb: Rgb, x: number, y: number, amount: number): Rgb {
+    if (amount === 0) return rgb;
+    const distance = Math.hypot((x - 0.5) * 1.25, y - 0.5) * 1.6;
+    const edge = this.smoothstep(0.28, 0.92, distance);
+    const strength = amount < 0 ? 0.8 : 0.45;
+    const factor = 1 + amount / 100 * edge * strength;
+    return {
+      red: this.clamp(rgb.red * factor),
+      green: this.clamp(rgb.green * factor),
+      blue: this.clamp(rgb.blue * factor)
+    };
   }
 
   private boxBlend(source: Float32Array, width: number, height: number, amount: number): Float32Array {

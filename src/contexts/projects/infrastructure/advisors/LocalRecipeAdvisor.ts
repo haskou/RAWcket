@@ -23,13 +23,13 @@ export class LocalRecipeAdvisor implements EditingAdvisor {
     if (intent.includes('night') || intent.includes('cinematic') || intent.includes('film')) {
       return {
         explanation: 'A cinematic night treatment adds separation while keeping bright signs and lamps under control.',
-        deltas: { contrast: 14, highlights: -32, shadows: 9, temperature: -7, tint: 4, saturation: -5, dehaze: 9 }
+        deltas: { contrast: 14, highlights: -32, shadows: 9, temperature: -7, tint: 4, saturation: -5, dehaze: 9, vignette: -18 }
       };
     }
     if (intent.includes('portrait') || intent.includes('skin')) {
       return {
         explanation: 'A restrained portrait treatment protects highlights, opens facial shadows, and reduces hard local contrast.',
-        deltas: { exposure: 0.25, highlights: -22, shadows: 16, vibrance: 8, clarity: -6, temperature: 4 }
+        deltas: { exposure: 0.25, highlights: -22, shadows: 16, vibrance: 8, clarity: -6, texture: -4, temperature: 4 }
       };
     }
     if (intent.includes('highlight') || intent.includes('bright')) {
@@ -41,7 +41,7 @@ export class LocalRecipeAdvisor implements EditingAdvisor {
     if (intent.includes('landscape') || intent.includes('sky')) {
       return {
         explanation: 'A natural landscape treatment improves atmospheric separation and color without pushing global saturation.',
-        deltas: { highlights: -20, shadows: 14, vibrance: 16, clarity: 8, dehaze: 10, contrast: 7 }
+        deltas: { highlights: -20, shadows: 14, vibrance: 16, clarity: 8, texture: 10, dehaze: 10, contrast: 7 }
       };
     }
     return {

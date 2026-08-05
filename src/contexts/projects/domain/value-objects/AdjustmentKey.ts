@@ -12,9 +12,11 @@ const adjustmentKeys = [
   'saturation',
   'vibrance',
   'clarity',
+  'texture',
   'dehaze',
   'sharpness',
-  'noiseReduction'
+  'noiseReduction',
+  'vignette'
 ] as const;
 
 export type AdjustmentKeyPrimitive = (typeof adjustmentKeys)[number];
@@ -31,9 +33,11 @@ export class AdjustmentKey extends Enum<AdjustmentKeyPrimitive> {
   public static readonly SATURATION = new AdjustmentKey('saturation');
   public static readonly VIBRANCE = new AdjustmentKey('vibrance');
   public static readonly CLARITY = new AdjustmentKey('clarity');
+  public static readonly TEXTURE = new AdjustmentKey('texture');
   public static readonly DEHAZE = new AdjustmentKey('dehaze');
   public static readonly SHARPNESS = new AdjustmentKey('sharpness');
   public static readonly NOISE_REDUCTION = new AdjustmentKey('noiseReduction');
+  public static readonly VIGNETTE = new AdjustmentKey('vignette');
 
   private constructor(value: AdjustmentKeyPrimitive) {
     super(value);

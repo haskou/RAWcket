@@ -4,6 +4,7 @@ import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import { ProjectMigrator } from '@/contexts/projects/infrastructure/migrations/ProjectMigrator';
 import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionZeroToOneProjectMigration';
 import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
+import { VersionTwoToThreeProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTwoToThreeProjectMigration';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
@@ -14,7 +15,7 @@ describe('IndexedDbProjectRepository', () => {
     const connection = RawcketDatabase.open(databaseName);
     const repository = new IndexedDbProjectRepository(
       connection,
-      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration()])
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration()])
     );
     const project = PhotoProjectMother.create();
 
@@ -34,7 +35,7 @@ describe('IndexedDbProjectRepository', () => {
     const connection = RawcketDatabase.open(databaseName);
     const repository = new IndexedDbProjectRepository(
       connection,
-      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration()])
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration()])
     );
     const project = PhotoProjectMother.create();
 
@@ -61,7 +62,7 @@ describe('IndexedDbProjectRepository', () => {
     const connection = RawcketDatabase.open(databaseName);
     const repository = new IndexedDbProjectRepository(
       connection,
-      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration()])
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration()])
     );
     const project = PhotoProjectMother.create();
 

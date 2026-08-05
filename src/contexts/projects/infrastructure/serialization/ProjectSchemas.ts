@@ -5,7 +5,7 @@ const pointSchema = z.object({ x: z.number().min(0).max(1), y: z.number().min(0)
 const rectangleSchema = pointSchema.extend({ width: z.number().min(0).max(1), height: z.number().min(0).max(1) });
 const adjustmentKeySchema = z.enum([
   'exposure', 'temperature', 'tint', 'contrast', 'highlights', 'shadows', 'whites', 'blacks',
-  'saturation', 'vibrance', 'clarity', 'dehaze', 'sharpness', 'noiseReduction'
+  'saturation', 'vibrance', 'clarity', 'texture', 'dehaze', 'sharpness', 'noiseReduction', 'vignette'
 ]);
 const adjustmentSchema = z.record(adjustmentKeySchema, z.number());
 const localAdjustmentSchema = z.partialRecord(adjustmentKeySchema, z.number());

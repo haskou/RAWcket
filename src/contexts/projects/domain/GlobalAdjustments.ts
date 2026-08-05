@@ -21,9 +21,11 @@ export class GlobalAdjustments {
       saturation: 0,
       vibrance: 0,
       clarity: 0,
+      texture: 0,
       dehaze: 0,
       sharpness: 0,
-      noiseReduction: 0
+      noiseReduction: 0,
+      vignette: 0
     });
   }
 
@@ -60,9 +62,11 @@ export class GlobalAdjustments {
       saturation: this.get(AdjustmentKey.SATURATION).valueOf(),
       vibrance: this.get(AdjustmentKey.VIBRANCE).valueOf(),
       clarity: this.get(AdjustmentKey.CLARITY).valueOf(),
+      texture: this.get(AdjustmentKey.TEXTURE).valueOf(),
       dehaze: this.get(AdjustmentKey.DEHAZE).valueOf(),
       sharpness: this.get(AdjustmentKey.SHARPNESS).valueOf(),
-      noiseReduction: this.get(AdjustmentKey.NOISE_REDUCTION).valueOf()
+      noiseReduction: this.get(AdjustmentKey.NOISE_REDUCTION).valueOf(),
+      vignette: this.get(AdjustmentKey.VIGNETTE).valueOf()
     };
   }
 }

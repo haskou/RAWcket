@@ -22,7 +22,9 @@ export const adjustmentDefinitions: readonly AdjustmentDefinition[] = [
   { key: 'saturation', label: 'Saturation', section: 'color', minimum: -100, maximum: 100, step: 1 },
   { key: 'vibrance', label: 'Vibrance', section: 'color', minimum: -100, maximum: 100, step: 1 },
   { key: 'clarity', label: 'Clarity', section: 'detail', minimum: -100, maximum: 100, step: 1 },
+  { key: 'texture', label: 'Texture', section: 'detail', minimum: -100, maximum: 100, step: 1 },
   { key: 'dehaze', label: 'Dehaze', section: 'detail', minimum: -100, maximum: 100, step: 1 },
   { key: 'sharpness', label: 'Sharpness', section: 'detail', minimum: 0, maximum: 100, step: 1 },
-  { key: 'noiseReduction', label: 'Noise Reduction', section: 'detail', minimum: 0, maximum: 100, step: 1 }
+  { key: 'noiseReduction', label: 'Noise Reduction', section: 'detail', minimum: 0, maximum: 100, step: 1 },
+  { key: 'vignette', label: 'Vignette', section: 'detail', minimum: -100, maximum: 100, step: 1 }
 ];

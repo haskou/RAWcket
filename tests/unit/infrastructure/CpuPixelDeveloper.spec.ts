@@ -75,4 +75,30 @@ describe('CpuPixelDeveloper', () => {
 
     expect([...developed]).toEqual([128, 128, 128, 255, 64, 64, 64, 255]);
   });
+
+  it('applies a non-destructive edge vignette while preserving the center', () => {
+    const adjustments = { ...GlobalAdjustments.neutral().toPrimitives(), vignette: -100 };
+    const source = new Uint8ClampedArray(5 * 5 * 4).fill(255);
+    const developed = new CpuPixelDeveloper().develop(source, 5, 5, {
+      ...settings(),
+      adjustments
+    });
+    const corner = developed[0] ?? 0;
+    const center = developed[(2 * 5 + 2) * 4] ?? 0;
+
+    expect(corner).toBeLessThan(center);
+    expect(center).toBe(255);
+  });
+
+  it('applies texture as a bounded spatial detail treatment', () => {
+    const adjustments = { ...GlobalAdjustments.neutral().toPrimitives(), texture: 100 };
+    const source = new Uint8ClampedArray([
+      80, 80, 80, 255, 80, 80, 80, 255, 80, 80, 80, 255,
+      80, 80, 80, 255, 140, 140, 140, 255, 80, 80, 80, 255,
+      80, 80, 80, 255, 80, 80, 80, 255, 80, 80, 80, 255
+    ]);
+    const developed = new CpuPixelDeveloper().develop(source, 3, 3, { ...settings(), adjustments });
+
+    expect(developed[16]).toBeGreaterThan(140);
+  });
 });

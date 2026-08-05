@@ -20,6 +20,7 @@ import { BrowserSourceImageInspector } from '@/contexts/projects/infrastructure/
 import { ProjectMigrator } from '@/contexts/projects/infrastructure/migrations/ProjectMigrator';
 import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionZeroToOneProjectMigration';
 import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
+import { VersionTwoToThreeProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTwoToThreeProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
@@ -57,7 +58,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const database = RawcketDatabase.open(databaseName);
   const migrator = new ProjectMigrator([
     new VersionZeroToOneProjectMigration(),
-    new VersionOneToTwoProjectMigration()
+    new VersionOneToTwoProjectMigration(),
+    new VersionTwoToThreeProjectMigration()
   ]);
   const projects = new IndexedDbProjectRepository(database, migrator);
   const sourceFiles = new BrowserSourceFileRepository(database);
