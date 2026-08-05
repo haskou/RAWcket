@@ -148,6 +148,18 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
 ]);
 
 const historyEntrySchema = z.object({ operation: editOperationSchema, inverse: editOperationSchema });
+const aiDevelopmentAdviceSchema = z.object({
+  id: z.uuid(),
+  request: z.string().max(2_000),
+  suggestedIntent: z.string().min(1).max(500),
+  critique: z.string().min(1).max(1_200),
+  strengths: z.array(z.string().min(1).max(240)).max(8),
+  opportunities: z.array(z.string().min(1).max(240)).max(8),
+  explanation: z.string().min(1).max(1_200),
+  operations: z.array(editOperationSchema).min(1).max(64),
+  createdAt: z.number().finite(),
+  status: z.enum(['proposed', 'applied', 'rejected'])
+});
 
 export const photoProjectSchema = z.object({
   schemaVersion: z.int().nonnegative(),
@@ -186,6 +198,7 @@ export const photoProjectSchema = z.object({
     tags: z.array(z.string().min(1).max(32)).max(20),
     favorite: z.boolean()
   }),
+  aiDevelopment: z.object({ advice: z.array(aiDevelopmentAdviceSchema).max(50) }),
   recipe: z.object({
     globalAdjustments: adjustmentSchema,
     curves: curveSetSchema,

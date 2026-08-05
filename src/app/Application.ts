@@ -15,6 +15,7 @@ import { CopyDevelopmentSettings } from '@/contexts/projects/application/copy-de
 import { CreateProject } from '@/contexts/projects/application/create-project/CreateProject';
 import { CreateSemanticMask } from '@/contexts/projects/application/create-semantic-mask/CreateSemanticMask';
 import { DeleteProject } from '@/contexts/projects/application/delete-project/DeleteProject';
+import { DecideAiDevelopmentAdvice } from '@/contexts/projects/application/decide-ai-development-advice/DecideAiDevelopmentAdvice';
 import { DuplicateProject } from '@/contexts/projects/application/duplicate-project/DuplicateProject';
 import { EstimateHorizon } from '@/contexts/projects/application/estimate-horizon/EstimateHorizon';
 import { ExportProjectPhoto } from '@/contexts/projects/application/export-project-photo/ExportProjectPhoto';
@@ -31,6 +32,7 @@ import { RequestPhotoOpinion } from '@/contexts/projects/application/request-pho
 import { ReviewDevelopment } from '@/contexts/projects/application/review-development/ReviewDevelopment';
 import { ReviewImportCandidates } from '@/contexts/projects/application/review-import-candidates/ReviewImportCandidates';
 import { ReconcileProjectAssets } from '@/contexts/projects/application/reconcile-project-assets/ReconcileProjectAssets';
+import { RecordAiDevelopmentAdvice } from '@/contexts/projects/application/record-ai-development-advice/RecordAiDevelopmentAdvice';
 import { PasteDevelopmentSettings } from '@/contexts/projects/application/paste-development-settings/PasteDevelopmentSettings';
 import type { ProjectExporter } from '@/contexts/projects/application/ports/ProjectExporter';
 import type { ProjectImporter } from '@/contexts/projects/application/ports/ProjectImporter';
@@ -48,6 +50,7 @@ import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastru
 import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFiveToSixProjectMigration';
 import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSixToSevenProjectMigration';
 import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSevenToEightProjectMigration';
+import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { IndexedDbProjectAssetJournal } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectAssetJournal';
@@ -85,6 +88,7 @@ export type Application = {
   saveProject: SaveProject;
   suggestPhotoTags: SuggestPhotoTags;
   deleteProject: DeleteProject;
+  decideAiDevelopmentAdvice: DecideAiDevelopmentAdvice;
   duplicateProject: DuplicateProject;
   estimateHorizon: EstimateHorizon;
   sourceFiles: SourceFileRepository;
@@ -97,6 +101,7 @@ export type Application = {
   persistentStorage: PersistentStorageRequest;
   renderProjectPreview: RenderProjectPreview;
   requestEditingAdvice: RequestEditingAdvice;
+  recordAiDevelopmentAdvice: RecordAiDevelopmentAdvice;
   requestPhotoOpinion: RequestPhotoOpinion;
   reviewDevelopment: ReviewDevelopment;
   reviewImportCandidates: ReviewImportCandidates;
@@ -116,7 +121,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
     new VersionFourToFiveProjectMigration(),
     new VersionFiveToSixProjectMigration(),
     new VersionSixToSevenProjectMigration(),
-    new VersionSevenToEightProjectMigration()
+    new VersionSevenToEightProjectMigration(),
+    new VersionEightToNineProjectMigration()
   ]);
   const projects = new IndexedDbProjectRepository(database, migrator);
   const sourceFiles = new BrowserSourceFileRepository(database);
@@ -155,6 +161,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     saveProject: new SaveProject(projects),
     suggestPhotoTags: new SuggestPhotoTags(semanticSegmentationModel),
     deleteProject: new DeleteProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
+    decideAiDevelopmentAdvice: new DecideAiDevelopmentAdvice(),
     duplicateProject: new DuplicateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     estimateHorizon: new EstimateHorizon(new BrowserHorizonEstimator()),
     sourceFiles,
@@ -167,6 +174,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi, new OpenAiEditProposalMapper())),
+    recordAiDevelopmentAdvice: new RecordAiDevelopmentAdvice(),
     requestPhotoOpinion: new RequestPhotoOpinion(new OpenAiPhotoOpinionAdvisor(openAi)),
     reviewDevelopment: new ReviewDevelopment(new LocalDevelopmentTutor()),
     reviewImportCandidates: new ReviewImportCandidates(sourceImageInspector, new OpenAiImportCandidateReviewer(openAi)),

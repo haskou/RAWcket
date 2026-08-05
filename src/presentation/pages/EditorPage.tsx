@@ -17,12 +17,14 @@ import { ChangeHistoryMessage } from '@/contexts/projects/application/change-his
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { CopyDevelopmentSettingsMessage } from '@/contexts/projects/application/copy-development-settings/messages/CopyDevelopmentSettingsMessage';
 import { CreateSemanticMaskMessage } from '@/contexts/projects/application/create-semantic-mask/messages/CreateSemanticMaskMessage';
+import { DecideAiDevelopmentAdviceMessage } from '@/contexts/projects/application/decide-ai-development-advice/messages/DecideAiDevelopmentAdviceMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { ExportProjectPhotoMessage } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
 import { ExportProjectSidecarMessage } from '@/contexts/projects/application/export-project-sidecar/messages/ExportProjectSidecarMessage';
 import { EstimateHorizonMessage } from '@/contexts/projects/application/estimate-horizon/messages/EstimateHorizonMessage';
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
+import { RecordAiDevelopmentAdviceMessage } from '@/contexts/projects/application/record-ai-development-advice/messages/RecordAiDevelopmentAdviceMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
 import { ReviewDevelopmentMessage } from '@/contexts/projects/application/review-development/messages/ReviewDevelopmentMessage';
 import { PasteDevelopmentSettingsMessage } from '@/contexts/projects/application/paste-development-settings/messages/PasteDevelopmentSettingsMessage';
@@ -31,6 +33,7 @@ import type { DevelopmentGuidanceItem } from '@/contexts/projects/application/po
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import type { SemanticModelStatus } from '@/contexts/projects/application/ports/SemanticSegmentationModel';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
+import type { AiDevelopmentAdvicePrimitives } from '@/contexts/projects/domain/AiDevelopmentJournal';
 import { GlobalAdjustments } from '@/contexts/projects/domain/GlobalAdjustments';
 import { DevelopmentRecipe, type DevelopmentSettingsPrimitives } from '@/contexts/projects/domain/DevelopmentRecipe';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
@@ -124,6 +127,17 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
     || (target instanceof HTMLElement && target.isContentEditable);
 }
 
+function editProposalFromAdvice(advice: AiDevelopmentAdvicePrimitives): EditProposal {
+  return {
+    suggestedIntent: advice.suggestedIntent,
+    critique: advice.critique,
+    strengths: [...advice.strengths],
+    opportunities: [...advice.opportunities],
+    explanation: advice.explanation,
+    operations: structuredClone(advice.operations)
+  };
+}
+
 export function EditorPage(): ReactElement {
   const { projectId = '' } = useParams();
   const application = useApplication();
@@ -177,6 +191,7 @@ export function EditorPage(): ReactElement {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiMessage, setAiMessage] = useState('Connect OpenAI API to request a visual opinion or an editable proposal. Cloud AI actions send only a reduced preview.');
   const [aiProposal, setAiProposal] = useState<EditProposal | null>(null);
+  const [aiProposalId, setAiProposalId] = useState<string | null>(null);
   const [aiSelection, setAiSelection] = useState<Set<number>>(new Set());
   const [aiGenerating, setAiGenerating] = useState(false);
   const [pendingAiAction, setPendingAiAction] = useState<PendingAiAction>(null);
@@ -219,6 +234,16 @@ export function EditorPage(): ReactElement {
           return;
         }
         setProject(loaded);
+        const savedAdvice = loaded.getAiDevelopmentJournal().advice;
+        const latestAdvice = savedAdvice.at(-1);
+        if (latestAdvice !== undefined) setAiPrompt(latestAdvice.suggestedIntent);
+        const pendingAdvice = [...savedAdvice].reverse().find((entry) => entry.status === 'proposed');
+        if (pendingAdvice !== undefined) {
+          setAiProposal(editProposalFromAdvice(pendingAdvice));
+          setAiProposalId(pendingAdvice.id);
+          setAiSelection(new Set(pendingAdvice.operations.map((_, index) => index)));
+          setAiMessage('Restored an unapplied AI Companion proposal from this project.');
+        }
         const original = await application.sourceFiles.find(loaded.getId());
         if (original !== null && loaded.getSource().getSupportedMimeType() === 'image/x-sony-arw') {
           const inspection = await application.inspectSourceImage.inspect(new InspectSourceImageMessage(original, loaded.getSource().getFileName().valueOf()));
@@ -743,6 +768,7 @@ export function EditorPage(): ReactElement {
     setAiGenerating(true);
     setAiMessage('Reviewing subject, story, light, crop, curves, geometry, and local masks in one request…');
     try {
+      const request = aiPrompt;
       const proposal = await application.requestEditingAdvice.propose(
         project,
         new RequestEditingAdviceMessage(
@@ -753,9 +779,26 @@ export function EditorPage(): ReactElement {
           previewAnalysis?.highlightClipping ?? 0
         )
       );
+      if (aiProposalId !== null) {
+        application.decideAiDevelopmentAdvice.decide(project, new DecideAiDevelopmentAdviceMessage(projectId, aiProposalId, 'rejected'));
+      }
+      const adviceId = crypto.randomUUID();
+      application.recordAiDevelopmentAdvice.record(project, new RecordAiDevelopmentAdviceMessage(
+        projectId,
+        adviceId,
+        request,
+        proposal.suggestedIntent,
+        proposal.critique,
+        proposal.strengths,
+        proposal.opportunities,
+        proposal.explanation,
+        proposal.operations
+      ));
       setAiPrompt(proposal.suggestedIntent);
       setAiProposal(proposal);
+      setAiProposalId(adviceId);
       setAiSelection(new Set(proposal.operations.map((_, index) => index)));
+      setRevision((current) => current + 1);
       setAiMessage('Opinion and editable proposal ready. Review every operation before applying it.');
     } catch (error: unknown) {
       setAiMessage(error instanceof Error ? error.message : 'The proposal could not be generated.');
@@ -804,9 +847,25 @@ export function EditorPage(): ReactElement {
       }
       apply(operation);
     });
+    if (project !== null && aiProposalId !== null) {
+      application.decideAiDevelopmentAdvice.decide(project, new DecideAiDevelopmentAdviceMessage(projectId, aiProposalId, 'applied'));
+      setRevision((current) => current + 1);
+    }
     setAiProposal(null);
+    setAiProposalId(null);
     setAiSelection(new Set());
     setAiMessage('The selected operations were applied through the same reversible history as manual edits.');
+  };
+
+  const rejectAiProposal = (): void => {
+    if (project !== null && aiProposalId !== null) {
+      application.decideAiDevelopmentAdvice.decide(project, new DecideAiDevelopmentAdviceMessage(projectId, aiProposalId, 'rejected'));
+      setRevision((current) => current + 1);
+    }
+    setAiProposal(null);
+    setAiProposalId(null);
+    setAiSelection(new Set());
+    setAiMessage('Proposal rejected. The project was not changed. The Companion review remains in project history.');
   };
 
   const toggleAiOperation = (index: number): void => {
@@ -1014,6 +1073,7 @@ export function EditorPage(): ReactElement {
   if (project === null) return <main className="centered-state"><div className="loader" /><p>Opening local project…</p></main>;
 
   const mode = project.getInterfaceMode().valueOf();
+  const aiDevelopmentHistory = [...project.getAiDevelopmentJournal().advice].reverse();
   const statusLabel = autosave.status === 'saved' ? 'Saved locally' : autosave.status === 'saving' ? 'Saving…' : 'Save failed';
   const transform = `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
   const sourcePrecisionLabel = previewAnalysis?.sourcePrecision === 'raw-linear-16-bit'
@@ -1138,11 +1198,28 @@ export function EditorPage(): ReactElement {
                   ))}
                 </div>
                 <div className="ai-proposal-actions">
-                  <button className="button ghost" type="button" onClick={() => { setAiProposal(null); setAiSelection(new Set()); setAiMessage('Proposal rejected. The project was not changed.'); }}>Reject</button>
+                  <button className="button ghost" type="button" onClick={rejectAiProposal}>Reject</button>
                   <button className="button ai-primary" type="button" disabled={aiSelection.size === 0} onClick={applyAiProposal}>Apply selected</button>
                 </div>
               </div>
             )}
+            {aiDevelopmentHistory.length > 0 && <details className="ai-development-history">
+              <summary>Saved Companion history · {aiDevelopmentHistory.length}</summary>
+              <div className="ai-development-history-list">
+                {aiDevelopmentHistory.map((entry) => <article key={entry.id}>
+                  <div><strong>{entry.suggestedIntent}</strong><span className={`ai-advice-status ${entry.status}`}>{entry.status}</span></div>
+                  <small>{entry.request.length === 0 ? 'Open visual opinion' : `Asked · ${entry.request}`}</small>
+                  <p>{entry.critique}</p>
+                  <footer><span>{entry.operations.length} editable operation{entry.operations.length === 1 ? '' : 's'} · saved in project and bundle</span>{entry.status === 'proposed' && entry.id !== aiProposalId && <button className="text-button" type="button" onClick={() => {
+                    setAiPrompt(entry.suggestedIntent);
+                    setAiProposal(editProposalFromAdvice(entry));
+                    setAiProposalId(entry.id);
+                    setAiSelection(new Set(entry.operations.map((_, index) => index)));
+                    setAiMessage('Restored the selected Companion proposal from project history.');
+                  }}>Resume</button>}</footer>
+                </article>)}
+              </div>
+            </details>}
             <SemanticMaskControls
               descriptor={semanticDescriptor}
               status={semanticStatus}

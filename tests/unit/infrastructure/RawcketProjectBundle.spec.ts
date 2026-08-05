@@ -10,9 +10,13 @@ import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastru
 import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFiveToSixProjectMigration';
 import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSixToSevenProjectMigration';
 import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSevenToEightProjectMigration';
+import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
 import { InMemoryProjectRepository } from '@/contexts/projects/infrastructure/repositories/InMemoryProjectRepository';
 import { InMemorySourceFileRepository } from '@/contexts/projects/infrastructure/repositories/InMemorySourceFileRepository';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
+import { RecordAiDevelopmentAdvice } from '@/contexts/projects/application/record-ai-development-advice/RecordAiDevelopmentAdvice';
+import { RecordAiDevelopmentAdviceMessage } from '@/contexts/projects/application/record-ai-development-advice/messages/RecordAiDevelopmentAdviceMessage';
+import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 
 describe('RawcketProjectBundle', () => {
   const journal = (): ProjectAssetJournal => ({ begin: vi.fn(() => Promise.resolve()), complete: vi.fn(() => Promise.resolve()), findPending: vi.fn(() => Promise.resolve([])) });
@@ -30,12 +34,24 @@ describe('RawcketProjectBundle', () => {
         new VersionFourToFiveProjectMigration(),
         new VersionFiveToSixProjectMigration(),
         new VersionSixToSevenProjectMigration(),
-        new VersionSevenToEightProjectMigration()
+        new VersionSevenToEightProjectMigration(),
+        new VersionEightToNineProjectMigration()
       ]),
       journal(),
       new Queue(QueueOptions.withConcurrency(1))
     );
     const project = PhotoProjectMother.create();
+    new RecordAiDevelopmentAdvice().record(project, new RecordAiDevelopmentAdviceMessage(
+      project.getId().valueOf(),
+      crypto.randomUUID(),
+      'Make the light feel more focused.',
+      'Focus the existing light around the subject.',
+      'The subject already carries the image.',
+      ['Strong subject'],
+      ['Control highlights'],
+      'Reduce the brightest values without flattening the frame.',
+      [{ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'highlights', value: -18, groupId: null }]
+    ));
     await projects.save(project);
     await sources.save(project.getId(), new Blob(['jpg'], { type: 'image/jpeg' }));
 
@@ -43,7 +59,12 @@ describe('RawcketProjectBundle', () => {
     const importedId = await bundle.importProject(exported);
 
     expect(importedId.isNotEqual(project.getId())).toBe(true);
-    expect(await projects.findById(importedId)).not.toBeNull();
+    const imported = await projects.findById(importedId);
+    expect(imported?.getAiDevelopmentJournal().advice[0]).toMatchObject({
+      request: 'Make the light feel more focused.',
+      suggestedIntent: 'Focus the existing light around the subject.',
+      status: 'proposed'
+    });
     expect(await sources.find(importedId)).not.toBeNull();
   });
 

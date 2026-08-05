@@ -30,6 +30,8 @@ Schema version 7 adds bounded horizontal and vertical perspective values to `Vie
 
 Schema version 8 makes ordered brush paint/erase semantics, per-point pressure, and mask expansion explicit recipe data. Its migration recursively updates brush and composite masks in the active recipe plus add/update/replace operations in both history stacks; old mouse strokes become additive full-pressure strokes.
 
+Schema version 9 adds the bounded `AiDevelopmentJournal` to the aggregate. Each entry retains photographer-authored request text, the normalized Companion brief, its ordinary edit operations, timestamp, and proposed/applied/rejected decision. The journal is project data and therefore survives IndexedDB snapshots, duplication, and checksummed bundles; reduced previews, credentials, provider response envelopes, and transient cost/error data are excluded.
+
 Schema version 5 adds immutable `CaptureMetadata`. The bounded TIFF reader extracts only validated, size-limited EXIF fields from Sony ARW containers; the aggregate persists those facts separately from editable project state. Missing fields remain explicitly null and the UI distinguishes embedded-preview development from future high-depth RAW demosaicing.
 
 `JsonProjectSidecarCodec` is an infrastructure boundary for recipe-only `.rawcket.json` files. Application messages validate project identity and file size; importing delegates to the aggregate’s `replace-recipe` operation so the entire change is validated, serializable, and undoable without copying source bytes or project identity.
@@ -52,6 +54,7 @@ Project/source mutations cross IndexedDB and OPFS, so `projectAssetJournal` reco
 - OPFS is used only behind `SourceFileRepository`; IndexedDB is the fallback.
 - `PreviewRenderer` isolates worker and image-pipeline concerns from React and the domain.
 - `EditingAdvisor` returns one bounded critique/intent/proposal result whose proposal contains only `EditOperation` values; it never receives authority to mutate an aggregate. Infrastructure maps provider-authored point/box smart-mask suggestions into versioned domain mask definitions before the application result crosses into presentation.
+- `RecordAiDevelopmentAdvice` and `DecideAiDevelopmentAdvice` are explicit application entrypoints. They validate identifiers and bounded narrative Value Objects before the aggregate records or decides an AI journal entry and emits its normal changed event.
 - `SemanticSegmentationModel` owns the optional model lifecycle and returns only normalized suggestions. `CreateSemanticMask` converts region suggestions into domain-owned, versioned `MaskDefinition` values; `SuggestPhotoTags` validates category suggestions as `ProjectTags` before the import flow records the normal reversible tag operation.
 - `HorizonEstimator` reads only a bounded local preview and returns correction/confidence evidence. `EstimateHorizon` validates that result before presentation can convert it into the existing reversible viewport operation.
 - Portable development settings exclude source identity, geometry, masks, and disposable caches; paste and presets use one reversible aggregate operation.

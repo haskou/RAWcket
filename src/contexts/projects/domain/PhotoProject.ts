@@ -1,4 +1,10 @@
 import { StringValueObject, Timestamp } from '@haskou/value-objects';
+import {
+  AiDevelopmentJournal,
+  type AiDevelopmentAdvice,
+  type AiDevelopmentAdviceStatus,
+  type AiDevelopmentJournalPrimitives
+} from './AiDevelopmentJournal';
 import { CaptureMetadata, type CaptureMetadataPrimitives } from './CaptureMetadata';
 import { CurveChannel, ToneCurve } from './ToneCurve';
 import { DevelopmentRecipe, type DevelopmentRecipePrimitives, type DevelopmentSettingsPrimitives } from './DevelopmentRecipe';
@@ -14,6 +20,7 @@ import { PhotoProjectSummary } from './PhotoProjectSummary';
 import { SourceImageReference, type SourceImageMimeType } from './SourceImageReference';
 import { ViewportTransform } from './ViewportTransform';
 import { AdjustmentKey } from './value-objects/AdjustmentKey';
+import type { AiDevelopmentAdviceId } from './value-objects/AiDevelopmentAdviceId';
 import { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
 import { MaskId } from './value-objects/MaskId';
 import { ProjectId } from './value-objects/ProjectId';
@@ -29,6 +36,7 @@ export type PhotoProjectPrimitives = {
   metadata: { createdAt: number; updatedAt: number; width: number; height: number };
   captureMetadata: CaptureMetadataPrimitives;
   organization: { rating: number; tags: string[]; favorite: boolean };
+  aiDevelopment: AiDevelopmentJournalPrimitives;
   recipe: DevelopmentRecipePrimitives;
   history: EditHistoryPrimitives;
   uiState: { mode: InterfaceModePrimitive };
@@ -47,7 +55,8 @@ export class PhotoProject {
     private readonly recipe: DevelopmentRecipe,
     private readonly history: EditHistory,
     private readonly uiState: ProjectUiState,
-    private readonly organization: ProjectOrganization
+    private readonly organization: ProjectOrganization,
+    private readonly aiDevelopment: AiDevelopmentJournal
   ) {}
 
   public static create(
@@ -68,7 +77,8 @@ export class PhotoProject {
       DevelopmentRecipe.neutral(),
       new EditHistory(historyLimit),
       new ProjectUiState(InterfaceMode.SIMPLE),
-      new ProjectOrganization(ProjectRating.UNRATED, ProjectTags.fromPrimitives([]), false)
+      new ProjectOrganization(ProjectRating.UNRATED, ProjectTags.fromPrimitives([]), false),
+      AiDevelopmentJournal.empty()
     );
     project.recordEvent('PhotoProjectWasCreated', metadata.getCreatedAt());
     return project;
@@ -99,7 +109,8 @@ export class PhotoProject {
         new ProjectRating(input.organization.rating),
         ProjectTags.fromPrimitives(input.organization.tags),
         input.organization.favorite
-      )
+      ),
+      AiDevelopmentJournal.fromPrimitives(input.aiDevelopment)
     );
   }
 
@@ -118,7 +129,8 @@ export class PhotoProject {
         new ProjectRating(this.organization.getRating()),
         ProjectTags.fromPrimitives(this.organization.getTags().toPrimitives()),
         this.organization.isFavorite()
-      )
+      ),
+      AiDevelopmentJournal.fromPrimitives(this.aiDevelopment.toPrimitives())
     );
     duplicate.recordEvent('PhotoProjectWasCreated', metadata.getCreatedAt());
     return duplicate;
@@ -148,6 +160,16 @@ export class PhotoProject {
 
   public chooseInterfaceMode(mode: InterfaceMode): void {
     this.uiState.chooseMode(mode);
+  }
+
+  public recordAiDevelopmentAdvice(advice: AiDevelopmentAdvice, at: Timestamp): void {
+    this.aiDevelopment.record(advice);
+    this.markChanged(at);
+  }
+
+  public decideAiDevelopmentAdvice(id: AiDevelopmentAdviceId, status: AiDevelopmentAdviceStatus, at: Timestamp): void {
+    this.aiDevelopment.decide(id, status);
+    this.markChanged(at);
   }
 
   public getId(): ProjectId {
@@ -249,6 +271,10 @@ export class PhotoProject {
     return this.history.getTimeline();
   }
 
+  public getAiDevelopmentJournal(): AiDevelopmentJournalPrimitives {
+    return this.aiDevelopment.toPrimitives();
+  }
+
   public pullDomainEvents(): ProjectDomainEvent[] {
     const events = [...this.events];
     this.events = [];
@@ -278,6 +304,7 @@ export class PhotoProject {
         tags: this.organization.getTags().toPrimitives(),
         favorite: this.organization.isFavorite()
       },
+      aiDevelopment: this.aiDevelopment.toPrimitives(),
       recipe: this.recipe.toPrimitives(),
       history: this.history.toPrimitives(),
       uiState: { mode: this.uiState.getMode().valueOf() }

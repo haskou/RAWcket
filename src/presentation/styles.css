@@ -181,6 +181,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-opinion-summary > strong { color: var(--accent); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
 .ai-opinion-summary p { margin: 6px 0; }
 .ai-opinion-summary div { display: grid; gap: 3px; color: #aeb7ad; font-size: .62rem; }
+.ai-development-history { margin: 10px 0 14px; border: 1px solid #303832; border-radius: 9px; background: #111412; }
+.ai-development-history > summary { padding: 10px 12px; color: #c5cdc5; font-size: .66rem; cursor: pointer; }
+.ai-development-history-list { display: grid; gap: 6px; max-height: 300px; padding: 0 8px 8px; overflow: auto; }
+.ai-development-history article { padding: 9px; border: 1px solid #292f2a; border-radius: 7px; background: #171a18; }
+.ai-development-history article > div, .ai-development-history footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ai-development-history article strong { color: #d3dbd2; font-size: .64rem; }
+.ai-development-history article small, .ai-development-history footer { color: #768078; font-size: .55rem; }
+.ai-development-history article p { margin: 6px 0; color: #aab2aa; font-size: .59rem; line-height: 1.45; }
+.ai-advice-status { padding: 2px 5px; border-radius: 999px; color: #aab2aa; background: #292e2a; font-size: .5rem; text-transform: uppercase; }
+.ai-advice-status.proposed { color: var(--accent); background: var(--accent-dark); }
+.ai-advice-status.applied { color: #93c8ff; background: #132333; }
+.ai-advice-status.rejected { color: #a49b9b; }
+.ai-development-history .text-button { padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; cursor: pointer; }
 .pan-hint { position: absolute; right: 20px; bottom: 20px; padding: 7px 10px; border-radius: 7px; background: rgba(12,13,13,.75); color: #848a85; font-size: .62rem; pointer-events: none; }
 .comparison-badge { position: absolute; top: 20px; left: 20px; padding: 7px 10px; border: 1px solid #70766f; border-radius: 7px; background: rgba(11,12,12,.82); color: #f1f2ed; font-size: .68rem; font-weight: 700; letter-spacing: .04em; pointer-events: none; }
 .recipe-panel { min-width: 0; overflow-y: auto; border-right: 1px solid var(--line); background: #111312; }

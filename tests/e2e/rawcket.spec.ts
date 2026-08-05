@@ -263,6 +263,11 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
   await page.getByRole('button', { name: 'Open night' }).click();
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
+  await expect(page.getByText('Saved Companion history · 1')).toBeVisible();
+  await page.getByText('Saved Companion history · 1').click();
+  const savedCompanionAdvice = page.getByRole('article');
+  await expect(savedCompanionAdvice.getByText('Shape a cinematic night portrait while keeping skin believable.')).toBeVisible();
+  await expect(savedCompanionAdvice.getByText('applied', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
   await expect(page.getByLabel('Vertical perspective numeric value')).toHaveValue('18');

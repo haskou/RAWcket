@@ -8,6 +8,7 @@ import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastru
 import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFiveToSixProjectMigration';
 import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSixToSevenProjectMigration';
 import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSevenToEightProjectMigration';
+import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
 import { photoProjectSchema } from '@/contexts/projects/infrastructure/serialization/ProjectSchemas';
 
 describe('ProjectMigrator', () => {
@@ -19,7 +20,8 @@ describe('ProjectMigrator', () => {
     new VersionFourToFiveProjectMigration(),
     new VersionFiveToSixProjectMigration(),
     new VersionSixToSevenProjectMigration(),
-    new VersionSevenToEightProjectMigration()
+    new VersionSevenToEightProjectMigration(),
+    new VersionEightToNineProjectMigration()
   ]);
 
   it('migrates a demo project from schema 0 to the current schema', () => {
@@ -27,7 +29,7 @@ describe('ProjectMigrator', () => {
     const legacy = { ...current, schemaVersion: 0 };
     delete (legacy as Partial<typeof legacy>).uiState;
     const migrated = photoProjectSchema.parse(migrator.migrate(legacy));
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(9);
     expect(migrated.uiState.mode).toBe('simple');
     expect(migrated.recipe.disabledGlobalAdjustments).toEqual([]);
     expect(migrated.recipe.globalAdjustments.texture).toBe(0);
@@ -35,6 +37,7 @@ describe('ProjectMigrator', () => {
     expect(migrated.organization).toEqual({ rating: 0, tags: [], favorite: false });
     expect(migrated.recipe.viewport).toMatchObject({ horizontalPerspective: 0, verticalPerspective: 0 });
     expect(Object.values(migrated.captureMetadata)).toEqual(Array(14).fill(null));
+    expect(migrated.aiDevelopment).toEqual({ advice: [] });
   });
 
   it('rejects future versions', () => {
@@ -81,5 +84,14 @@ describe('ProjectMigrator', () => {
     const brush = migrated.recipe.masks[0];
     expect(brush).toMatchObject({ expansion: 0, shape: { kind: 'brush', strokes: [{ mode: 'add', points: [{ pressure: 1 }] }] } });
     expect(migrated.history.undo[0]?.operation).toMatchObject({ kind: 'add-mask', mask: { expansion: 0 } });
+  });
+
+  it('adds an empty AI development journal to schema 8 projects', () => {
+    const legacy = { ...PhotoProjectMother.create().toPrimitives(), schemaVersion: 8 };
+    delete (legacy as Partial<typeof legacy>).aiDevelopment;
+
+    const migrated = photoProjectSchema.parse(new VersionEightToNineProjectMigration().migrate(legacy));
+
+    expect(migrated).toMatchObject({ schemaVersion: 9, aiDevelopment: { advice: [] } });
   });
 });
