@@ -2,134 +2,137 @@
 
 # RAWcket
 
-RAWcket es la base de un editor fotografico RAW no destructivo, local-first y ejecutado completamente en el navegador. Busca ofrecer una entrada sencilla y una profundidad progresiva sin copiar la interfaz ni la identidad de otros editores.
+RAWcket is the foundation of a non-destructive, local-first RAW photo editor that runs entirely in the browser. It combines a simple entry point with progressively disclosed professional depth and an AI-first workflow in which every proposal remains inspectable and reversible.
 
-El original nunca se modifica: cada cambio se registra como una operacion serializable dentro de una receta. JPEG/PNG ya tienen una preview CPU de referencia en Web Worker para exposicion y contraste; el resto de herramientas y el motor RAW continuan marcados honestamente como pendientes.
+The original is never modified. Every human, preset, or AI change becomes a serializable operation in a versioned recipe.
 
-## Estado actual
+## Current status
 
-Implementado:
+Implemented:
 
-- Aplicacion React + Vite + TypeScript strict, responsive y accesible.
-- Biblioteca local con importacion JPEG/PNG, demo generada en Canvas, reapertura, renombrado, duplicado y borrado confirmado.
-- Editor con modo Simple/Advanced, zoom y preview Web Worker que aplica exposicion/contraste a pixeles reales con progreso y cancelacion.
-- Modelo no destructivo: ajustes globales, curvas, transformacion de viewport y siete familias de mascaras.
-- Operaciones comunes para humano e IA, validacion, serializacion, agrupacion de cambios, historial limitado, undo y redo.
-- IndexedDB para proyecto/indice/configuracion y OPFS para originales con fallback IndexedDB.
-- Autoguardado con debounce y guardado ante `visibilitychange`, `pagehide` y cierre explicito.
-- Bundles `.rawcket` ZIP con `manifest.json`, `project.json`, original e integridad SHA-256.
-- Migraciones versionadas con una migracion demostrativa `0 -> 1`.
-- IA desactivada por defecto y vault opcional AES-GCM/PBKDF2 con contrasena maestra no almacenada.
-- PWA opcional y app shell cacheada para uso offline despues de la primera carga.
-- Unit, integracion y E2E; CI para lint, typecheck, tests, build y Chromium.
+- Strict TypeScript React/Vite application with responsive, accessible foundations.
+- Local library with JPEG/PNG import, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, and portable project bundles.
+- Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
+- Navigable Active Recipe sidebar with a reversible enable switch for every global parameter.
+- Reference CPU renderer in a cancellable Web Worker for all current global adjustments, independent RGB/luminance curves, progress, timeout, and bounded concurrency.
+- Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families.
+- One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
+- IndexedDB project/index/settings persistence and OPFS originals with an IndexedDB fallback.
+- Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
+- `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
+- Versioned schema migrations through version 2.
+- AI disabled by default, with an optional AES-GCM/PBKDF2 key vault whose master password is never stored.
+- Optional PWA installation and an offline app shell after the first successful load.
+- Unit, integration, and Chromium E2E coverage; CI for lint, typecheck, tests, build, and E2E.
 
-No implementado:
+Not implemented yet:
 
-- Decodificacion RAW/ARW, demosaicing o pipeline lineal de alta profundidad.
-- Revelado GPU/WebGL2 y herramientas visuales distintas de exposicion/contraste; histograma, curvas interactivas y mascaras renderizadas.
-- Segmentacion IA, asesor de revelado conectado o llamadas a proveedores.
-- Exportacion fotografica final JPEG/PNG/TIFF. “Exportar” genera un bundle de proyecto portable.
+- RAW/ARW decoding, demosaicing, or a high-depth linear pipeline.
+- WebGPU/WebGL2 rendering, interactive curve graph, geometry rasterization, histograms, and rendered masks.
+- Local AI segmentation, a connected editing advisor, or provider calls.
+- Final photographic JPEG/PNG/TIFF export. The current Export action creates a portable project bundle.
 
-El plan exhaustivo esta en [TODO.md](TODO.md).
+The detailed, actively maintained plan is in [TODO.md](TODO.md).
 
-## Ejecutar
+## Run locally
 
-Requisitos: Node.js 22+ y pnpm 10+.
+Requirements: Node.js 22+ and pnpm 10+.
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Tras instalar dependencias, `pnpm dev` es el unico comando necesario para arrancar RAWcket. Vite muestra la URL local.
+After dependencies are installed, `pnpm dev` is the only command required to start RAWcket. Vite prints the local URL.
 
-## Calidad y build
+## Quality and production build
 
 ```bash
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm exec playwright install chromium   # solo la primera vez
+pnpm exec playwright install chromium   # first run only
 pnpm test:e2e
 ```
 
-`pnpm preview` sirve el build de produccion localmente.
+`pnpm preview` serves the production build locally.
 
-## Arquitectura
+## Architecture
 
-RAWcket aplica DDD practico y arquitectura hexagonal en un unico contexto inicial, `projects`:
+RAWcket applies practical DDD and hexagonal architecture in its initial `projects` bounded context:
 
-- `domain`: agregado `PhotoProject`, Value Objects, receta, operaciones, historial y contratos de repositorio. No importa React, IndexedDB, WebGPU, OpenAI ni APIs del navegador.
-- `application`: casos de uso con mensajes explicitos y puertos para render, import/export y asesor IA.
-- `infrastructure`: IndexedDB, OPFS, Zod, migraciones, bundles ZIP, hashing y cifrado.
-- `presentation`: rutas, componentes, hooks de sesion/autoguardado y CSS.
-- `app`: composition root declarativo que conecta contratos e implementaciones.
+- `domain`: `PhotoProject` aggregate, Value Objects, recipe, operations, history, and repository contracts. It does not import React, IndexedDB, WebGPU, OpenAI, or browser APIs.
+- `application`: use cases with explicit application messages and ports for rendering, import/export, and optional AI advice.
+- `infrastructure`: IndexedDB, OPFS, Zod, migrations, ZIP bundles, hashing, encryption, and worker rendering.
+- `presentation`: routes, React components, session/autosave hooks, and CSS.
+- `app`: declarative composition root connecting contracts to implementations.
 
-Detalles: [docs/architecture.md](docs/architecture.md) y [ADRs](docs/adr/).
+See [docs/architecture.md](docs/architecture.md) and the [ADRs](docs/adr/).
 
-## Almacenamiento local
+## Local storage
 
-Los proyectos, indices y preferencias viven en IndexedDB. Los originales JPEG/PNG se guardan en OPFS cuando esta disponible; en otros navegadores se usa un object store de IndexedDB. RAWcket solicita almacenamiento persistente, pero sigue funcionando si el navegador lo rechaza.
+Projects, indexes, and preferences live in IndexedDB. JPEG/PNG originals use OPFS when available and an IndexedDB object store otherwise. RAWcket requests persistent storage but remains functional when the browser rejects it.
 
-El navegador puede purgar datos por cuota, politica o accion del usuario. **El almacenamiento local no sustituye una copia de seguridad.** Exporta bundles `.rawcket` regularmente.
+A browser may purge data because of quota, policy, or user action. **Local storage is not a replacement for a backup.** Export `.rawcket` bundles regularly.
 
-## Formato `.rawcket`
+## `.rawcket` format
 
-Un `.rawcket` es un ZIP que contiene:
+A `.rawcket` file is a ZIP containing:
 
 ```text
-manifest.json    formato, versiones, tamanos y SHA-256
-project.json     receta, metadata, historial y estado de UI versionados
-original.jpg     o original.png
+manifest.json    format, versions, sizes, and SHA-256 values
+project.json     versioned recipe, metadata, history, and UI state
+original.jpg     or original.png
 ```
 
-La importacion valida el manifest, la version, todos los hashes y el esquema Zod antes de hidratar el dominio. Si ya existe el id, se genera uno nuevo para evitar sobreescrituras.
+Import validates the manifest, format version, every hash, and the Zod schema before hydrating the domain model. If an ID already exists, RAWcket generates a new one to prevent overwriting.
 
-## Privacidad y seguridad
+## Privacy and security
 
-- No existe backend, cuenta, autenticacion, analytics ni SaaS obligatorio.
-- Ninguna imagen o metadata sale del dispositivo.
-- La IA esta desactivada y el adaptador por defecto falla de forma explicita.
-- Una API key puede vivir solo en memoria de sesion o cifrarse con AES-GCM; la clave de descifrado se deriva de una contrasena maestra que no se guarda.
-- Las keys no forman parte del proyecto, bundles, logs ni errores.
+- There is no backend, account, authentication, analytics, or mandatory SaaS.
+- No image or metadata leaves the device without an explicit future consent flow.
+- AI is disabled by default and its disabled adapter fails explicitly.
+- An API key can remain in session memory or be encrypted with AES-GCM; its decryption key is derived from a master password that is never stored.
+- Keys never become part of projects, bundles, logs, or errors.
 
-Guardar secretos en un navegador compartido sigue teniendo riesgos. El modelo de amenaza y endurecimiento futuro se detalla en `TODO.md`.
+Storing secrets in a shared browser still carries risk. The threat model and planned hardening are documented in [TODO.md](TODO.md).
 
-## Estructura principal
+## Main structure
 
 ```text
 src/
   app/                         composition root
   contexts/projects/
-    domain/                    modelo no destructivo y repositorios
-    application/               casos de uso, mensajes y puertos
-    infrastructure/            IndexedDB, OPFS, bundles, Zod, migraciones
-  presentation/                React, rutas, componentes, hooks y estilos
-  shared/infrastructure/       base de datos, settings, cifrado, storage
+    domain/                    non-destructive model and repositories
+    application/               use cases, messages, and ports
+    infrastructure/            persistence, bundles, schemas, workers
+  presentation/                React routes, components, hooks, and styles
+  shared/infrastructure/       database, settings, encryption, storage
 tests/
-  unit/                        dominio e infraestructura
-  integration/                 pantalla de biblioteca
-  e2e/                         flujo persistente en Chromium
-docs/adr/                      decisiones arquitectonicas
+  unit/                        domain, application, and infrastructure
+  integration/                 library workflow
+  e2e/                         persistent Chromium workflow
+docs/adr/                      architecture decisions
 ```
 
-## Limitaciones conocidas
+## Known limitations
 
-- Solo se importan JPEG y PNG; la preview CPU aplica exposicion y contraste, pero el resto de la receta aun no transforma pixeles.
-- OPFS, persistencia solicitada y PWA dependen de capacidades del navegador y degradan de forma segura.
-- `pagehide` no garantiza completar escrituras asincronas si el proceso termina abruptamente; el debounce reduce la ventana de perdida.
-- El vault protege datos en reposo, no frente a XSS ejecutandose en el mismo origen.
-- La experiencia prioriza escritorio, aunque biblioteca y editor no se rompen en tablet o movil.
+- Only JPEG and PNG can currently be imported.
+- The reference CPU algorithms prioritize deterministic architecture and testability over production photographic quality.
+- OPFS, persistent-storage requests, workers, and PWA behavior depend on browser capabilities and degrade safely.
+- `pagehide` cannot guarantee completion of asynchronous writes when a process terminates abruptly; debouncing reduces the loss window.
+- The vault protects data at rest, not against XSS executing in the same origin.
+- The experience prioritizes desktop while retaining a functional tablet/mobile layout.
 
-## Contribuir
+## Contributing
 
-1. Crea una rama; no trabajes directamente en `main`.
-2. Mantén comportamiento de dominio fuera de React e infraestructura.
-3. Añade mensajes explicitos a nuevos entrypoints de aplicacion y pruebas directas para clases no triviales.
-4. Ejecuta lint, typecheck, tests, build y el E2E relevante.
-5. Usa commits convencionales con gitmoji, por ejemplo `feat(editor): ✨ Add curve interaction`.
+1. Create a branch; never work directly on `main`.
+2. Keep domain behavior out of React and infrastructure.
+3. Add explicit application messages to new entry points and direct tests for non-trivial classes.
+4. Run lint, typecheck, tests, build, and relevant E2E checks.
+5. Use conventional commits with gitmoji, for example `feat(editor): ✨ Add curve interaction`.
 
-## Licencia
+## License
 
-MIT. Consulta [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

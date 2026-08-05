@@ -1,269 +1,216 @@
-# Roadmap de producto de RAWcket
+# RAWcket product roadmap
 
-Este documento solo contiene funcionalidades de producto pendientes. La configuracion, arquitectura base, CI, persistencia inicial, bundles, cifrado, documentacion y pruebas de esta iteracion ya estan resueltas.
+This document tracks product capabilities that are still incomplete. Tooling, the architectural foundation, CI, initial persistence, portable bundles, encryption, and the first automated test suite are already in place.
 
-## Progreso del objetivo completo
+## Current progress
 
-- [x] Contrato versionado de preview con tamaño validado.
-- [x] Web Worker cancelable con progreso, timeout y concurrencia limitada.
-- [x] Pipeline CPU de referencia para exposicion y contraste JPEG/PNG.
-- [ ] LibRaw/WASM y Sony A6600 ARW.
-- [ ] Pipeline WebGPU/WebGL2 y resto de bloques detallados a continuacion.
+- [x] Versioned preview contract with validated resolution.
+- [x] Cancellable Web Worker with progress, timeout, and bounded concurrency.
+- [x] Reference CPU pipeline for every current global adjustment and RGB/luminance tone curves.
+- [x] Sliders, exact numeric entry, reset, grouped history, and per-adjustment enable/disable state.
+- [x] Navigable Active Recipe sidebar, preview pan/zoom, and keyboard shortcuts.
+- [x] English UI and user-facing errors.
+- [ ] LibRaw/WASM and Sony A6600 ARW support.
+- [ ] WebGPU/WebGL2 pipeline and the remaining capabilities below.
 
-## Orden recomendado inmediato
+## Recommended implementation order
 
-1. Prototipo LibRaw/WASM en worker con Sony A6600 ARW y extraccion de preview.
-2. Contrato versionado de `PreviewRenderer` con progreso, cancelacion y niveles de resolucion.
-3. Pipeline sRGB CPU/WASM de referencia y suite de imagenes doradas.
-4. Renderer WebGPU para exposicion/contraste y fallback WebGL2.
-5. Editor de curvas RGB interactivo con LUT y actualizacion de preview.
+1. Finish the interactive tone-curve editor and geometry tools on the reference renderer.
+2. Prototype LibRaw/WASM in a worker with a redistributable Sony A6600 ARW fixture.
+3. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
+4. Add WebGPU and WebGL2 renderers behind the existing preview boundary.
+5. Build manual masks before local AI segmentation and optional cloud assistance.
 
 ---
 
-## 1. Motor RAW y formatos de entrada
+## 1. RAW engine and input formats
 
-**Objetivo.** Convertir un original de camara en una imagen lineal de alta profundidad, reproducible y preparada para el pipeline, empezando por Sony ARW de la A6600.
+**Goal.** Convert camera originals into a reproducible, high-depth linear image prepared for the development pipeline, starting with Sony A6600 ARW.
 
-**Alcance.** Evaluar wrappers existentes de LibRaw frente a build propio; compilar LibRaw a WebAssembly; abrir ARW A6600; extraer preview embebida y EXIF; leer balance de blancos de camara, black/white levels y patron Bayer; implementar demosaicing y salida lineal de alta profundidad. Preparar JPEG/PNG/TIFF adicionales y una arquitectura de codecs extensible para otros RAW. Ejecutar en Web Worker con progreso y cancelacion, limites explicitos y gestion cuidadosa de memoria WASM.
+**Scope.** Evaluate existing LibRaw wrappers against a first-party build; compile LibRaw to WebAssembly; open A6600 ARW files; extract embedded previews and EXIF; read camera white balance, black/white levels, and Bayer pattern; implement reference demosaicing and high-depth linear output. Keep the codec boundary extensible for other RAW formats and additional JPEG/PNG/TIFF inputs. Run decoding in a worker with progress, cancellation, explicit limits, and careful WASM memory management.
 
-**Dependencias.** Contrato ampliado de `PreviewRenderer`; toolchain Emscripten; fixtures RAW redistribuibles; worker protocol; politica de memoria/cache; investigacion de licencias de LibRaw y wrappers.
+**Dependencies.** The existing `PreviewRenderer` boundary; Emscripten; redistributable RAW fixtures; worker protocol; memory/cache policy; LibRaw and wrapper license review.
 
-**Criterios de aceptacion.** Un ARW A6600 conocido abre sin bloquear el main thread; metadata y niveles coinciden con herramientas de referencia; la preview aparece antes del revelado completo; cancelar libera memoria; archivos corruptos producen errores legibles; tests dorados detectan regresiones; JPEG/PNG actuales siguen funcionando.
+**Acceptance.** A known A6600 ARW opens without blocking the main thread; metadata and levels match trusted reference tools; an embedded preview appears before full development; cancellation releases memory; corrupt files produce actionable errors; golden tests detect regressions; JPEG/PNG keep working.
 
-**Riesgos tecnicos.** Peso y tiempo de carga de WASM; picos de RAM; diferencias de color entre camaras; licencias/configuracion de codecs; Safari; ficheros maliciosos o truncados; copias WASM-JS costosas.
+**Risks.** WASM download and startup cost; RAM peaks; camera color differences; codec licensing; Safari constraints; malicious or truncated files; expensive WASM/JS copies.
 
-**Fases sugeridas.** (1) benchmark wrapper/build y preview embebida; (2) metadata A6600; (3) mosaico lineal + demosaic de referencia; (4) worker cancelable; (5) optimizacion memoria; (6) registro de codecs adicionales.
+## 2. GPU pipeline, color, and previews
 
-## 2. Pipeline GPU, color y previews
+**Goal.** Apply the recipe interactively without sacrificing quality or blocking the interface.
 
-**Objetivo.** Aplicar la receta de manera interactiva sin sacrificar calidad ni bloquear la interfaz.
+**Scope.** Use WebGPU first, WebGL2 as the graphics fallback, and CPU/WASM where appropriate. Produce 512 px thumbnails, 2048–3072 px interactive previews, and full resolution only for final export. Add 1024/4096-entry curve LUTs, initial sRGB color management, future Display P3 support, clipping warnings, RGB/luminance histograms, optional scopes, before/after comparison, intelligent caches, and incremental rendering.
 
-**Alcance.** WebGPU principal; fallback WebGL2; fallback CPU/WASM cuando sea razonable. Generar thumbnail de 512 px, preview interactiva de 2048–3072 px y full resolution solo al exportar. Diseñar shaders, LUTs de curvas de 1024 o 4096 entradas, color management sRGB inicial y futura compatibilidad Display P3. Añadir clipping warnings, histogramas RGB/luminancia, scopes opcionales, comparacion before/after, cache inteligente y render incremental.
+**Dependencies.** Linear RAW engine; capability detection; preview boundary and worker protocol; color fixtures; documented operation order; versioned caches.
 
-**Dependencias.** Motor RAW lineal; capability detection; `PreviewRenderer`; worker protocol; fixtures de color; especificacion del orden de operaciones; cache versionada.
+**Acceptance.** GPU and CPU reference results remain visually equivalent within a stated tolerance; edits update without jank; resolution switches without visible jumps; histograms and clipping describe the rendered frame; missing WebGPU produces a clear fallback.
 
-**Criterios de aceptacion.** La misma receta produce resultados visualmente equivalentes en GPU y referencia CPU dentro de tolerancia definida; el cambio de un ajuste actualiza la preview sin jank; el nivel de resolucion cambia sin saltos; histogramas y clipping reflejan el frame renderizado; la ausencia de WebGPU degrada con mensaje y fallback.
+**Risks.** Driver/shader divergence; texture precision; ICC handling; GPU memory and device loss; histogram readback cost; inconsistent P3 support.
 
-**Riesgos tecnicos.** Divergencia de shaders/controladores; precision de textura; gestion de perfiles ICC; limites de memoria GPU; device loss; coste de lectura GPU para histogramas; P3 inconsistente.
+## 3. Global development tools
 
-**Fases sugeridas.** (1) pipeline CPU de referencia; (2) WebGPU exposicion + contraste; (3) niveles de preview/cache; (4) WebGL2; (5) LUTs y color; (6) histogramas/scopes/before-after; (7) render incremental.
+**Goal.** Provide a predictable, educational, reversible photographic pipeline.
 
-## 3. Herramientas globales de revelado
+**Implemented.** Exposure, temperature, tint, contrast, highlights, shadows, whites, blacks, saturation, vibrance, clarity, dehaze, sharpening, and noise reduction affect pixels in the reference renderer. Each has a slider, exact numeric entry, reset, undo/redo, and a non-destructive enable switch.
 
-**Objetivo.** Conectar los ajustes ya modelados a un pipeline fotografico predecible, educativo y reversible.
+**Remaining.** Texture, vignette, lens profiles, chromatic aberration, distortion, stronger production-grade algorithms, presets, copy/paste recipe, and a future batch-editing foundation.
 
-**Alcance.** Exposicion, temperatura, tint, contraste, luces, sombras, blancos, negros, saturacion, vibrance, claridad, texture, dehaze, sharpen y reduccion de ruido. Añadir viñeta, correcciones opticas, aberracion cromatica, distorsion y perfiles de lente. Incorporar presets, copy/paste recipe y base para edicion por lotes futura.
+**Acceptance.** Every control changes recipe and pixels consistently; reset is identity; undo/redo does not drift; ranges and units are documented; presets remain auditable operations; copy/paste excludes IDs and caches; optical corrections can be disabled.
 
-**Dependencias.** Pipeline GPU/CPU; metadata y perfiles de camara/lente; orden documentado de etapas; nuevas operaciones y migracion de schema para texture, viñeta y optica.
+**Risks.** Similar tool names masking different algorithms; halos/noise; operation order; denoise/sharpen performance; lens database licensing; destructive-looking presets.
 
-**Criterios de aceptacion.** Cada control cambia pixeles y receta de forma equivalente; reset es identidad; undo/redo no deriva; rangos tienen unidad/documentacion; presets son operaciones auditables; copiar/pegar no copia ids o caches; correcciones opticas se pueden desactivar.
+## 4. Tone curves
 
-**Riesgos tecnicos.** Algoritmos con nombres iguales pero resultados distintos; halos/ruido; orden de operaciones; rendimiento de denoise/sharpen; base de datos de lentes/licencia; presets destructivos.
+**Goal.** Offer precise tonal editing with fluid, mathematically stable interaction.
 
-**Fases sugeridas.** (1) luz/color basicos; (2) claridad/texture/dehaze; (3) sharpen/denoise; (4) viñeta; (5) optica/perfiles; (6) presets y copy/paste; (7) batch como contexto separado.
+**Implemented.** Master RGB, independent R/G/B, and optional luminance curves are versioned domain values. Linear and monotonic-cubic evaluators produce bounded LUTs and render through the CPU worker. Basic RGB presets are undoable.
 
-## 4. Curvas (prioridad alta)
+**Remaining.** Interactive graph; background histogram; draggable/addable/removable points; channel selector; clipping display; per-channel reset and copy/paste; exact numeric editing; local mask curves; educational channel help; keyboard and touch interaction.
 
-**Objetivo.** Ofrecer edicion tonal precisa con una interaccion fluida y matematicamente estable.
+**Acceptance.** X coordinates never cross or duplicate; a drag is one history action; monotonic cubic interpolation does not overshoot; LUT and CPU evaluator agree; reset/copy preserve the channel; clipping is not communicated by color alone.
 
-**Alcance.** Curva RGB maestra editable; R/G/B independientes; luminancia; histograma de fondo; puntos arrastrables; añadir/eliminar puntos; interpolacion monotonic-cubic y linear; LUT de 1024 o 4096 entradas; actualizacion interactiva; clipping; presets; reset por canal; copiar/pegar; edicion numerica avanzada; curvas locales en mascaras; documentacion educativa de cada canal.
+**Risks.** Overshoot, banding, 8/16-bit precision, canvas accessibility, dense points, interactive performance, LUT divergence.
 
-**Dependencias.** LUTs del pipeline; histograma; modelo `ToneCurve` actual; agrupacion de operaciones continuas; accesibilidad de grafica; schema para curvas locales.
+## 5. Crop, framing, and geometry
 
-**Criterios de aceptacion.** Nunca se cruzan/duplican x; teclado y touch pueden mover puntos; un drag genera una sola accion; monotonic-cubic no crea overshoot; LUT coincide con evaluador CPU; reset y copy/paste preservan canal; clipping es visible sin depender solo del color.
+**Goal.** Reframe without physically altering the original until export.
 
-**Riesgos tecnicos.** Overshoot/banding; precision a 8/16 bit; accesibilidad de canvas; rendimiento al arrastrar; puntos densos; diferencias entre LUTs.
+**Scope.** Fixed crop frame; free image translation underneath; development scale; rotation/straightening; aspect ratios; flips; perspective/vertical/horizontal correction; rule-of-thirds and golden-ratio overlays; later re-editing; geometry rasterized only for final output.
 
-**Fases sugeridas.** (1) evaluador + LUT dorada; (2) editor RGB lineal; (3) monotonic-cubic; (4) canales e histograma; (5) presets/numerica; (6) curvas locales y contenido educativo.
+**Dependencies.** Existing `ViewportTransform`; renderer integration; pointer/touch/trackpad gestures; homography math; EXIF orientation.
 
-## 5. Recorte, encuadre y geometria
+**Acceptance.** Crop never discards source pixels; reset reproduces the initial frame; keyboard and touch can manipulate frame and image; persisted geometry reopens identically; final export matches preview; locked ratios never deform.
 
-**Objetivo.** Reencuadrar sin alterar fisicamente el original hasta la exportacion.
+**Risks.** Coordinates after rotation/flip; straightening gaps; precision; conflicting gestures; degenerate homographies; double-applied EXIF orientation.
 
-**Alcance.** Marco fijo; mover libremente la imagen debajo; zoom; rotacion y enderezado; aspect ratios; flip; perspectiva, verticales y horizontales; overlays de composicion (regla de tercios y golden ratio); re-edicion posterior; rasterizar geometria solo en exportacion.
+## 6. Manual masks
 
-**Dependencias.** `ViewportTransform`; renderer; gestos pointer/touch/trackpad; matematica de homografia para perspectiva; metadata de orientacion EXIF.
+**Goal.** Apply precise local changes from editable vector sources with disposable raster caches.
 
-**Criterios de aceptacion.** No se pierden pixeles al recortar; reset reproduce el encuadre inicial; marco e imagen se manipulan con teclado/touch; el viewport persistido reabre igual; export final coincide con preview; ratios bloqueados no deforman.
+**Scope.** Brush and eraser; size, hardness, flow, and pressure; linear/radial gradients; luminance/color ranges; feather, density, expand/contract, invert, and overlay. Add local adjustments/curves, add/subtract/intersect composition, vector persistence, regenerable raster caches, and GPU rendering.
 
-**Riesgos tecnicos.** Coordenadas tras rotacion/flip; huecos al enderezar; precision de transformacion; gestos conflictivos; homografias degeneradas; EXIF orientation doble.
+**Dependencies.** Existing `MaskDefinition`; local render stages; Pointer Events pressure; GPU/CPU rasterizer; versioned caches; curve editor.
 
-**Fases sugeridas.** (1) crop/translate/scale; (2) rotacion/enderezado/flip; (3) ratios/overlays; (4) perspectiva; (5) raster final y tests geometricos.
+**Acceptance.** Strokes remain editable; erasing never damages the original; GPU/CPU feather and density agree; boolean operations are deterministic; cache loss never loses a mask; overlays are accessible; long strokes do not freeze the UI.
 
-## 6. Mascaras manuales
+**Risks.** Point volume; device pressure differences; edge precision; memory growth; nested composition; cache migration.
 
-**Objetivo.** Aplicar ajustes locales precisos con fuentes vectoriales editables y caches regenerables.
+## 7. Local AI masks
 
-**Alcance.** Pincel y eraser; tamaño, hardness, flow y pressure; gradiente lineal/radial; rango de luminancia/color; feather, density, expand/contract, invert y overlay. Ajustes y curvas locales; booleanas add/subtract/intersect; almacenamiento vectorial, cache rasterizada y render GPU.
+**Goal.** Select by clicking without sending the photograph off-device.
 
-**Dependencias.** `MaskDefinition`; pipeline local; Pointer Events y pressure; rasterizador GPU/CPU; schema/caches versionados; editor de curvas.
+**Scope.** Positive/negative points, bounding boxes, and iterative refinement. Evaluate SAM, SAM 2, or a compatible alternative on ONNX Runtime Web/WebGPU. Download models only after consent into Cache Storage or OPFS; compute one embedding per preview; decode subsequent prompts quickly; offer light/advanced models and manual fallback.
 
-**Criterios de aceptacion.** Trazo vectorial reeditable; eraser no destruye el original; densidad/feather coinciden GPU/CPU; operaciones booleanas son deterministas; perder cache no pierde mascara; overlay accesible; grandes trazos no congelan UI.
+**Acceptance.** Nothing downloads without consent; cancellation stops network and compute; embeddings reuse a preview/model hash; the project preserves prompts/points/boxes/model/version rather than depending on a raster; the model works offline after download; unsupported devices retain manual tools.
 
-**Riesgos tecnicos.** Volumen de puntos; suavizado y pressure por dispositivo; precision de bordes; explosiones de memoria; composicion anidada; migracion de cache.
+**Risks.** Model size, RAM/VRAM, WebGPU support, warm-up time, output quality, model supply chain, quota, obsolete weights.
 
-**Fases sugeridas.** (1) rasterizador y overlay; (2) brush/eraser; (3) gradientes; (4) rangos; (5) locales/curvas; (6) booleanas y optimizacion.
+## 8. Semantic segmentation
 
-## 7. Mascaras con IA local
+**Goal.** Create local masks for common photographic categories.
 
-**Objetivo.** Seleccionar por click sin enviar la imagen fuera del dispositivo.
+**Scope.** Subject, sky, water, vegetation, people, background, buildings, skin, hair, and clothing; local model; confidence; manual refinement; category composition.
 
-**Alcance.** Click-to-mask; puntos positivos/negativos; bounding box; refinamiento iterativo. Evaluar SAM, SAM 2 o alternativa compatible sobre ONNX Runtime Web/WebGPU. Modelo bajo demanda en Cache Storage u OPFS; embedding una vez por preview y decoder rapido despues. Detectar capacidades; modelos ligero/avanzado; progreso, cancelacion y consentimiento; offline tras descarga; fallback manual.
+**Acceptance.** Available categories are explicitly tied to a model/version; confidence is visible; all results remain refinable and composable; missing categories are not presented as certainty.
 
-**Dependencias.** Mascaras manuales; preview normalizada; ONNX Runtime Web; gestor de modelos/cache/cuota; worker pool; UX de consentimiento.
+**Risks.** Bias; ambiguous classes; sensitive person/skin categories; large models; weak low-light results; false confidence.
 
-**Criterios de aceptacion.** Nada se descarga sin consentimiento; cancelar detiene red/computo; embedding se reutiliza por hash de preview/modelo; el proyecto conserva prompt/puntos/cajas/modelo/version, no depende del raster; funciona offline tras descargar; dispositivo no compatible ofrece herramientas manuales.
+## 9. Natural-language masks
 
-**Riesgos tecnicos.** Modelos grandes; RAM/VRAM; soporte WebGPU; calentamiento lento; calidad variable; supply chain de pesos; cuotas y modelos obsoletos.
+**Goal.** Translate text intent into inspectable regions, not an opaque generated mask.
 
-**Fases sugeridas.** (1) benchmark modelos; (2) descarga/cache; (3) encoder worker; (4) decoder interactivo; (5) variantes/capabilities; (6) refinamiento y fallback.
+**Scope.** Accept requests such as “select the red reflection in the water.” An optional cloud model—and later a local VLM—returns boxes, positive/negative points, and exclusions; local segmentation produces the precise mask. Persist prompt, regions, model, and version. Support boolean exclusions and uncertainty warnings.
 
-## 8. Segmentacion semantica
+**Acceptance.** The consent screen lists exactly what will leave the device; responses are schema-validated; outputs become normal `EditOperation` values; regions can be inspected and corrected; rejection changes nothing; full RAW data is never uploaded.
 
-**Objetivo.** Crear mascaras locales por categorias fotografias comunes.
+**Risks.** Spatial ambiguity; metadata prompt injection; cloud cost/privacy; hallucinated regions; language differences; provider dependency.
 
-**Alcance.** Sujeto, cielo, agua, vegetacion, personas, fondo, edificios, piel, pelo y ropa; modelo local; confianza; refinado manual; combinar categorias.
+## 10. Optional AI development
 
-**Dependencias.** Infraestructura IA local; dataset/evaluacion; taxonomia versionada; mascaras booleanas; overlay/refinamiento.
+**Goal.** Propose explainable, bounded edits without giving AI direct authority over a project.
 
-**Criterios de aceptacion.** Categorias disponibles dependen del modelo declarado; confianza visible; resultados refinables; categorias se combinan como operaciones; version/modelo persisten; ausencia de categoria no se representa como certeza.
+**Scope.** OpenAI as the first replaceable adapter and a future local VLM. With explicit consent, send only a reduced preview plus selected EXIF, histograms, clipping, percentiles, estimated noise, current values, and user intent. Structured output produces validated operations. Review each proposal step; accept/reject individually; try a weaker version; ask for an explanation; show cost and support cancellation. Never send full RAW or log images.
 
-**Riesgos tecnicos.** Sesgos; categorias ambiguas; piel/personas sensibles; modelos grandes; calidad en noche/concierto; falsa confianza.
+**Acceptance.** RAWcket works with no key; every call describes data and estimated cost; invalid output is rejected; operations pass through the aggregate and history; an unapplied proposal changes nothing; keys/previews never enter logs, errors, projects, or bundles.
 
-**Fases sugeridas.** (1) sujeto/cielo/personas; (2) agua/vegetacion/edificios; (3) piel/pelo/ropa; (4) confianza/calibracion; (5) combinacion y evaluacion diversa.
+**Risks.** Variable cost, hallucinations, privacy, evolving structured-output contracts, EXIF prompt injection, model dependency, identifiable previews.
 
-## 9. Mascaras por lenguaje natural
+## 11. Development tutor
 
-**Objetivo.** Traducir intencion textual a regiones editables y verificables, no a una mascara generativa opaca.
+**Goal.** Teach photographic decisions without replacing the user’s judgment.
 
-**Alcance.** Campo “describe que quieres seleccionar”; ejemplo “selecciona el reflejo rojo en el agua”. Modelo cloud opcional y VLM local futuro para convertir intencion en cajas, puntos y exclusiones; SAM local produce la mascara precisa. Conservar prompt, regiones, modelo y version. Admitir “agua excepto personas”, “cielo excepto edificios”, “zonas rojas del agua”, “sombras del sujeto” y “luces calidas de la derecha”; booleanas, advertencia de incertidumbre y edicion posterior.
+**Scope.** Explain every proposal; detect clipping, over-lifted shadows, noise, and unrecoverable data; teach RGB curves and white balance; preview consequences. Offer guided, copilot, and manual-observation modes with optional local preference learning.
 
-**Dependencias.** SAM local; segmentacion semantica; adapter de proveedor; consentimiento de red; Structured Outputs; parser de intencion; booleanas.
+**Acceptance.** Explanations link to visible measurements; facts and suggestions are clearly distinguished; the tutor can be silenced; preference learning is opt-in and local; deletion is complete; advice is never auto-applied.
 
-**Criterios de aceptacion.** Antes de enviar preview se muestra exactamente que saldra; respuesta se valida; toda salida se convierte a `EditOperation`; usuario puede inspeccionar/corregir regiones; incertidumbre se muestra; rechazar no muta nada; RAW completo nunca se envia.
+**Risks.** Prescriptive advice, false positives, excessive jargon, accessibility, sensitive local profiles, aesthetic bias.
 
-**Riesgos tecnicos.** Ambiguedad espacial; prompt injection en metadata; coste/privacidad cloud; VLM inventando regiones; traduccion/idiomas; dependencia de proveedor.
+## 12. Final photographic export
 
-**Fases sugeridas.** (1) gramatica local con categorias; (2) adapter cloud de cajas/puntos; (3) exclusiones/booleanas; (4) incertidumbre/refinado; (5) VLM local.
+**Goal.** Rasterize original plus recipe into a high-quality image while keeping project export separate.
 
-## 10. IA de revelado opcional
+**Scope.** JPEG, PNG, and TIFF; quality, dimensions, resize, output sharpening, sRGB, metadata controls, metadata removal, watermark, full resolution, progress, cancellation, and worker execution.
 
-**Objetivo.** Proponer cambios explicables y limitados sin obtener autoridad directa sobre el proyecto.
+**Acceptance.** Export preview and file agree within tolerance; cancellation leaves no partial file; metadata follows choices; full resolution does not block the main thread; sharpening follows output dimensions; extension, MIME, and bytes agree.
 
-**Alcance.** OpenAI como primer adapter y proveedores reemplazables; VLM local futuro. Enviar solo con consentimiento una preview reducida, EXIF elegido, histogramas, clipping, percentiles, ruido estimado, valores actuales e intencion. Structured Outputs/JSON Schema produce operaciones limitadas y validadas. UI para propuesta paso a paso, aplicar/rechazar cada cambio, “probar menos”, “explicame”, historial, coste y cancelacion. No enviar RAW completo ni registrar imagenes. Presets: noche urbana, retrato, concierto, paisaje, arquitectura, preservar ambiente y correccion tecnica neutra.
+**Risks.** Extreme memory use; canvas limits; TIFF/16-bit support; ICC profiles; private metadata; partial writes; resize artifacts.
 
-**Dependencias.** `EditingAdvisor`; pipeline de analisis; consentimiento; vault; adapter OpenAI; schemas de operacion; medicion de coste; red cancelable.
+## 13. Advanced project management
 
-**Criterios de aceptacion.** Funciona sin key con advisor desactivado; cada llamada enumera datos/coste estimado; output invalido se rechaza; operaciones pasan por el agregado e historial; una propuesta no aplicada no cambia nada; keys/previews no aparecen en logs/errores/proyectos.
+**Goal.** Make the library resilient to interrupted writes, quota pressure, corruption, and large collections.
 
-**Riesgos tecnicos.** Coste variable; alucinaciones; privacidad; Structured Outputs cambiante; prompt injection EXIF; dependencia de modelo; previews identificables.
+**Scope.** Journaling, snapshots, crash recovery, corruption detection, backups, `.rawcket.json` sidecars, browser portability, optional File System Access links, default OPFS copy, quota management, orphan cleanup, search, tags, ratings, and future collections.
 
-**Fases sugeridas.** (1) contrato/proveedor fake; (2) analisis local; (3) OpenAI con consentimiento; (4) revision por operacion; (5) presets e historial; (6) providers y VLM local.
+**Acceptance.** Interrupted saves recover the last consistent snapshot; corruption never overwrites the backup; cleanup never deletes a referenced original; quota errors are explained early; sidecars and bundles migrate by version; revoked file permissions fall back to OPFS.
 
-## 11. Tutor de revelado
+**Risks.** Limited `pagehide`; non-atomic IndexedDB/OPFS transactions; orphan races; filesystem permissions; stale sidecars; large indexes.
 
-**Objetivo.** Enseñar decisiones fotograficas sin sustituir el criterio del usuario.
+## 14. Security and privacy
 
-**Alcance.** Explicar por que se propone cada cambio; detectar clipping, sombras demasiado levantadas, ruido e informacion irrecuperable; explicar curvas RGB y balance de blancos; mostrar consecuencias antes de aplicar. Modos guiado, copiloto y manual con observaciones; aprendizaje local y opcional de preferencias.
+**Goal.** Reduce local and optional-integration risk with understandable controls.
 
-**Dependencias.** Histogramas/clipping/ruido; before-after; asesor; sistema de contenidos versionado; preferencias locales exportables/borrables.
+**Scope.** In-memory and password-encrypted API keys; AES-GCM and safe derivation; verifiable deletion; strict CSP; XSS prevention and Trusted Types; no analytics by default; opt-in telemetry only; dependency/supply-chain audit; cloud-preview minimization; explicit storage transparency.
 
-**Criterios de aceptacion.** Explicaciones enlazan a mediciones visibles; el tutor distingue dato de sugerencia; se puede silenciar; aprender preferencias exige opt-in y queda local; borrar preferencias es completo; ningun consejo se aplica automaticamente.
+**Acceptance.** Production CSP excludes `unsafe-eval`; secrets never enter serializable state, logs, or telemetry; a removed key cannot be recovered; cloud previews are minimized and consented; telemetry off means zero telemetry requests; CI audits dependencies.
 
-**Riesgos tecnicos.** Consejos prescriptivos; falsos positivos; lenguaje demasiado tecnico; accesibilidad; perfil local sensible; sesgo estetico.
+**Risks.** XSS defeating an unlocked vault; browser extensions; dependency exfiltration; misleading encryption expectations; HTTP caches; physical storage deletion limits.
 
-**Fases sugeridas.** (1) reglas deterministas de clipping; (2) contenido educativo; (3) modo guiado; (4) copiloto; (5) preferencias locales transparentes.
+## 15. PWA and offline operation
 
-## 12. Exportacion fotografica final
+**Goal.** Keep the website useful offline and make installation optional.
 
-**Objetivo.** Rasterizar original + receta a un archivo final de calidad y mantener export de proyecto separado.
+**Scope.** The service-worker app shell is in place. Add downloadable AI models, safe updates, new-version notices, schema-aware activation/rollback, and optional non-intrusive install prompts.
 
-**Alcance.** JPEG, PNG y TIFF; calidad, resolucion, resize, sharpening de salida, sRGB, metadata, opcion de eliminar metadata, marca de agua, full resolution, progreso, cancelacion y worker.
+**Acceptance.** The library opens offline after first load; incompatible code never activates before data can migrate; updates can be postponed; failed updates recover the previous shell; model size/status is visible; the normal website keeps every capability.
 
-**Dependencias.** Pipeline full-resolution; codecs; geometria; color management; EXIF writer; worker/memoria; File System Access API opcional.
+**Risks.** Stale caches, stuck service workers, shared quota, irreversible migration, huge models, iOS browser constraints.
 
-**Criterios de aceptacion.** Preview de export y archivo coinciden dentro de tolerancia; cancelar no deja archivo parcial; metadata responde a opciones; full resolution no bloquea main; sharpening depende del tamaño final; extension/MIME/bytes concuerdan.
+## 16. Performance and compatibility
 
-**Riesgos tecnicos.** Memoria extrema; limites de canvas; TIFF/16-bit; perfiles ICC; metadata privada; escritura parcial; artefactos al redimensionar.
+**Goal.** Keep interaction fluid with large files across heterogeneous devices.
 
-**Fases sugeridas.** (1) JPEG sRGB worker; (2) PNG y resize; (3) metadata/privacy; (4) TIFF/alta profundidad; (5) sharpening/marca de agua; (6) escritura cancelable.
+**Scope.** Worker pools, bounded WASM memory, tiled rendering, multi-level previews, OffscreenCanvas, ImageBitmap, cancellation, profiling, low-memory modes, Chrome/Safari/Firefox fallbacks, and explicit large-file limits.
 
-## 13. Gestion avanzada de proyectos
+**Acceptance.** Frame budget is measured; obsolete work is cancelled; memory returns near baseline after close; visible tiles are prioritized; low-RAM mode reduces resolution with notice; limits are detected before OOM; a browser/device matrix is documented.
 
-**Objetivo.** Hacer la biblioteca robusta ante cierres, cuotas, corrupcion y colecciones crecientes.
+**Risks.** Unreliable memory APIs, uneven OffscreenCanvas, competing workers, buffer copies, thermal throttling, immature WebGPU implementations.
 
-**Alcance.** Autosave robusto, snapshots, recuperacion inesperada, deteccion de corrupcion y copias de seguridad. Sidecars `.rawcket.json`, bundles y portabilidad entre navegadores. Vinculacion opcional al original con File System Access API y copia a OPFS por defecto. Gestion de cuotas, liberar espacio, archivos huerfanos, limpieza de caches, recientes, busqueda, tags, ratings y colecciones futuras.
+## 17. Design, learning, and accessibility
 
-**Dependencias.** Journal/transacciones; checksum por registro; API de cuota; cache catalog; search index; permisos de filesystem; migraciones.
+**Goal.** Preserve initial simplicity while revealing power without excluding keyboard, touch, or assistive-technology users.
 
-**Criterios de aceptacion.** Un cierre durante save recupera ultimo snapshot consistente; corrupcion no sobrescribe backup; limpieza nunca elimina original referenciado; cuota se explica antes de fallar; sidecar/bundle importan con versiones; permisos revocados degradan a copia OPFS.
+**Implemented.** Simple/Advanced modes, collapsible tools, exact labels, reduced-motion support, keyboard shortcuts, pan/zoom gestures, visible save/render states, English UI, and a navigable Active Recipe that never hides applied state.
 
-**Riesgos tecnicos.** `pagehide` limitado; transacciones entre IndexedDB/OPFS no atomicas; orphan races; permisos filesystem; sidecars desincronizados; indices grandes.
+**Remaining.** Visual history, favorites, educational tooltips, onboarding, complete touch/trackpad polish, before/after comparison, clipping and mask overlays, accessible canvas alternatives, full responsive review, and WCAG audit.
 
-**Fases sugeridas.** (1) journal/snapshots; (2) integridad/recuperacion; (3) cuota/cache/orphans; (4) sidecars/File System Access; (5) busqueda/tags/ratings; (6) colecciones.
-
-## 14. Seguridad y privacidad
-
-**Objetivo.** Reducir el riesgo local y de integraciones opcionales con controles comprensibles.
-
-**Alcance.** API key en memoria y cifrada con contrasena; AES-GCM y derivacion segura; borrado verificable. CSP, prevencion XSS, sin analytics por defecto, telemetria solo opt-in, auditoria de dependencias/supply chain, proteccion de previews enviadas a modelos, borrado explicito y transparencia de almacenamiento.
-
-**Dependencias.** Hosting headers; Trusted Types; proceso de security review; SBOM/Dependabot; consentimiento y redaccion de metadata; vault actual.
-
-**Criterios de aceptacion.** CSP estricta sin `unsafe-eval` en produccion; secretos no entran en estado serializable, logs ni telemetry; key eliminada no se recupera; preview cloud minimizada y consentida; telemetry off implica cero requests; auditoria de dependencias en CI.
-
-**Riesgos tecnicos.** XSS derrota vault desbloqueado; extensiones del navegador; exfiltracion por dependencias; falsa sensacion de cifrado; cache HTTP; borrado fisico no garantizado por storage.
-
-**Fases sugeridas.** (1) threat model/CSP; (2) hygiene de logs/red; (3) dependency audit/SBOM; (4) consentimientos cloud; (5) telemetry opt-in; (6) revision externa.
-
-## 15. PWA y offline
-
-**Objetivo.** Mantener la web util sin conexion y permitir instalacion sin exigirla.
-
-**Alcance.** Service worker/app shell offline ya iniciados; añadir modelos IA descargables, actualizacion segura, aviso de nueva version, recuperacion si cambia schema e instalacion opcional nunca obligatoria.
-
-**Dependencias.** Estrategia de version de assets; migraciones; gestor de modelos; UI de updates; pruebas offline multi-browser.
-
-**Criterios de aceptacion.** Biblioteca abre offline despues de primera carga; update no activa codigo incompatible con datos sin migrar; usuario puede posponer; fallo de update recupera shell anterior; modelos indican tamaño y estado; web normal conserva todas las funciones.
-
-**Riesgos tecnicos.** Cache obsoleta; service worker atascado; cuotas compartidas; migracion irreversible; modelo enorme; navegadores iOS.
-
-**Fases sugeridas.** (1) tests de app shell; (2) UX de update; (3) rollback/schema handshake; (4) gestor de modelos; (5) install prompts no intrusivos.
-
-## 16. Rendimiento y compatibilidad
-
-**Objetivo.** Sostener interaccion fluida con archivos grandes en dispositivos heterogeneos.
-
-**Alcance.** Worker pool, memoria WASM, tiled rendering, previews multinivel, OffscreenCanvas, ImageBitmap, cancelacion y main thread libre. Profiling; modos para poca RAM; Safari, Chrome y Firefox cuando WebGPU sea suficiente; fallbacks; limites explicitos de archivos grandes.
-
-**Dependencias.** Motor/pipeline; scheduler; capability/memory estimation; telemetria local de rendimiento; matriz de dispositivos.
-
-**Criterios de aceptacion.** Presupuesto de frame definido; tareas obsoletas se cancelan; memoria vuelve cerca de baseline al cerrar; tiles visibles priorizados; poca RAM reduce resolucion con aviso; limites se detectan antes de OOM; matriz CI/browser documentada.
-
-**Riesgos tecnicos.** Falta de APIs de memoria fiables; OffscreenCanvas desigual; competencia workers; copias de buffers; thermal throttling; WebGPU inmaduro.
-
-**Fases sugeridas.** (1) instrumentacion/performance budgets; (2) cancelacion/scheduler; (3) multi-resolution; (4) tiling/OffscreenCanvas; (5) low-memory; (6) matriz Safari/Chrome/Firefox.
-
-## 17. Diseño, aprendizaje y accesibilidad
-
-**Objetivo.** Mantener sencillez inicial y revelar potencia sin copiar Luminar Neo ni excluir teclado, touch o lectores de pantalla.
-
-**Alcance.** Consolidar Simple/Advanced y progressive disclosure; atajos, historial visual, favoritos, paneles plegables, tooltips educativos, onboarding, empty states, procesamiento/errores legibles, accesibilidad, touch/trackpad, comparacion, overlays, vista de mascara e interfaz responsive. Priorizar pantalla grande sin romper movil/tablet.
-
-**Dependencias.** Herramientas reales; sistema de comandos/atajos; design tokens; pruebas con usuarios; auditoria WCAG; before-after y overlays.
-
-**Criterios de aceptacion.** Flujos principales completos por teclado; foco/labels/aria-live correctos; contraste WCAG AA; no depender solo de color; reduced motion respetado; touch targets adecuados; Simple no oculta estado aplicado; funciones pendientes nunca parecen activas.
-
-**Riesgos tecnicos.** Densidad de herramientas; divergencia mobile/desktop; canvas inaccesible; atajos conflictivos; onboarding molesto; traduccion; imitacion involuntaria de referencias.
-
-**Fases sugeridas.** (1) tokens/auditoria base; (2) atajos e historial; (3) tooltips/onboarding; (4) touch/trackpad; (5) canvas accesible; (6) tests de usuario y refinamiento responsive.
+**Acceptance.** Primary flows work entirely by keyboard; focus, labels, and live regions are correct; contrast is WCAG AA; meaning never relies on color alone; touch targets are adequate; pending features never appear active.
 
 ---
 
-## Definition of Done para cualquier bloque
+## Definition of Done for every roadmap slice
 
-- Dominio y contratos versionados, sin primitivas invalidas ni acoplamiento a React/proveedor.
-- Operaciones serializables, migracion y compatibilidad documentadas cuando cambie schema.
-- Unit tests de clases no triviales, integracion del flujo y E2E de persistencia cuando aplique.
-- Cancelacion, progreso, errores legibles, accesibilidad y privacidad incluidos en el alcance, no añadidos al final.
-- README/ADRs/TODO actualizados; `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` y E2E relevante en verde.
+- Versioned domain model and contracts, with no invalid primitives or React/provider coupling.
+- Serializable operations, migration, and compatibility documentation whenever the schema changes.
+- Direct unit coverage for non-trivial classes, integration coverage for the workflow, and persistence E2E when applicable.
+- Cancellation, progress, actionable errors, accessibility, and privacy designed into the slice.
+- README, ADRs, and this roadmap updated; `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, and relevant E2E checks all green.

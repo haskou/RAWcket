@@ -1,16 +1,16 @@
-# ADR 0003: IndexedDB para estructura y OPFS para binarios
+# ADR 0003: IndexedDB for structure and OPFS for binary data
 
-- Estado: aceptada
-- Fecha: 2026-08-05
+- Status: accepted
+- Date: 2026-08-05
 
-## Contexto
+## Context
 
-Los proyectos necesitan consultas e indices; los originales y futuras caches son blobs potencialmente grandes.
+Projects need queries and indexes; originals and future caches are potentially large blobs.
 
 ## Decision
 
-IndexedDB guarda agregados serializados, indice y configuracion. `SourceFileRepository` usa OPFS cuando existe y un object store de IndexedDB como fallback. La aplicacion solicita persistencia sin asumir que sera concedida.
+IndexedDB stores serialized aggregates, indexes, and settings. `SourceFileRepository` uses OPFS where available and an IndexedDB object store as fallback. The application requests persistent storage without assuming it will be granted.
 
-## Consecuencias
+## Consequences
 
-No existe dependencia de red. Hay que administrar cuotas, residuos y migraciones. El guardado ante cierre es best-effort y no reemplaza backups.
+There is no network dependency. Quota, orphan cleanup, and migrations require active management. Close-time persistence is best effort and does not replace backups.

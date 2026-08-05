@@ -1,16 +1,16 @@
-# ADR 0002: El JSON de receta es la fuente de verdad no destructiva
+# ADR 0002: Recipe JSON is the non-destructive source of truth
 
-- Estado: aceptada
-- Fecha: 2026-08-05
+- Status: accepted
+- Date: 2026-08-05
 
-## Contexto
+## Context
 
-Recorte, curvas, ajustes y mascaras deben poder cambiarse despues sin tocar el original. Rasters y embeddings pueden regenerarse.
+Crop, curves, adjustments, and masks must remain editable without changing the original. Rasters and embeddings can be regenerated.
 
 ## Decision
 
-`PhotoProject` conserva una `DevelopmentRecipe` versionada. Valores invalidos se rechazan con Value Objects y objetos de dominio. El original solo se rasterizara durante una futura exportacion final.
+`PhotoProject` owns a versioned `DevelopmentRecipe`. Value Objects and domain objects reject invalid values. The original is rasterized only for previews and future final export; it is never overwritten.
 
-## Consecuencias
+## Consequences
 
-La receta es portable, testeable y migrable. El renderer debe ser determinista respecto a receta + original + version de pipeline. Caches nunca sustituyen al JSON.
+The recipe is portable, testable, and migratable. A renderer must be deterministic for recipe + original + pipeline version. Caches never replace the JSON source of truth.

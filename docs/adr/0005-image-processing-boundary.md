@@ -1,16 +1,16 @@
-# ADR 0005: Procesamiento de imagen detras de PreviewRenderer
+# ADR 0005: Image processing behind PreviewRenderer
 
-- Estado: aceptada
-- Fecha: 2026-08-05
+- Status: accepted
+- Date: 2026-08-05
 
-## Contexto
+## Context
 
-LibRaw/WASM, WebGPU, WebGL2 y CPU tienen ciclos de vida, capacidades y fallos distintos. No deben contaminar dominio ni React.
+LibRaw/WASM, WebGPU, WebGL2, and CPU rendering have different lifecycles, capabilities, and failure modes. They must not leak into the domain or React.
 
 ## Decision
 
-`PreviewRenderer` es el puerto de aplicacion para previews. `WorkerPreviewRenderer` coordina resolucion, progreso, cancelacion, timeout y concurrencia con `@haskou/flow`; una referencia CPU aplica exposicion/contraste sobre pixeles reales. WebGPU/WebGL2 y el pipeline RAW se añadiran como adapters sin contaminar React o dominio.
+`PreviewRenderer` is the application port for previews. `WorkerPreviewRenderer` coordinates resolution, progress, cancellation, timeout, and concurrency using `@haskou/flow`. The current reference CPU pipeline applies all modeled global adjustments and tone curves to real pixels. WebGPU, WebGL2, and RAW pipelines will be added as replaceable adapters.
 
-## Consecuencias
+## Consequences
 
-El dominio permanece independiente y el renderer puede sustituirse. Habra que definir un contrato de progreso/cancelacion y tests visuales deterministas antes de conectar controles a pixeles.
+The domain remains independent and the renderer is replaceable. New implementations must match the documented progress/cancellation contract and deterministic golden-image tolerances before becoming the default.

@@ -1,16 +1,16 @@
-# ADR 0001: Aplicacion frontend-only y local-first
+# ADR 0001: Frontend-only, local-first application
 
-- Estado: aceptada
-- Fecha: 2026-08-05
+- Status: accepted
+- Date: 2026-08-05
 
-## Contexto
+## Context
 
-RAWcket debe funcionar sin cuentas, backend, API key o SaaS obligatorio y no enviar imagenes sin una accion explicita.
+RAWcket must work without accounts, a backend, an API key, or mandatory SaaS, and it must never send photographs without explicit user action.
 
 ## Decision
 
-La primera arquitectura es una SPA Vite/React. Proyecto, original, preferencias y secretos cifrados se conservan en almacenamiento del navegador. Una PWA cachea el app shell, pero instalarla es opcional.
+The initial architecture is a Vite/React SPA. Projects, originals, preferences, and encrypted secrets remain in browser storage. A PWA caches the app shell, but installation is always optional.
 
-## Consecuencias
+## Consequences
 
-Privacidad, offline y despliegue estatico son simples. Cuota, purga y portabilidad del almacenamiento pasan a ser riesgos de producto; los bundles `.rawcket` son el mecanismo de backup y transporte.
+Privacy, offline use, and static deployment remain straightforward. Quota, eviction, and storage portability become product risks; `.rawcket` bundles provide the backup and transport mechanism.

@@ -1,16 +1,16 @@
-# ADR 0004: Operaciones compartidas por humano e IA
+# ADR 0004: Shared edit operations for humans and AI
 
-- Estado: aceptada
-- Fecha: 2026-08-05
+- Status: accepted
+- Date: 2026-08-05
 
-## Contexto
+## Context
 
-Una IA no debe obtener una ruta privilegiada o mutar el estado fuera del historial.
+AI must not receive a privileged mutation path or bypass project history.
 
 ## Decision
 
-UI, presets, importacion futura e `EditingAdvisor` producen el mismo union serializable `EditOperation`. `PhotoProject` valida, aplica, calcula inversas, agrupa cambios continuos y limita historial.
+The UI, presets, future import flows, and `EditingAdvisor` all produce the same serializable `EditOperation` union. `PhotoProject` validates and applies operations, computes inverses, groups continuous changes, and bounds history.
 
-## Consecuencias
+## Consequences
 
-Undo/redo, auditoria y validacion son uniformes. Los adapters IA solo proponen operaciones; el usuario decide que aplicar. Cambiar el contrato exige migracion y tests de compatibilidad.
+Undo/redo, auditing, and validation stay uniform. AI adapters only propose operations; the user decides what to apply. Contract changes require schema migration and compatibility tests.

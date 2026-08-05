@@ -1,54 +1,59 @@
-# Arquitectura de RAWcket
+# RAWcket architecture
 
-## Mapa
+## Map
 
 ```mermaid
 flowchart LR
-  UI["Presentacion React"] --> APP["Casos de uso y mensajes"]
-  APP --> DOMAIN["PhotoProject + receta + historial"]
-  APP --> PORTS["Puertos de salida"]
-  IDB["IndexedDB"] -. implementa .-> PORTS
-  OPFS["OPFS / fallback"] -. implementa .-> PORTS
-  BUNDLE["Bundle .rawcket"] -. implementa .-> PORTS
-  ADVISOR["DisabledEditingAdvisor"] -. implementa .-> PORTS
-  IDB --> ZOD["Zod + migraciones"]
+  UI["React presentation"] --> APP["Use cases and messages"]
+  APP --> DOMAIN["PhotoProject + recipe + history"]
+  APP --> PORTS["Outbound ports"]
+  IDB["IndexedDB"] -. implements .-> PORTS
+  OPFS["OPFS / fallback"] -. implements .-> PORTS
+  BUNDLE[".rawcket bundle"] -. implements .-> PORTS
+  RENDER["Worker preview renderer"] -. implements .-> PORTS
+  ADVISOR["DisabledEditingAdvisor"] -. implements .-> PORTS
+  IDB --> ZOD["Zod + migrations"]
   BUNDLE --> ZOD
 ```
 
-Las flechas de dependencia apuntan hacia dominio/aplicacion. El dominio solo depende de `@haskou/value-objects` y conceptos propios.
+Dependency arrows point toward the application and domain layers. The domain depends only on `@haskou/value-objects` and its own concepts.
 
-## Agregado
+## Aggregate
 
-`PhotoProject` es la frontera de consistencia. Posee nombre, referencia al original, metadata, `DevelopmentRecipe`, `EditHistory` y `ProjectUiState`. Toda mutacion editorial pasa por `EditOperation`; el agregado calcula la inversa antes de registrar el cambio y emite un evento de dominio.
+`PhotoProject` is the consistency boundary. It owns the name, original reference, metadata, `DevelopmentRecipe`, `EditHistory`, and `ProjectUiState`. Every editorial mutation passes through an `EditOperation`; the aggregate computes the inverse before recording history and emits a domain event.
 
-`DevelopmentRecipe` contiene:
+`DevelopmentRecipe` contains:
 
-- `GlobalAdjustments`: catorce ajustes con rangos por concepto.
-- `CurveSet`: RGB, R, G, B y luminancia opcional; puntos 0..1 e interpolacion validada.
-- `ViewportTransform`: marco fijo y transformacion reversible del original.
-- `MaskDefinition[]`: formas vectoriales/semanticas; raster y embeddings son caches, no verdad.
+- `GlobalAdjustments`: fourteen adjustments with concept-specific ranges and independent enabled state.
+- `CurveSet`: RGB, R, G, B, and optional luminance; normalized points and validated interpolation.
+- `ViewportTransform`: a fixed crop frame and reversible original-image transform.
+- `MaskDefinition[]`: vector/semantic source definitions; rasters and embeddings are caches, never source of truth.
 
-## Limites
+## Boundaries
 
-- Zod valida JSON y persistencia antes de `fromPrimitives`.
-- Los mappers de persistencia son los unicos consumidores normales de serializacion completa.
-- OPFS se usa solo detras de `SourceFileRepository`; IndexedDB es el fallback.
-- `PreviewRenderer` es la futura frontera del worker/pipeline. La UI actual no lo suplanta con filtros CSS.
-- `EditingAdvisor` solo puede devolver propuestas de `EditOperation`; nunca recibe capacidad de mutar el agregado.
+- Zod validates JSON and persistence data before `fromPrimitives` hydration.
+- Persistence mappers are the normal consumers of complete primitive serialization.
+- OPFS is used only behind `SourceFileRepository`; IndexedDB is the fallback.
+- `PreviewRenderer` isolates worker and image-pipeline concerns from React and the domain.
+- `EditingAdvisor` can return only `EditOperation` proposals and never receives authority to mutate an aggregate.
 
-## Flujo de guardado
+## Save flow
 
 ```mermaid
 sequenceDiagram
-  participant User as Usuario
-  participant UI as Editor React
+  participant User
+  participant UI as React editor
   participant Project as PhotoProject
   participant Save as Autosave
   participant DB as IndexedDB
-  User->>UI: aumenta exposicion
+  User->>UI: change exposure
   UI->>Project: apply(SetGlobalAdjustment)
-  Project->>Project: valida + calcula inversa + registra historial
-  UI->>Save: marca revision
-  Save-->>DB: save tras debounce
-  Note over UI,DB: visibilitychange, pagehide y cierre fuerzan flush
+  Project->>Project: validate + compute inverse + record history
+  UI->>Save: increment revision
+  Save-->>DB: save after debounce
+  Note over UI,DB: visibilitychange, pagehide, and close force a flush
 ```
+
+## Preview flow
+
+`RenderProjectPreview` accepts a validated application message. `WorkerPreviewRenderer` owns scheduling, cancellation, timeout, and source lookup. The worker decodes the source into an `OffscreenCanvas`, applies the complete versioned global recipe and tone-curve LUTs with `CpuPixelDeveloper`, and returns an encoded WebP preview. Future WebGPU, WebGL2, and RAW adapters must preserve this port contract.
