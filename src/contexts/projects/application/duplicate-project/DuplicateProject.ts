@@ -1,5 +1,5 @@
 import { Timestamp } from '@haskou/value-objects';
-import { PhotoProject } from '../../domain/PhotoProject';
+import type { PhotoProject } from '../../domain/PhotoProject';
 import { ProjectMetadata } from '../../domain/ProjectMetadata';
 import { SourceImageReference } from '../../domain/SourceImageReference';
 import type { ProjectRepository } from '../../domain/repositories/ProjectRepository';
@@ -20,16 +20,20 @@ export class DuplicateProject {
     const id = new ProjectId(crypto.randomUUID());
     const stored = await this.sourceFiles.save(id, source);
     const now = Timestamp.now();
-    const project = PhotoProject.create(
+    const project = original.duplicate(
       id,
-      original.getName().copy(),
       new SourceImageReference(
         original.getSource().getFileName(),
         original.getSource().getMimeType(),
         stored.getSize(),
         stored.getStorageKey()
       ),
-      new ProjectMetadata(now, now, primitives.metadata.width, primitives.metadata.height)
+      new ProjectMetadata(
+        now,
+        now,
+        primitives.metadata.width,
+        primitives.metadata.height
+      )
     );
     await this.projects.save(project);
     return project;

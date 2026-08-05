@@ -3,6 +3,8 @@ import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { adjustmentDefinitions, type AdjustmentSection } from '../editor/adjustmentDefinitions';
 
+type RecipeBlock = readonly ['curves' | 'crop' | 'masks', string];
+
 export function ActiveRecipePanel({
   project,
   onNavigate,
@@ -11,7 +13,9 @@ export function ActiveRecipePanel({
   onCopy,
   onPaste,
   onApplyPreset,
-  transferMessage
+  transferMessage,
+  collapsed,
+  onToggleCollapsed
 }: {
   project: PhotoProject;
   onNavigate: (section: AdjustmentSection) => void;
@@ -21,10 +25,25 @@ export function ActiveRecipePanel({
   onPaste?: () => void;
   onApplyPreset?: (name: 'Natural' | 'Cinematic' | 'Monochrome') => void;
   transferMessage?: string;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }): ReactElement {
+  const modifiedAdjustments = adjustmentDefinitions.filter((definition) => project.isGlobalAdjustmentModified(AdjustmentKey.fromPrimitives(definition.key)));
+  const recipeBlocks: RecipeBlock[] = [];
+  if (project.hasCurveAdjustments()) recipeBlocks.push(['curves', 'Tone Curve']);
+  if (project.hasGeometryAdjustments()) recipeBlocks.push(['crop', 'Crop & Geometry']);
+  if (project.hasMasks()) recipeBlocks.push(['masks', 'Local Masks']);
+
+  if (collapsed) {
+    return <aside className="recipe-panel collapsed" aria-label="Active Recipe collapsed">
+      <button className="recipe-expand" type="button" onClick={onToggleCollapsed} aria-label="Expand Active Recipe" title="Expand Active Recipe"><span aria-hidden="true">›</span><strong>Recipe</strong></button>
+    </aside>;
+  }
+
   return (
     <aside className="recipe-panel" aria-label="Active Recipe">
       <div className="recipe-panel-heading">
+        <button className="recipe-collapse" type="button" onClick={onToggleCollapsed} aria-label="Collapse Active Recipe" title="Collapse Active Recipe">‹</button>
         <span className="eyebrow">Non-destructive</span>
         <h2>Active Recipe</h2>
         <p>Toggle any instruction without losing its value. Select it to edit.</p>
@@ -40,7 +59,7 @@ export function ActiveRecipePanel({
         {transferMessage !== undefined && <output className="recipe-transfer-message" aria-live="polite">{transferMessage}</output>}
       </div>
       <div className="recipe-items">
-        {adjustmentDefinitions.map((definition) => {
+        {modifiedAdjustments.map((definition) => {
           const key = AdjustmentKey.fromPrimitives(definition.key);
           const value = project.getGlobalAdjustment(key).valueOf();
           const enabled = project.isGlobalAdjustmentEnabled(key);
@@ -57,12 +76,9 @@ export function ActiveRecipePanel({
             </div>
           );
         })}
-        <div className="recipe-blocks-heading">Recipe blocks</div>
-        {([
-          ['curves', 'Tone Curve'],
-          ['crop', 'Crop & Geometry'],
-          ['masks', 'Local Masks']
-        ] as const).map(([tool, label]) => (
+        {modifiedAdjustments.length === 0 && recipeBlocks.length === 0 && <div className="recipe-empty"><strong>No active edits</strong><p>Changed parameters appear here. Reset values disappear automatically.</p></div>}
+        {recipeBlocks.length > 0 && <div className="recipe-blocks-heading">Recipe blocks</div>}
+        {recipeBlocks.map(([tool, label]) => (
           <button className="recipe-block" type="button" key={tool} onClick={() => onNavigateTool?.(tool)}>
             <span>{label}</span><span aria-hidden="true">→</span>
           </button>

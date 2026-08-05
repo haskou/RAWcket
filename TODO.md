@@ -9,6 +9,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Reference CPU pipeline for every current global adjustment and RGB/luminance tone curves.
 - [x] Sliders, exact numeric entry, reset, grouped history, and per-adjustment enable/disable state.
 - [x] Navigable Active Recipe sidebar, preview pan/zoom, and keyboard shortcuts.
+- [x] Workspace-relative Fit, collapsible recipe column, composition/level guides, contextual mask help, and modified-control indicators.
 - [x] English UI and user-facing errors.
 - [x] Interactive RGB/R/G/B/luminance curve graph with draggable and exact points.
 - [x] Rendered non-destructive crop/geometry, before/after, masks, histogram, and clipping.
@@ -94,7 +95,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Fixed crop frame, free image translation, development scale, rotation/straightening, aspect ratios, flips, persistence, undo/redo, and identical preview/export rasterization.
 
-**Remaining.** Perspective/vertical/horizontal correction, direct-manipulation crop handles, rule-of-thirds/golden-ratio overlays, and touch gesture polish.
+**Implemented.** Rule-of-thirds, quarter-grid, diagonal, golden-ratio, and central horizontal/vertical level overlays are available from both the canvas and geometry panel. They are editing-only and excluded from export. Fit recalculates against the live canvas after either sidebar changes size.
+
+**Remaining.** Perspective/vertical/horizontal pixel correction, automatic horizon estimation, direct-manipulation crop handles, and touch gesture polish.
 
 **Dependencies.** Existing `ViewportTransform`; renderer integration; pointer/touch/trackpad gestures; homography math; EXIF orientation.
 
@@ -194,7 +197,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Five per-project SHA-256 snapshots, newest-valid corruption recovery without overwriting damaged data, portable checksummed bundles, OPFS/IndexedDB original storage, persistent-storage request, quota visibility, and import safety reserve.
 
-**Remaining.** Write-ahead journaling across IndexedDB/OPFS, `.rawcket.json` sidecars, optional File System Access links, orphan cleanup, search, tags, ratings, and future collections.
+**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query.
+
+**Remaining.** Write-ahead journaling across IndexedDB/OPFS, `.rawcket.json` sidecars, optional File System Access links, orphan cleanup, and future collections.
 
 **Acceptance.** Interrupted saves recover the last consistent snapshot; corruption never overwrites the backup; cleanup never deletes a referenced original; quota errors are explained early; sidecars and bundles migrate by version; revoked file permissions fall back to OPFS.
 
@@ -242,9 +247,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Preserve initial simplicity while revealing power without excluding keyboard, touch, or assistive-technology users.
 
-**Implemented.** Simple/Advanced modes, collapsible tools, exact labels, reduced-motion support, keyboard shortcuts, pan/zoom gestures, visible save/render states, English UI, and a navigable Active Recipe that never hides applied state.
+**Implemented.** Simple/Advanced modes, collapsible tools and recipe column, exact labels, reduced-motion support, keyboard shortcuts, pan/zoom gestures, workspace-relative Fit, visible save/render states, English UI, and a navigable Active Recipe that lists every non-default instruction while automatically removing reset values.
 
-**Implemented.** Before/after comparison, histogram/clipping display, brush/radial/linear/smart-point overlays, and AI tutor explanations now join the existing keyboard, pan/zoom, responsive, and Active Recipe work.
+**Implemented.** Before/after comparison, histogram/clipping display, composition and level guides, brush/radial/linear/smart-point overlays, per-mask workflow explanations, modified-control marks, and AI tutor explanations now join the keyboard, pan/zoom, responsive, and Active Recipe work. Luminance masks explicitly disclose that their per-pixel colored overlay is still pending even though their effect renders.
 
 **Remaining.** Visual history, favorites, onboarding, complete touch/trackpad polish, accessible non-visual alternatives for every canvas interaction, full responsive review, and WCAG audit.
 

@@ -4,6 +4,8 @@ import { PhotoProjectSummary } from '../../domain/PhotoProjectSummary';
 import type { ProjectRepository } from '../../domain/repositories/ProjectRepository';
 import { ProjectName } from '../../domain/value-objects/ProjectName';
 import { ProjectId } from '../../domain/value-objects/ProjectId';
+import { ProjectRating } from '../../domain/value-objects/ProjectRating';
+import { ProjectTags } from '../../domain/value-objects/ProjectTags';
 import type { RawcketDatabaseConnection } from '../../../../shared/infrastructure/database/RawcketDatabase';
 import { photoProjectSchema } from '../serialization/ProjectSchemas';
 import type { ProjectMigrator } from '../migrations/ProjectMigrator';
@@ -34,7 +36,9 @@ export class IndexedDbProjectRepository implements ProjectRepository {
       new ProjectId(record.id),
       new ProjectName(record.name),
       Timestamp.new(record.updatedAt),
-      new StringValueObject(record.sourceMimeType)
+      new StringValueObject(record.sourceMimeType),
+      new ProjectRating(record.rating ?? 0),
+      ProjectTags.fromPrimitives(record.tags ?? [])
     ));
   }
 
@@ -56,7 +60,9 @@ export class IndexedDbProjectRepository implements ProjectRepository {
         id: primitives.id,
         name: primitives.name,
         updatedAt: primitives.metadata.updatedAt,
-        sourceMimeType: primitives.source.mimeType
+        sourceMimeType: primitives.source.mimeType,
+        rating: primitives.organization.rating,
+        tags: primitives.organization.tags
       })
     ];
     if (snapshot !== null) writes.push(transaction.objectStore('projectSnapshots').put(snapshot));

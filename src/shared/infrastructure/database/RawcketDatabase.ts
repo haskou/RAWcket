@@ -5,6 +5,8 @@ export type ProjectIndexRecord = {
   name: string;
   updatedAt: number;
   sourceMimeType: string;
+  rating?: number;
+  tags?: string[];
 };
 
 export type ProjectSnapshotRecord = {

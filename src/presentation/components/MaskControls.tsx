@@ -11,6 +11,7 @@ export function MaskControls({
   aiPointActive,
   aiPointPolarity,
   brushSize,
+  overlayVisible,
   onSelect,
   onAddBrush,
   onAddRadial,
@@ -21,7 +22,8 @@ export function MaskControls({
   onBrushActiveChange,
   onAiPointActiveChange,
   onAiPointPolarityChange,
-  onBrushSizeChange
+  onBrushSizeChange,
+  onOverlayVisibleChange
 }: {
   project: PhotoProject;
   selectedId: string | null;
@@ -29,6 +31,7 @@ export function MaskControls({
   aiPointActive: boolean;
   aiPointPolarity: 'positive' | 'negative';
   brushSize: number;
+  overlayVisible: boolean;
   onSelect: (id: string) => void;
   onAddBrush: () => void;
   onAddRadial: () => void;
@@ -40,6 +43,7 @@ export function MaskControls({
   onAiPointActiveChange: (active: boolean) => void;
   onAiPointPolarityChange: (polarity: 'positive' | 'negative') => void;
   onBrushSizeChange: (size: number) => void;
+  onOverlayVisibleChange: (visible: boolean) => void;
 }): ReactElement {
   const groups = useRef(new Map<string, string>());
   const masks = project.getMasks().map((mask) => mask.toPrimitives());
@@ -119,23 +123,30 @@ export function MaskControls({
 
   return (
     <div className="mask-controls">
+      <details className="context-help mask-help" open={masks.length === 0}>
+        <summary>How local masks work</summary>
+        <ol><li>Create a mask shape.</li><li>Select it below and position or paint it over the photograph.</li><li>Change <strong>Local exposure</strong>; only covered pixels are affected.</li><li>Use Feather for softer edges, Density for strength, and Invert for the opposite region.</li></ol>
+        <p>The colored overlay is an editing aid and is never exported. Every mask remains reversible recipe data.</p>
+      </details>
+      <label className="mask-overlay-switch"><input type="checkbox" checked={overlayVisible} onChange={(event) => onOverlayVisibleChange(event.target.checked)} /> Show colored mask overlay</label>
       <div className="mask-create-actions">
-        <button type="button" onClick={onAddBrush}>+ Brush mask</button>
-        <button type="button" onClick={onAddRadial}>+ Radial mask</button>
-        <button type="button" onClick={onAddLinear}>+ Linear gradient</button>
-        <button type="button" onClick={onAddLuminance}>+ Luminance range</button>
+        <button type="button" aria-label="+ Brush mask" title="Paint freehand directly over the photograph" onClick={onAddBrush}><strong>+ Brush</strong><small>Paint a free shape</small></button>
+        <button type="button" aria-label="+ Radial mask" title="An editable ellipse for faces, objects, and vignettes" onClick={onAddRadial}><strong>+ Radial</strong><small>Ellipse or spotlight</small></button>
+        <button type="button" aria-label="+ Linear gradient" title="A gradual transition between two editable points" onClick={onAddLinear}><strong>+ Linear</strong><small>Graduated transition</small></button>
+        <button type="button" aria-label="+ Luminance range" title="Select pixels by rendered brightness, regardless of position" onClick={onAddLuminance}><strong>+ Luminance</strong><small>Select by brightness</small></button>
       </div>
       {masks.length === 0 && <p className="mask-empty">Create a local mask, then paint or position it directly over the photograph.</p>}
       <div className="mask-list">
         {masks.map((mask, index) => (
           <button className={mask.id === selectedId ? 'active' : ''} type="button" key={mask.id} onClick={() => onSelect(mask.id)}>
             <span>{mask.shape.kind === 'brush' ? 'Brush' : mask.shape.kind === 'radial' ? 'Radial' : mask.shape.kind === 'linear-gradient' ? 'Linear' : mask.shape.kind === 'luminance-range' ? 'Luminance' : mask.shape.kind === 'ai-segmentation' ? 'Smart' : 'Mask'} {index + 1}</span>
-            <small>{mask.enabled ? 'On' : 'Off'}</small>
+            <small>{mask.enabled ? `On · ${maskVisualizationStatus(mask.shape.kind)}` : 'Off'}</small>
           </button>
         ))}
       </div>
       {selected !== null && (
         <div className="selected-mask-controls">
+          <div className="selected-mask-status"><span className="mask-status-swatch" aria-hidden="true" /><span><strong>{maskKindLabel(selected.shape.kind)} mask selected</strong><small>{maskKindExplanation(selected.shape.kind)}</small></span></div>
           <div className="mask-switches">
             <label><input type="checkbox" checked={selected.enabled} onChange={(event) => onUpdate({ ...selected, enabled: event.target.checked }, null)} /> Enabled</label>
             <label><input type="checkbox" checked={selected.inverted} onChange={(event) => onUpdate({ ...selected, inverted: event.target.checked }, null)} /> Invert</label>
@@ -168,6 +179,7 @@ export function MaskControls({
           {selected.shape.kind === 'luminance-range' && (
             <>
               <div className="geometry-grid-heading">Rendered luminance range</div>
+              <p className="mask-inline-help"><strong>Visualization limitation:</strong> luminance coverage is rendered into the photograph, but a per-pixel green overlay is not available yet. Adjust Local exposure temporarily to confirm the selected range.</p>
               <MaskNumberControl label="Minimum" value={selected.shape.minimum} minimum={0} maximum={1} step={0.01} groupKey="luminance-minimum" groups={groups.current} onChange={(value, groupId) => updateLuminance('minimum', value, groupId)} />
               <MaskNumberControl label="Maximum" value={selected.shape.maximum} minimum={0} maximum={1} step={0.01} groupKey="luminance-maximum" groups={groups.current} onChange={(value, groupId) => updateLuminance('maximum', value, groupId)} />
             </>
@@ -207,6 +219,33 @@ function boxFieldLabel(field: 'x' | 'y' | 'width' | 'height'): string {
   if (field === 'x') return 'X';
   if (field === 'y') return 'Y';
   return field === 'width' ? 'Width' : 'Height';
+}
+
+function maskKindLabel(kind: MaskDefinitionPrimitives['shape']['kind']): string {
+  if (kind === 'brush') return 'Brush';
+  if (kind === 'radial') return 'Radial';
+  if (kind === 'linear-gradient') return 'Linear gradient';
+  if (kind === 'luminance-range') return 'Luminance range';
+  if (kind === 'ai-segmentation') return 'Smart';
+  if (kind === 'color-range') return 'Color range';
+  return 'Composite';
+}
+
+function maskKindExplanation(kind: MaskDefinitionPrimitives['shape']['kind']): string {
+  if (kind === 'brush') return 'Activate painting, then drag directly on the photograph.';
+  if (kind === 'radial') return 'The ellipse defines the affected region; edit its center, radii, and rotation.';
+  if (kind === 'linear-gradient') return 'The effect increases gradually from the start point to the end point.';
+  if (kind === 'luminance-range') return 'Pixels are selected by rendered brightness, not by a fixed shape.';
+  if (kind === 'ai-segmentation') return 'Positive points include a region; negative points reject similar areas.';
+  if (kind === 'color-range') return 'Pixels are selected around sampled colors.';
+  return 'Child masks are combined non-destructively.';
+}
+
+function maskVisualizationStatus(kind: MaskDefinitionPrimitives['shape']['kind']): string {
+  if (kind === 'luminance-range' || kind === 'color-range') return 'effect only';
+  if (kind === 'ai-segmentation') return 'points + box';
+  if (kind === 'composite') return 'combined';
+  return 'overlay';
 }
 
 function MaskNumberControl({ label, value, minimum, maximum, step, groupKey, groups, onChange }: {

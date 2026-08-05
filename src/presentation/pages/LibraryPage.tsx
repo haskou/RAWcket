@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Queue, QueueOptions } from '@haskou/flow';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
 import { AssessImportCapacityMessage } from '@/contexts/projects/application/assess-import-capacity/messages/AssessImportCapacityMessage';
 import type { ImportCapacityAssessment } from '@/contexts/projects/application/assess-import-capacity/AssessImportCapacity';
@@ -8,11 +9,13 @@ import { DeleteProjectMessage } from '@/contexts/projects/application/delete-pro
 import { DuplicateProjectMessage } from '@/contexts/projects/application/duplicate-project/messages/DuplicateProjectMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
+import { ListProjectsMessage } from '@/contexts/projects/application/list-projects/messages/ListProjectsMessage';
 import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import type { PhotoProjectSummary } from '@/contexts/projects/domain/PhotoProjectSummary';
 import { useApplication } from '../ApplicationContext';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { ProjectThumbnail } from '../components/ProjectThumbnail';
+import { ProjectOrganizationControls } from '../components/ProjectOrganizationControls';
 import { createDemoImageBlob, downloadBlob } from '../lib/browserImages';
 
 export function LibraryPage(): ReactElement {
@@ -20,14 +23,22 @@ export function LibraryPage(): ReactElement {
   const navigate = useNavigate();
   const imageInput = useRef<HTMLInputElement>(null);
   const bundleInput = useRef<HTMLInputElement>(null);
+  const [projectMutationQueue] = useState(() => new Queue(QueueOptions.withConcurrency(1)));
   const [projects, setProjects] = useState<PhotoProjectSummary[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [minimumRating, setMinimumRating] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState<ImportCapacityAssessment | null>(null);
+  const projectFilter = useMemo(() => new ListProjectsMessage(searchQuery, minimumRating), [minimumRating, searchQuery]);
+  const filteredProjects = useMemo(() => projects.filter((project) => project.matches(
+    projectFilter.getQuery(),
+    projectFilter.getMinimumRating()
+  )), [projectFilter, projects]);
 
   const refresh = useCallback(async (): Promise<void> => {
-    setProjects(await application.listProjects.list());
+    setProjects(await application.listProjects.list(new ListProjectsMessage('', 0)));
   }, [application]);
 
   useEffect(() => {
@@ -83,6 +94,42 @@ export function LibraryPage(): ReactElement {
     }));
     await application.saveProject.save(project);
     await refresh();
+  };
+
+  const changeRating = async (summary: PhotoProjectSummary, rating: number): Promise<void> => {
+    await projectMutationQueue.run(async () => {
+      const project = await application.findProject.find(new FindProjectMessage(summary.getId().valueOf()));
+      if (project === null) return;
+      try {
+        application.applyEditOperation.apply(project, new ApplyEditOperationMessage(project.getId().valueOf(), {
+          kind: EDIT_OPERATION.SET_PROJECT_RATING,
+          rating,
+          groupId: null
+        }));
+        await application.saveProject.save(project);
+        await refresh();
+      } catch (caught: unknown) {
+        setError(caught instanceof Error ? caught.message : 'The project rating could not be changed.');
+      }
+    });
+  };
+
+  const changeTags = async (summary: PhotoProjectSummary, tags: string[]): Promise<void> => {
+    await projectMutationQueue.run(async () => {
+      const project = await application.findProject.find(new FindProjectMessage(summary.getId().valueOf()));
+      if (project === null) return;
+      try {
+        application.applyEditOperation.apply(project, new ApplyEditOperationMessage(project.getId().valueOf(), {
+          kind: EDIT_OPERATION.SET_PROJECT_TAGS,
+          tags,
+          groupId: null
+        }));
+        await application.saveProject.save(project);
+        await refresh();
+      } catch (caught: unknown) {
+        setError(caught instanceof Error ? caught.message : 'The project tags could not be changed.');
+      }
+    });
   };
 
   const duplicate = async (id: string): Promise<void> => {
@@ -148,7 +195,19 @@ export function LibraryPage(): ReactElement {
       </p>
       {error !== null && <p className="notice error" role="alert">{error}</p>}
       <section aria-labelledby="projects-title">
-        <div className="section-heading"><h2 id="projects-title">Recent projects</h2><span>{projects.length} {projects.length === 1 ? 'project' : 'projects'}</span></div>
+        <div className="section-heading"><h2 id="projects-title">Recent projects</h2><span>{filteredProjects.length} of {projects.length} {projects.length === 1 ? 'project' : 'projects'}</span></div>
+        {projects.length > 0 && <div className="library-filters" role="search">
+          <label><span>Search names and tags</span><input type="search" value={searchQuery} placeholder="Portrait, night, client…" onChange={(event) => setSearchQuery(event.target.value)} /></label>
+          <label><span>Minimum rating</span><select value={minimumRating} onChange={(event) => setMinimumRating(Number(event.target.value))}>
+            <option value={0}>All ratings</option>
+            <option value={1}>★ and above</option>
+            <option value={2}>★★ and above</option>
+            <option value={3}>★★★ and above</option>
+            <option value={4}>★★★★ and above</option>
+            <option value={5}>★★★★★ only</option>
+          </select></label>
+          {(searchQuery.length > 0 || minimumRating > 0) && <button type="button" onClick={() => { setSearchQuery(''); setMinimumRating(0); }}>Clear filters</button>}
+        </div>}
         {projects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon" aria-hidden="true">+</div>
@@ -156,9 +215,15 @@ export function LibraryPage(): ReactElement {
             <p>Import a JPEG, PNG, or Sony ARW. The original remains untouched and local.</p>
             <button className="button primary" type="button" onClick={() => imageInput.current?.click()}>Choose image</button>
           </div>
+        ) : filteredProjects.length === 0 ? (
+          <div className="empty-state compact">
+            <h3>No matching projects</h3>
+            <p>Try another name, tag, or rating.</p>
+            <button className="button ghost" type="button" onClick={() => { setSearchQuery(''); setMinimumRating(0); }}>Clear filters</button>
+          </div>
         ) : (
           <div className="project-grid">
-            {projects.map((project) => {
+            {filteredProjects.map((project) => {
               const id = project.getId().valueOf();
               const name = project.getName().valueOf();
               return (
@@ -167,6 +232,7 @@ export function LibraryPage(): ReactElement {
                     <ProjectThumbnail projectId={id} name={name} mimeType={project.getSourceMimeType().valueOf()} />
                     <span className="project-meta"><strong>{name}</strong><small>Edited {project.getUpdatedAt().toDate().toLocaleString('en')}</small></span>
                   </button>
+                  <ProjectOrganizationControls project={project} onRate={(rating) => void changeRating(project, rating)} onTags={(tags) => void changeTags(project, tags)} />
                   <div className="project-actions" aria-label={`Actions for ${name}`}>
                     <button type="button" onClick={() => void rename(project)}>Rename</button>
                     <button type="button" onClick={() => void duplicate(id)}>Duplicate</button>

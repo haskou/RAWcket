@@ -5,6 +5,7 @@ import { EDIT_OPERATION, type EditOperation } from './EditOperation';
 import { EditHistory, type EditHistoryPrimitives } from './EditHistory';
 import { MaskDefinition } from './MaskDefinition';
 import { ProjectMetadata } from './ProjectMetadata';
+import { ProjectOrganization } from './ProjectOrganization';
 import { type ProjectDomainEvent } from './ProjectDomainEvent';
 import { ProjectSchemaVersion } from './ProjectSchemaVersion';
 import { InterfaceMode, ProjectUiState, type InterfaceModePrimitive } from './ProjectUiState';
@@ -16,6 +17,8 @@ import { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
 import { MaskId } from './value-objects/MaskId';
 import { ProjectId } from './value-objects/ProjectId';
 import { ProjectName } from './value-objects/ProjectName';
+import { ProjectRating } from './value-objects/ProjectRating';
+import { ProjectTags } from './value-objects/ProjectTags';
 
 export type PhotoProjectPrimitives = {
   schemaVersion: number;
@@ -23,6 +26,7 @@ export type PhotoProjectPrimitives = {
   name: string;
   source: { fileName: string; mimeType: SourceImageMimeType; size: number; storageKey: string };
   metadata: { createdAt: number; updatedAt: number; width: number; height: number };
+  organization: { rating: number; tags: string[] };
   recipe: DevelopmentRecipePrimitives;
   history: EditHistoryPrimitives;
   uiState: { mode: InterfaceModePrimitive };
@@ -39,7 +43,8 @@ export class PhotoProject {
     private metadata: ProjectMetadata,
     private readonly recipe: DevelopmentRecipe,
     private readonly history: EditHistory,
-    private readonly uiState: ProjectUiState
+    private readonly uiState: ProjectUiState,
+    private readonly organization: ProjectOrganization
   ) {}
 
   public static create(
@@ -57,7 +62,8 @@ export class PhotoProject {
       metadata,
       DevelopmentRecipe.neutral(),
       new EditHistory(historyLimit),
-      new ProjectUiState(InterfaceMode.SIMPLE)
+      new ProjectUiState(InterfaceMode.SIMPLE),
+      new ProjectOrganization(ProjectRating.UNRATED, ProjectTags.fromPrimitives([]))
     );
     project.recordEvent('PhotoProjectWasCreated', metadata.getCreatedAt());
     return project;
@@ -82,8 +88,31 @@ export class PhotoProject {
       ),
       DevelopmentRecipe.fromPrimitives(input.recipe),
       EditHistory.fromPrimitives(input.history),
-      new ProjectUiState(InterfaceMode.fromPrimitives(input.uiState.mode))
+      new ProjectUiState(InterfaceMode.fromPrimitives(input.uiState.mode)),
+      new ProjectOrganization(
+        new ProjectRating(input.organization.rating),
+        ProjectTags.fromPrimitives(input.organization.tags)
+      )
     );
+  }
+
+  public duplicate(id: ProjectId, source: SourceImageReference, metadata: ProjectMetadata): PhotoProject {
+    const duplicate = new PhotoProject(
+      new ProjectSchemaVersion(ProjectSchemaVersion.CURRENT),
+      id,
+      this.name.copy(),
+      source,
+      metadata,
+      DevelopmentRecipe.fromPrimitives(this.recipe.toPrimitives()),
+      new EditHistory(100),
+      new ProjectUiState(this.uiState.getMode()),
+      new ProjectOrganization(
+        new ProjectRating(this.organization.getRating()),
+        ProjectTags.fromPrimitives(this.organization.getTags().toPrimitives())
+      )
+    );
+    duplicate.recordEvent('PhotoProjectWasCreated', metadata.getCreatedAt());
+    return duplicate;
   }
 
   public apply(operation: EditOperation, at: Timestamp): void {
@@ -128,12 +157,22 @@ export class PhotoProject {
     return this.source;
   }
 
+  public getRating(): ProjectRating {
+    return this.organization.getRating();
+  }
+
+  public getTags(): ProjectTags {
+    return this.organization.getTags();
+  }
+
   public getSummary(): PhotoProjectSummary {
     return new PhotoProjectSummary(
       this.id,
       this.name,
       this.metadata.getUpdatedAt(),
-      this.source.getMimeType()
+      this.source.getMimeType(),
+      this.organization.getRating(),
+      this.organization.getTags()
     );
   }
 
@@ -143,6 +182,22 @@ export class PhotoProject {
 
   public isGlobalAdjustmentEnabled(key: AdjustmentKey): boolean {
     return this.recipe.isGlobalAdjustmentEnabled(key);
+  }
+
+  public isGlobalAdjustmentModified(key: AdjustmentKey): boolean {
+    return !this.recipe.getGlobalAdjustment(key).isZero();
+  }
+
+  public hasCurveAdjustments(): boolean {
+    return this.recipe.hasCurveAdjustments();
+  }
+
+  public hasGeometryAdjustments(): boolean {
+    return this.recipe.hasGeometryAdjustments();
+  }
+
+  public hasMasks(): boolean {
+    return this.recipe.hasMasks();
   }
 
   public getViewportTransform(): ViewportTransform {
@@ -197,6 +252,10 @@ export class PhotoProject {
         width: this.metadata.getWidth(),
         height: this.metadata.getHeight()
       },
+      organization: {
+        rating: this.organization.getRating().valueOf(),
+        tags: this.organization.getTags().toPrimitives()
+      },
       recipe: this.recipe.toPrimitives(),
       history: this.history.toPrimitives(),
       uiState: { mode: this.uiState.getMode().valueOf() }
@@ -246,6 +305,16 @@ export class PhotoProject {
       const previous = this.recipe.getDevelopmentSettings();
       this.recipe.replaceDevelopmentSettings(operation.settings);
       return { ...operation, settings: previous };
+    }
+    if (operation.kind === EDIT_OPERATION.SET_PROJECT_RATING) {
+      const previous = this.organization.getRating();
+      this.organization.changeRating(new ProjectRating(operation.rating));
+      return { ...operation, rating: previous.valueOf() };
+    }
+    if (operation.kind === EDIT_OPERATION.SET_PROJECT_TAGS) {
+      const previous = this.organization.getTags();
+      this.organization.replaceTags(ProjectTags.fromPrimitives(operation.tags));
+      return { ...operation, tags: previous.toPrimitives() };
     }
     const previousName = this.name;
     this.name = new ProjectName(operation.name);

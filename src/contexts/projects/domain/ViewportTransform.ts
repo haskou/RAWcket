@@ -86,4 +86,19 @@ export class ViewportTransform {
           : { width: this.aspectRatio.getWidth(), height: this.aspectRatio.getHeight() }
     };
   }
+
+  public isReset(): boolean {
+    const origin = this.cropFrame.getOrigin();
+    return origin.getX().isZero()
+      && origin.getY().isZero()
+      && this.cropFrame.getWidth().isEqual(new NormalizedCoordinate(1))
+      && this.cropFrame.getHeight().isEqual(new NormalizedCoordinate(1))
+      && this.translation.getX().isEqual(new NormalizedCoordinate(0.5))
+      && this.translation.getY().isEqual(new NormalizedCoordinate(0.5))
+      && this.scale === 1
+      && this.rotationDegrees === 0
+      && !this.flipHorizontal
+      && !this.flipVertical
+      && this.aspectRatio === null;
+  }
 }

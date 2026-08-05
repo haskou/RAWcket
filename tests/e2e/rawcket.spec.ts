@@ -22,6 +22,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   });
 
   await expect(page.getByLabel('Project name')).toHaveValue('night');
+  await expect(page.getByText('No active edits')).toBeVisible();
+  await expect(page.getByLabel('Active Recipe').getByRole('button', { name: /^Exposure / })).toHaveCount(0);
   const webGpuAvailable = await page.evaluate(async () => {
     if (!Reflect.has(navigator, 'gpu')) return false;
     return (await navigator.gpu.requestAdapter()) !== null;
@@ -57,9 +59,14 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('checkbox', { name: 'Contrast: +14' })).toBeChecked();
   await page.getByRole('button', { name: 'Apply selected' }).click();
   await expect(page.getByRole('button', { name: /Contrast \+14/ })).toBeVisible();
-  await page.getByRole('button', { name: /Exposure/ }).click();
+  await page.keyboard.press('1');
+  await expect(page.getByRole('button', { name: 'Light Shortcut 1' })).toHaveAttribute('aria-expanded', 'true');
   await page.getByLabel('Exposure numeric value').fill('0.25');
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
+  await expect(page.locator('.adjustment-control.modified').filter({ has: page.getByLabel('Exposure numeric value') }).getByLabel('Modified')).toBeVisible();
+  await page.getByRole('button', { name: 'Reset Exposure' }).click();
+  await expect(page.getByLabel('Active Recipe').getByRole('button', { name: /^Exposure / })).toHaveCount(0);
+  await page.getByLabel('Exposure numeric value').fill('0.25');
   await page.getByLabel('Exposure enabled').uncheck();
   await expect(page.getByLabel('Exposure numeric value')).toBeDisabled();
   await page.getByLabel('Exposure enabled').check();
@@ -67,18 +74,36 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'After · B' }).click();
   await expect(page.getByText('Original · Before')).toBeVisible();
   await page.getByRole('button', { name: 'Before · B' }).click();
-  await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
+  const canvasWidthBeforeCollapse = await page.locator('.canvas-area').evaluate((element) => element.getBoundingClientRect().width);
+  await page.getByRole('button', { name: 'Collapse Active Recipe' }).click();
+  await expect(page.getByRole('button', { name: 'Expand Active Recipe' })).toBeVisible();
+  await expect.poll(() => page.locator('.canvas-area').evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(canvasWidthBeforeCollapse);
+  await page.getByRole('button', { name: 'Fit', exact: true }).click();
+  const horizontalCenterDelta = await page.evaluate(() => {
+    const stage = document.querySelector('.photo-stage')?.getBoundingClientRect();
+    const preview = document.querySelector('.preview-surface')?.getBoundingClientRect();
+    if (stage === undefined || preview === undefined) return Number.POSITIVE_INFINITY;
+    return Math.abs((stage.left + stage.width / 2) - (preview.left + preview.width / 2));
+  });
+  expect(horizontalCenterDelta).toBeLessThan(2);
+  await page.getByRole('button', { name: 'Expand Active Recipe' }).click();
+  await page.getByLabel('Editing tools').getByRole('button', { name: /Crop & Geometry/ }).click();
+  await page.getByLabel('Geometry composition guide').selectOption('thirds');
+  await page.getByLabel('Level axes').check();
+  await expect(page.getByLabel('Composition and level guides')).toBeVisible();
   await page.getByLabel('Rotation numeric value').fill('10');
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
-  await page.getByRole('button', { name: 'Local Masks', exact: true }).click();
+  await page.getByLabel('Editing tools').getByRole('button', { name: 'Masks AI ready' }).click();
+  await expect(page.getByText('How local masks work')).toBeVisible();
   await page.getByRole('button', { name: '+ Radial mask' }).click();
+  await expect(page.getByText('Radial mask selected')).toBeVisible();
   await page.getByLabel('Local exposure numeric value').fill('1');
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await page.getByRole('tab', { name: '✦ AI' }).click();
   await page.getByRole('button', { name: 'Create and place points' }).click();
   await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
   await expect(page.getByText('CPU compatibility preview')).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
+  await page.keyboard.press('4');
   await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
   const curveGraph = page.locator('.curve-graph');
   await expect(curveGraph.locator('path.curve-line')).toHaveAttribute('d', /^M0,1 L/);
@@ -105,6 +130,18 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
+  await page.getByRole('button', { name: 'Rate night 4 stars' }).click();
+  await expect(page.getByRole('button', { name: 'Rate night 4 stars' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Edit tags' }).click();
+  await page.getByLabel('Comma-separated tags').fill('night, client');
+  await page.getByRole('button', { name: 'Save tags' }).click();
+  await expect(page.getByText('client', { exact: true })).toBeVisible();
+  await page.getByLabel('Search names and tags').fill('client');
+  await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
+  await page.getByLabel('Minimum rating').selectOption('5');
+  await expect(page.getByText('No matching projects')).toBeVisible();
+  await page.getByLabel('Minimum rating').selectOption('4');
+  await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
   await page.getByRole('button', { name: 'Open night' }).click();
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
   await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();

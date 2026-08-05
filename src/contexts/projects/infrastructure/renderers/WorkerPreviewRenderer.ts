@@ -76,7 +76,12 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
       };
       worker.onmessage = (event: MessageEvent<unknown>): void => {
         const response = previewWorkerResponseSchema.safeParse(event.data);
-        if (!response.success || response.data.id !== workerRequest.id) return;
+        if (!response.success) {
+          cleanup();
+          reject(new Error(`The preview worker returned an invalid response: ${response.error.issues.map((issue) => issue.message).join('; ')}`));
+          return;
+        }
+        if (response.data.id !== workerRequest.id) return;
         if (response.data.kind === 'progress') {
           control.onProgress?.({ stage: response.data.stage, completed: response.data.completed });
           return;

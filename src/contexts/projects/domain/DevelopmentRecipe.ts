@@ -117,6 +117,18 @@ export class DevelopmentRecipe {
     return this.masks.map((mask) => MaskDefinition.fromPrimitives(mask.toPrimitives()));
   }
 
+  public hasCurveAdjustments(): boolean {
+    return this.curves.hasAdjustments();
+  }
+
+  public hasGeometryAdjustments(): boolean {
+    return !this.viewport.isReset();
+  }
+
+  public hasMasks(): boolean {
+    return this.masks.length > 0;
+  }
+
   public getDevelopmentSettings(): DevelopmentSettingsPrimitives {
     return {
       globalAdjustments: this.globalAdjustments.toPrimitives(),

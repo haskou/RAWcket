@@ -111,6 +111,18 @@ export class ToneCurve {
       interpolation: this.interpolation.valueOf()
     };
   }
+
+  public isIdentity(): boolean {
+    const first = this.points[0];
+    const last = this.points[1];
+    return this.points.length === 2
+      && first !== undefined
+      && last !== undefined
+      && first.getX().isZero()
+      && first.getY().isZero()
+      && last.getX().isEqual(new CurveCoordinate(1))
+      && last.getY().isEqual(new CurveCoordinate(1));
+  }
 }
 
 export type CurveSetPrimitives = Record<'rgb' | 'red' | 'green' | 'blue', ToneCurvePrimitives> & {
@@ -159,6 +171,14 @@ export class CurveSet {
     if (channel.isGreen()) return this.green;
     if (channel.isBlue()) return this.blue;
     return this.luminance;
+  }
+
+  public hasAdjustments(): boolean {
+    return !this.rgb.isIdentity()
+      || !this.red.isIdentity()
+      || !this.green.isIdentity()
+      || !this.blue.isIdentity()
+      || (this.luminance !== null && !this.luminance.isIdentity());
   }
 
   public toPrimitives(): CurveSetPrimitives {

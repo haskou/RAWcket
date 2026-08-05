@@ -50,6 +50,7 @@ import {
   adjustmentDefinitions,
   type AdjustmentSection
 } from '../editor/adjustmentDefinitions';
+import type { CompositionGuide } from '../editor/CompositionGuide';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useProjectAutosave } from '../hooks/useProjectAutosave';
 import { downloadBlob } from '../lib/browserImages';
@@ -60,9 +61,11 @@ type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
 type BrushGesture = { pointerId: number; maskId: string; groupId: string };
 type AiPointPolarity = 'positive' | 'negative';
+type ImageDimensions = { width: number; height: number };
 
 const minimumZoom = 0.1;
 const maximumZoom = 8;
+const compositionGuideSequence: CompositionGuide[] = ['none', 'thirds', 'grid', 'diagonals', 'golden-ratio'];
 const curvePresets: Record<'Identity' | 'S curve' | 'Fade', ToneCurvePrimitives> = {
   Identity: {
     points: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
@@ -120,6 +123,7 @@ export function EditorPage(): ReactElement {
   const panGesture = useRef<PanGesture | null>(null);
   const brushGesture = useRef<BrushGesture | null>(null);
   const previewSurface = useRef<HTMLDivElement>(null);
+  const photoStage = useRef<HTMLDivElement>(null);
   const exportAbort = useRef<AbortController | null>(null);
   const semanticAbort = useRef<AbortController | null>(null);
   const [project, setProject] = useState<PhotoProject | null>(null);
@@ -132,7 +136,13 @@ export function EditorPage(): ReactElement {
   const [revision, setRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
+  const [imageDimensions, setImageDimensions] = useState<ImageDimensions | null>(null);
+  const [fitDimensions, setFitDimensions] = useState<ImageDimensions | null>(null);
   const [panning, setPanning] = useState(false);
+  const [recipeCollapsed, setRecipeCollapsed] = useState(false);
+  const [compositionGuide, setCompositionGuide] = useState<CompositionGuide>('none');
+  const [levelAxesVisible, setLevelAxesVisible] = useState(false);
+  const [maskOverlayVisible, setMaskOverlayVisible] = useState(true);
   const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
   const [brushActive, setBrushActive] = useState(false);
   const [aiPointActive, setAiPointActive] = useState(false);
@@ -219,7 +229,8 @@ export function EditorPage(): ReactElement {
       }
     }).catch((error: unknown) => {
       if (!(error instanceof DOMException) || error.name !== 'AbortError') {
-        setRenderProgress('Preview unavailable; showing original');
+        const message = error instanceof Error ? error.message : 'Unknown rendering error.';
+        setRenderProgress(`Preview unavailable; showing original. ${message}`);
       }
     });
     return () => controller.abort();
@@ -250,10 +261,28 @@ export function EditorPage(): ReactElement {
     setRevision((current) => current + 1);
   }, [application, project, projectId]);
 
+  const calculateFitDimensions = useCallback((dimensions: ImageDimensions | null = imageDimensions): void => {
+    const bounds = photoStage.current?.getBoundingClientRect();
+    if (bounds === undefined || dimensions === null) return;
+    const availableWidth = Math.max(1, bounds.width - 64);
+    const availableHeight = Math.max(1, bounds.height - 118);
+    const scale = Math.min(availableWidth / dimensions.width, availableHeight / dimensions.height, 1);
+    setFitDimensions({ width: Math.max(1, Math.round(dimensions.width * scale)), height: Math.max(1, Math.round(dimensions.height * scale)) });
+  }, [imageDimensions]);
+
   const fitPreview = useCallback((): void => {
+    calculateFitDimensions();
     setZoom(1);
     setPan({ x: 0, y: 0 });
-  }, []);
+  }, [calculateFitDimensions]);
+
+  useEffect(() => {
+    const stage = photoStage.current;
+    if (stage === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => calculateFitDimensions());
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [calculateFitDimensions]);
 
   const openPanel = useCallback((panel: EditorPanel): void => {
     setActivePanel(panel);
@@ -292,7 +321,9 @@ export function EditorPage(): ReactElement {
       else if (event.key === '4') openPanel('curves');
       else if (event.key.toLowerCase() === 'a') openPanel('ai');
       else if (event.key.toLowerCase() === 'b') setShowOriginal((value) => !value);
+      else if (event.key.toLowerCase() === 'g') setCompositionGuide((current) => compositionGuideSequence[(compositionGuideSequence.indexOf(current) + 1) % compositionGuideSequence.length] ?? 'none');
       else if (event.key.toLowerCase() === 'm') openPanel('masks');
+      else if (event.key.toLowerCase() === 'r') setRecipeCollapsed((value) => !value);
       else if (event.key === 'Escape') { setBrushActive(false); setAiPointActive(false); }
       else if (event.key === '?') setShortcutsOpen((value) => !value);
       else return;
@@ -770,6 +801,17 @@ export function EditorPage(): ReactElement {
     changeZoom(zoom * (event.deltaY < 0 ? 1.1 : 0.9));
   };
 
+  const previewLoaded = (image: HTMLImageElement): void => {
+    const dimensions = { width: image.naturalWidth, height: image.naturalHeight };
+    if (imageDimensions?.width === dimensions.width && imageDimensions.height === dimensions.height) return;
+    setImageDimensions(dimensions);
+    window.requestAnimationFrame(() => {
+      calculateFitDimensions(dimensions);
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    });
+  };
+
   if (loadError !== null) {
     return <main className="centered-state"><h1>Unable to open</h1><p>{loadError}</p><button className="button primary" onClick={() => void navigate('/')}>Back to library</button></main>;
   }
@@ -797,7 +839,7 @@ export function EditorPage(): ReactElement {
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
-      <section className="editor-workspace">
+      <section className={`editor-workspace ${recipeCollapsed ? 'recipe-collapsed' : ''}`}>
         <ActiveRecipePanel
           project={project}
           onNavigate={showAdjustment}
@@ -807,6 +849,8 @@ export function EditorPage(): ReactElement {
           onPaste={() => void pasteDevelopmentSettings()}
           onApplyPreset={applyBuiltInPreset}
           transferMessage={recipeTransferMessage}
+          collapsed={recipeCollapsed}
+          onToggleCollapsed={() => setRecipeCollapsed((value) => !value)}
         />
         <div className="canvas-area">
           <div className="canvas-toolbar" aria-label="Preview controls">
@@ -815,9 +859,15 @@ export function EditorPage(): ReactElement {
             <label><span className="visually-hidden">Zoom percentage</span><input type="number" min={10} max={800} step={1} value={Math.round(zoom * 100)} onChange={(event) => changeZoom(event.currentTarget.valueAsNumber / 100)} />%</label>
             <button type="button" onClick={() => changeZoom(zoom + 0.1)} aria-label="Zoom in">+</button>
             <button type="button" onClick={fitPreview}>Fit</button>
+            <select aria-label="Composition guide" value={compositionGuide} onChange={(event) => setCompositionGuide(event.target.value as CompositionGuide)} title="Composition overlay">
+              <option value="none">No guide</option><option value="thirds">Thirds</option><option value="grid">Grid</option><option value="diagonals">Diagonals</option><option value="golden-ratio">Golden ratio</option>
+            </select>
+            <button className={levelAxesVisible ? 'active' : ''} aria-pressed={levelAxesVisible} type="button" onClick={() => setLevelAxesVisible((value) => !value)} title="Show horizontal and vertical level references">Level</button>
+            {project.hasMasks() && <button className={maskOverlayVisible ? 'active' : ''} aria-pressed={maskOverlayVisible} type="button" onClick={() => setMaskOverlayVisible((value) => !value)} title="Show or hide the editable mask overlay">Mask</button>}
             <button className={showOriginal ? 'active' : ''} type="button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
           </div>
           <div
+            ref={photoStage}
             className={`photo-stage ${panning ? 'panning' : ''} ${brushActive || aiPointActive ? 'painting' : ''}`}
             onPointerDown={startPan}
             onPointerMove={movePan}
@@ -827,9 +877,10 @@ export function EditorPage(): ReactElement {
             aria-label="Photo preview. Drag to pan and use the mouse wheel to zoom."
           >
             {sourceUrl !== null && (
-              <div ref={previewSurface} className="preview-surface" style={{ transform }}>
-                <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} />
-                {!showOriginal && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={project.getMasks().map((mask) => mask.toPrimitives())} />}
+              <div ref={previewSurface} className="preview-surface" style={{ transform, width: fitDimensions?.width, height: fitDimensions?.height, maxWidth: fitDimensions === null ? undefined : 'none', maxHeight: fitDimensions === null ? undefined : 'none' }}>
+                <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => previewLoaded(event.currentTarget)} />
+                {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={project.getMasks().map((mask) => mask.toPrimitives())} />}
+                <CompositionGuideOverlay guide={compositionGuide} showLevelAxes={levelAxesVisible} />
               </div>
             )}
             <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{previewAnalysis?.backend === 'webgpu' || previewAnalysis?.backend === 'webgl2' ? 'GPU global development · CPU geometry' : 'Reference renderer for masks and spatial stages'} · {renderProgress}</small></span></div>
@@ -910,14 +961,14 @@ export function EditorPage(): ReactElement {
           </div>
           <p className="mode-explanation">{mode === 'simple' ? 'Essential light and color controls.' : 'Full technical control, curves, geometry, and masks.'}</p>
           <ToolSection id="light" title="Light" active={activePanel === 'light'} onToggle={setActivePanel} badge="Shortcut 1">
-            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} />
+            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
           </ToolSection>
           <ToolSection id="color" title="Color" active={activePanel === 'color'} onToggle={setActivePanel} badge="Shortcut 2">
-            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeAdjustment} />
+            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
           </ToolSection>
           {mode === 'advanced' && <>
           <ToolSection id="detail" title="Detail" active={activePanel === 'detail'} onToggle={setActivePanel} badge="Shortcut 3">
-            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} />
+            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
           </ToolSection>
           <ToolSection id="curves" title="Tone Curve" active={activePanel === 'curves'} onToggle={setActivePanel} badge="Shortcut 4">
             <p>Edit every channel with draggable or exact numeric points. Click or drag anywhere on the graph to add a point.</p>
@@ -928,7 +979,7 @@ export function EditorPage(): ReactElement {
           </ToolSection>
           <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel} badge="Rendered">
             <p>Crop, image position, scale, rotation, and flips are persisted, undoable, and rendered by the reference pipeline.</p>
-            <GeometryControls project={project} onChange={changeViewport} />
+            <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} showLevelAxes={levelAxesVisible} onGuideChange={setCompositionGuide} onLevelAxesChange={setLevelAxesVisible} />
           </ToolSection>
           <ToolSection id="masks" title="Masks" active={activePanel === 'masks'} onToggle={setActivePanel} badge="AI ready">
             <p>Local masks remain editable recipe data. Brush and radial coverage now render through the reference pipeline.</p>
@@ -939,6 +990,7 @@ export function EditorPage(): ReactElement {
               aiPointActive={aiPointActive}
               aiPointPolarity={aiPointPolarity}
               brushSize={brushSize}
+              overlayVisible={maskOverlayVisible}
               onSelect={selectMask}
               onAddBrush={addBrushMask}
               onAddRadial={addRadialMask}
@@ -950,6 +1002,7 @@ export function EditorPage(): ReactElement {
               onAiPointActiveChange={(active) => { setAiPointActive(active); if (active) setBrushActive(false); }}
               onAiPointPolarityChange={setAiPointPolarity}
               onBrushSizeChange={setBrushSize}
+              onOverlayVisibleChange={setMaskOverlayVisible}
             />
           </ToolSection>
           </>}
@@ -1001,6 +1054,8 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
     ['Tone Curve', '4'],
     ['AI Studio', 'A'],
     ['Before / after', 'B'],
+    ['Cycle composition guides', 'G'],
+    ['Collapse / expand recipe', 'R'],
     ['Masks', 'M'],
     ['Shortcut guide', '?']
   ];
@@ -1040,6 +1095,20 @@ function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactEle
   );
 }
 
+function CompositionGuideOverlay({ guide, showLevelAxes }: {
+  guide: CompositionGuide;
+  showLevelAxes: boolean;
+}): ReactElement | null {
+  if (guide === 'none' && !showLevelAxes) return null;
+  return <svg className="composition-guide-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Composition and level guides">
+    {guide === 'thirds' && <path d="M.333 0V1 M.667 0V1 M0 .333H1 M0 .667H1" />}
+    {guide === 'grid' && <path d="M.25 0V1 M.5 0V1 M.75 0V1 M0 .25H1 M0 .5H1 M0 .75H1" />}
+    {guide === 'diagonals' && <path d="M0 0L1 1 M1 0L0 1" />}
+    {guide === 'golden-ratio' && <path d="M.382 0V1 M.618 0V1 M0 .382H1 M0 .618H1" />}
+    {showLevelAxes && <g className="level-axes"><path d="M0 .5H1 M.5 0V1" /><path className="level-ticks" d="M.48 .25H.52 M.48 .75H.52 M.25 .48V.52 M.75 .48V.52" /><circle cx=".5" cy=".5" r=".012" /></g>}
+  </svg>;
+}
+
 function describeOperation(operation: EditOperation): string {
   if (operation.kind === EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT) {
     const label = adjustmentDefinitions.find((definition) => definition.key === operation.key)?.label ?? operation.key;
@@ -1050,6 +1119,8 @@ function describeOperation(operation: EditOperation): string {
   if (operation.kind === EDIT_OPERATION.SET_VIEWPORT_TRANSFORM) return 'Update crop and geometry';
   if (operation.kind === EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS) return 'Replace development settings';
   if (operation.kind === EDIT_OPERATION.RENAME_PROJECT) return `Rename project to ${operation.name}`;
+  if (operation.kind === EDIT_OPERATION.SET_PROJECT_RATING) return `Rate project ${operation.rating} stars`;
+  if (operation.kind === EDIT_OPERATION.SET_PROJECT_TAGS) return `Replace project tags`;
   if (operation.kind === EDIT_OPERATION.REMOVE_MASK) return 'Remove local mask';
   return operation.kind === EDIT_OPERATION.ADD_MASK ? 'Add local mask' : 'Update local mask';
 }

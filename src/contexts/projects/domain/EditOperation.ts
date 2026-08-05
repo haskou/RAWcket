@@ -13,7 +13,9 @@ export const EDIT_OPERATION = {
   REMOVE_MASK: 'remove-mask',
   SET_VIEWPORT_TRANSFORM: 'set-viewport-transform',
   REPLACE_DEVELOPMENT_SETTINGS: 'replace-development-settings',
-  RENAME_PROJECT: 'rename-project'
+  RENAME_PROJECT: 'rename-project',
+  SET_PROJECT_RATING: 'set-project-rating',
+  SET_PROJECT_TAGS: 'set-project-tags'
 } as const;
 
 type OperationMetadata = { groupId: string | null };
@@ -57,6 +59,14 @@ export type ReplaceDevelopmentSettingsOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS;
   settings: DevelopmentSettingsPrimitives;
 };
+export type SetProjectRatingOperation = OperationMetadata & {
+  kind: typeof EDIT_OPERATION.SET_PROJECT_RATING;
+  rating: number;
+};
+export type SetProjectTagsOperation = OperationMetadata & {
+  kind: typeof EDIT_OPERATION.SET_PROJECT_TAGS;
+  tags: string[];
+};
 
 export type EditOperation =
   | SetGlobalAdjustmentOperation
@@ -67,4 +77,6 @@ export type EditOperation =
   | RemoveMaskOperation
   | SetViewportTransformOperation
   | ReplaceDevelopmentSettingsOperation
-  | RenameProjectOperation;
+  | RenameProjectOperation
+  | SetProjectRatingOperation
+  | SetProjectTagsOperation;

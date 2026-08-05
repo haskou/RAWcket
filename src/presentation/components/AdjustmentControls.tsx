@@ -3,10 +3,11 @@ import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import type { AdjustmentDefinition } from '../editor/adjustmentDefinitions';
 
-export function AdjustmentControls({ project, definitions, onChange }: {
+export function AdjustmentControls({ project, definitions, onChange, onToggle }: {
   project: PhotoProject;
   definitions: readonly AdjustmentDefinition[];
   onChange: (key: AdjustmentKeyPrimitive, value: number, groupId: string | null) => void;
+  onToggle?: (key: AdjustmentKeyPrimitive, enabled: boolean) => void;
 }): ReactElement {
   const groups = useRef(new Map<AdjustmentKeyPrimitive, string>());
 
@@ -15,11 +16,13 @@ export function AdjustmentControls({ project, definitions, onChange }: {
       {definitions.map((definition) => {
         const value = project.getGlobalAdjustment(AdjustmentKey.fromPrimitives(definition.key)).valueOf();
         const enabled = project.isGlobalAdjustmentEnabled(AdjustmentKey.fromPrimitives(definition.key));
+        const modified = project.isGlobalAdjustmentModified(AdjustmentKey.fromPrimitives(definition.key));
         return (
-          <div className={`adjustment-control ${enabled ? '' : 'disabled'}`} key={definition.key}>
+          <div className={`adjustment-control ${enabled ? '' : 'disabled'} ${modified ? 'modified' : ''}`} key={definition.key}>
             <div className="adjustment-control-heading">
-              <label htmlFor={`adjustment-${definition.key}`}>{definition.label}</label>
+              <label htmlFor={`adjustment-${definition.key}`} title={modified ? 'Changed from the default value' : 'Default value'}>{definition.label}{modified && <span className="modified-mark" aria-label="Modified">●</span>}</label>
               <div className="numeric-control">
+                {onToggle !== undefined && <button className="adjustment-enable" type="button" aria-label={`${enabled ? 'Disable' : 'Enable'} ${definition.label}`} aria-pressed={enabled} onClick={() => onToggle(definition.key, !enabled)} title={`${enabled ? 'Disable' : 'Enable'} this instruction`}>{enabled ? '◉' : '○'}</button>}
                 <input
                   aria-label={`${definition.label} numeric value`}
                   type="number"

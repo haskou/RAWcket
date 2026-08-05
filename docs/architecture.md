@@ -23,6 +23,8 @@ Dependency arrows point toward the application and domain layers. The domain dep
 
 `PhotoProject` is the consistency boundary. It owns the name, original reference, metadata, `DevelopmentRecipe`, `EditHistory`, and `ProjectUiState`. Every editorial mutation passes through an `EditOperation`; the aggregate computes the inverse before recording history and emits a domain event.
 
+Schema version 4 also owns `ProjectOrganization`: a bounded zero-to-five `ProjectRating` and at most twenty normalized `ProjectTag` values. Rating/tag changes use the same serializable history as photographic edits. `PhotoProjectSummary` exposes matching behavior so application-level library filters do not extract and compare primitive domain values.
+
 `DevelopmentRecipe` contains:
 
 - `GlobalAdjustments`: sixteen adjustments with concept-specific ranges and independent enabled state.

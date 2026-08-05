@@ -13,18 +13,19 @@ Implemented:
 - Strict TypeScript React/Vite application with responsive, accessible foundations.
 - Local library with JPEG/PNG/Sony ARW import, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, quota preflight, and portable project bundles.
 - Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
-- Navigable Active Recipe sidebar with a reversible enable switch for every global parameter.
+- Collapsible, navigable Active Recipe sidebar that lists only non-default instructions, with reversible enable switches and links back to each editor.
 - Adaptive renderer in a cancellable Web Worker: WebGPU compute runs compatible global development and curve LUTs first, a real WebGL2 shader provides the graphics fallback, and the reference CPU backend handles masks and spatial stages. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, and a versioned LRU preview cache share the same boundary.
 - Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
-- Versioned schema migrations through version 3.
+- Versioned schema migrations through version 4.
 - AI-first workspace with local, reviewable recipe proposals, a measurement-backed development tutor, deterministic positive/negative-point smart masks, and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Optional cloud AI remains disabled by default.
 - Optional AES-GCM/PBKDF2 API-key vault whose master password is never stored.
 - Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
-- Interactive curves, before/after, exact geometry, brush/radial/linear/luminance masks, portable development settings, and built-in reversible presets.
+- Interactive curves, before/after, workspace-relative Fit, composition/level guides, exact geometry, explained brush/radial/linear/luminance masks, portable development settings, and built-in reversible presets.
+- Local library search across names and tags, validated comma-separated tags, and reversible zero-to-five-star ratings.
 - Optional PWA installation, an offline app shell after first load, and user-controlled update activation.
 - Unit, integration, and Chromium E2E coverage; CI for lint, typecheck, tests, build, and E2E.
 
@@ -35,7 +36,7 @@ Not implemented yet:
 - A consented optional cloud provider and larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
 - 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.
-- Tags, ratings, collections, sidecars, filesystem links, complete orphan cleanup, and a full WCAG/browser-device audit.
+- Collections, sidecars, filesystem links, complete orphan cleanup, and a full WCAG/browser-device audit.
 
 The detailed, actively maintained plan is in [TODO.md](TODO.md).
 

@@ -12,6 +12,6 @@ export class ProjectName extends StringValueObject {
   }
 
   public copy(): ProjectName {
-    return new ProjectName(`${this.valueOf()} (copia)`);
+    return new ProjectName(`${this.valueOf()} (copy)`);
   }
 }
