@@ -14,4 +14,10 @@ export class GlobalAdjustmentValue extends NumberValueObject {
   public static for(key: AdjustmentKey, value: number): GlobalAdjustmentValue {
     return new GlobalAdjustmentValue(value, key);
   }
+
+  public static clamp(key: AdjustmentKey, value: number): GlobalAdjustmentValue {
+    const minimum = key.isExposure() ? -5 : key.isUnsigned() ? 0 : -100;
+    const maximum = key.isExposure() ? 5 : 100;
+    return new GlobalAdjustmentValue(Math.min(maximum, Math.max(minimum, value)), key);
+  }
 }

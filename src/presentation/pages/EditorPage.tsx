@@ -15,13 +15,15 @@ import { ChangeHistoryMessage } from '@/contexts/projects/application/change-his
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
+import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
+import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
 import type { ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
-import type { AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
+import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { useApplication } from '../ApplicationContext';
 import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
 import { AdjustmentControls } from '../components/AdjustmentControls';
@@ -91,7 +93,10 @@ export function EditorPage(): ReactElement {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('Give this photograph a refined cinematic look while preserving natural skin tones.');
-  const [aiMessage, setAiMessage] = useState('AI is private and opt-in. Connect a provider to generate editable proposals.');
+  const [aiMessage, setAiMessage] = useState('Local Smart Edit is ready. No photograph or metadata will leave this browser.');
+  const [aiProposal, setAiProposal] = useState<EditProposal | null>(null);
+  const [aiSelection, setAiSelection] = useState<Set<number>>(new Set());
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sourceUrl = useObjectUrl(showOriginal ? source : preview ?? source);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
@@ -292,6 +297,51 @@ export function EditorPage(): ReactElement {
     setBrushActive(false);
   };
 
+  const generateAiProposal = async (): Promise<void> => {
+    if (project === null) return;
+    setAiGenerating(true);
+    setAiMessage('Analyzing your intent locally…');
+    try {
+      const proposal = await application.requestEditingAdvice.propose(
+        project,
+        new RequestEditingAdviceMessage(projectId, aiPrompt)
+      );
+      setAiProposal(proposal);
+      setAiSelection(new Set(proposal.operations.map((_, index) => index)));
+      setAiMessage('Proposal ready. Review every operation before applying it.');
+    } catch (error: unknown) {
+      setAiMessage(error instanceof Error ? error.message : 'The proposal could not be generated.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const applyAiProposal = (): void => {
+    if (aiProposal === null) return;
+    aiProposal.operations.forEach((operation, index) => {
+      if (!aiSelection.has(index)) return;
+      if (operation.kind === EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT) {
+        const key = AdjustmentKey.fromPrimitives(operation.key);
+        if (!project?.isGlobalAdjustmentEnabled(key)) {
+          apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED, key: operation.key, enabled: true, groupId: null });
+        }
+      }
+      apply(operation);
+    });
+    setAiProposal(null);
+    setAiSelection(new Set());
+    setAiMessage('The selected operations were applied through the same reversible history as manual edits.');
+  };
+
+  const toggleAiOperation = (index: number): void => {
+    setAiSelection((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
   const removeMask = (id: string): void => {
     apply({ kind: EDIT_OPERATION.REMOVE_MASK, maskId: id, groupId: null });
     setSelectedMaskId(null);
@@ -440,7 +490,7 @@ export function EditorPage(): ReactElement {
         <aside className="tools-panel" aria-label="Editing tools">
           <section className="ai-hero">
             <div><span className="ai-orb" aria-hidden="true">✦</span><span><strong>RAWcket AI</strong><small>Your editing copilot</small></span></div>
-            <p>Describe the result you want. AI proposals will always be explicit, reversible recipe changes.</p>
+            <p>Describe the result you want. Local Smart Edit turns it into explicit, reversible recipe changes.</p>
             <button className="button ai-primary full" type="button" onClick={() => setActivePanel('ai')}>Create with AI</button>
           </section>
           <div className="mode-switch" aria-label="Interface level">
@@ -453,9 +503,26 @@ export function EditorPage(): ReactElement {
             <div className="ai-quick-prompts" aria-label="AI prompt ideas">
               {['Natural portrait', 'Cinematic night', 'Recover highlights'].map((prompt) => <button key={prompt} type="button" onClick={() => setAiPrompt(prompt)}>{prompt}</button>)}
             </div>
-            <button className="button ai-primary full" type="button" onClick={() => setAiMessage('Connect an AI provider first. RAWcket will never upload pixels without your explicit consent.')}>Generate editable proposal</button>
+            <button className="button ai-primary full" type="button" disabled={aiGenerating || aiPrompt.trim().length < 3} onClick={() => void generateAiProposal()}>{aiGenerating ? 'Generating locally…' : 'Generate editable proposal'}</button>
             <p className="ai-status" aria-live="polite">{aiMessage}</p>
-            <button className="button ghost full" type="button" onClick={() => setSettingsOpen(true)}>AI privacy and provider settings</button>
+            {aiProposal !== null && (
+              <div className="ai-proposal" aria-label="AI edit proposal">
+                <p>{aiProposal.explanation}</p>
+                <div className="ai-proposal-operations">
+                  {aiProposal.operations.map((operation, index) => (
+                    <label key={`${operation.kind}-${index}`}>
+                      <input type="checkbox" checked={aiSelection.has(index)} onChange={() => toggleAiOperation(index)} />
+                      <span>{describeOperation(operation)}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="ai-proposal-actions">
+                  <button className="button ghost" type="button" onClick={() => { setAiProposal(null); setAiSelection(new Set()); setAiMessage('Proposal rejected. The project was not changed.'); }}>Reject</button>
+                  <button className="button ai-primary" type="button" disabled={aiSelection.size === 0} onClick={applyAiProposal}>Apply selected</button>
+                </div>
+              </div>
+            )}
+            <button className="button ghost full" type="button" onClick={() => setSettingsOpen(true)}>Optional cloud AI and privacy settings</button>
           </ToolSection>
           <ToolSection id="light" title="Light" active={activePanel === 'light'} onToggle={setActivePanel} badge="Shortcut 1">
             <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} />
@@ -555,4 +622,17 @@ function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactEle
       })}
     </svg>
   );
+}
+
+function describeOperation(operation: EditOperation): string {
+  if (operation.kind === EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT) {
+    const label = adjustmentDefinitions.find((definition) => definition.key === operation.key)?.label ?? operation.key;
+    return `${label}: ${operation.value > 0 ? '+' : ''}${operation.value}`;
+  }
+  if (operation.kind === EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED) return `${operation.enabled ? 'Enable' : 'Disable'} ${operation.key}`;
+  if (operation.kind === EDIT_OPERATION.SET_CURVE) return `Update ${operation.channel.toUpperCase()} curve`;
+  if (operation.kind === EDIT_OPERATION.SET_VIEWPORT_TRANSFORM) return 'Update crop and geometry';
+  if (operation.kind === EDIT_OPERATION.RENAME_PROJECT) return `Rename project to ${operation.name}`;
+  if (operation.kind === EDIT_OPERATION.REMOVE_MASK) return 'Remove local mask';
+  return operation.kind === EDIT_OPERATION.ADD_MASK ? 'Add local mask' : 'Update local mask';
 }

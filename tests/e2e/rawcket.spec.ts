@@ -22,6 +22,11 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   });
 
   await expect(page.getByLabel('Project name')).toHaveValue('night');
+  await page.getByRole('button', { name: 'Generate editable proposal' }).click();
+  await expect(page.getByLabel('AI edit proposal')).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Contrast: +14' })).toBeChecked();
+  await page.getByRole('button', { name: 'Apply selected' }).click();
+  await expect(page.getByRole('button', { name: /Contrast \+14/ })).toBeVisible();
   await page.getByRole('button', { name: /Exposure/ }).click();
   await page.getByLabel('Exposure numeric value').fill('0.25');
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();

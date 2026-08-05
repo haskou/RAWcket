@@ -8,6 +8,7 @@ import { FindProject } from '@/contexts/projects/application/find-project/FindPr
 import { ListProjects } from '@/contexts/projects/application/list-projects/ListProjects';
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
+import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
 import type { ProjectExporter } from '@/contexts/projects/application/ports/ProjectExporter';
 import type { ProjectImporter } from '@/contexts/projects/application/ports/ProjectImporter';
 import type { SourceFileRepository } from '@/contexts/projects/domain/repositories/SourceFileRepository';
@@ -18,6 +19,7 @@ import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastruct
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
+import { LocalRecipeAdvisor } from '@/contexts/projects/infrastructure/advisors/LocalRecipeAdvisor';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
@@ -39,6 +41,7 @@ export type Application = {
   apiKeyVault: BrowserApiKeyVault;
   persistentStorage: PersistentStorageRequest;
   renderProjectPreview: RenderProjectPreview;
+  requestEditingAdvice: RequestEditingAdvice;
 };
 
 export function createApplication(databaseName = 'rawcket'): Application {
@@ -67,6 +70,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     projectImporter: bundle,
     apiKeyVault: new BrowserApiKeyVault(settings),
     persistentStorage: new PersistentStorageRequest(),
-    renderProjectPreview: new RenderProjectPreview(previewRenderer)
+    renderProjectPreview: new RenderProjectPreview(previewRenderer),
+    requestEditingAdvice: new RequestEditingAdvice(new LocalRecipeAdvisor())
   };
 }

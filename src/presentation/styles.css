@@ -199,6 +199,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-quick-prompts { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 12px; }
 .ai-quick-prompts button { min-height: 27px; padding: 0 8px; }
 .ai-status { min-height: 34px; margin: 10px 0 !important; color: #9faa98; font-size: .67rem; }
+.ai-proposal { margin: 10px 0 14px; padding: 12px; border: 1px solid #53643a; border-radius: 10px; background: #10140e; }
+.ai-proposal > p { color: #b7c0af; font-size: .69rem; }
+.ai-proposal-operations { display: grid; gap: 4px; margin: 10px 0; }
+.ai-proposal-operations label { display: flex; gap: 8px; align-items: center; padding: 7px; border-radius: 6px; background: #1a2017; color: #d0d5cc; font-size: .67rem; cursor: pointer; }
+.ai-proposal-operations input { accent-color: var(--accent); }
+.ai-proposal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ai-proposal-actions .button { min-height: 34px; padding-inline: 8px; font-size: .67rem; }
 .shortcut-dialog dl { margin: 0; }
 .shortcut-dialog dl > div { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line-soft); }
 .shortcut-dialog dt { color: #cbd0cc; font-size: .8rem; }
