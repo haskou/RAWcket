@@ -48,6 +48,7 @@ export function LibraryPage(): ReactElement {
   const [selectedCandidate, setSelectedCandidate] = useState(0);
   const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
   const [imageDropActive, setImageDropActive] = useState(false);
+  const [pendingLocalModelImportFiles, setPendingLocalModelImportFiles] = useState<File[] | null>(null);
   const [pendingImportFiles, setPendingImportFiles] = useState<File[] | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [automaticTags, setAutomaticTags] = useState(true);
@@ -118,7 +119,7 @@ export function LibraryPage(): ReactElement {
     };
   }, [prepareTagModel]);
 
-  const persistImportedFile = async (file: File, inspection: SourceImageInspection): Promise<void> => {
+  const persistImportedFile = useCallback(async (file: File, inspection: SourceImageInspection): Promise<void> => {
       const capacity = await application.assessImportCapacity.assess(new AssessImportCapacityMessage(file.size));
       setStorageCapacity(capacity);
       if (!capacity.canImport) {
@@ -154,9 +155,9 @@ export function LibraryPage(): ReactElement {
       void application.persistentStorage.request();
       await refresh();
       void navigate(`/editor/${project.getId().valueOf()}`);
-  };
+  }, [application, automaticTags, navigate, refresh]);
 
-  const createFromFile = async (file: File, inspection?: SourceImageInspection): Promise<void> => {
+  const createFromFile = useCallback(async (file: File, inspection?: SourceImageInspection): Promise<void> => {
     setBusy(true);
     setError(null);
     try {
@@ -166,7 +167,7 @@ export function LibraryPage(): ReactElement {
     } finally {
       setBusy(false);
     }
-  };
+  }, [application, persistImportedFile]);
 
   const onImage = (event: ChangeEvent<HTMLInputElement>): void => {
     setImportDialogOpen(false);
@@ -177,8 +178,9 @@ export function LibraryPage(): ReactElement {
   const importImages = (files: File[]): void => {
     if (files.length === 0) return;
     if (localModelPreparing) {
+      setPendingLocalModelImportFiles(files);
       setImportDialogOpen(true);
-      setTagModelMessage(`Local AI is still downloading · ${Math.round(tagModelProgress * 100)}%. Import unlocks when it is ready.`);
+      setTagModelMessage(`Local AI is still downloading · ${Math.round(tagModelProgress * 100)}%. Your selection is held and import will continue when preparation finishes.`);
       return;
     }
     setImportDialogOpen(false);
@@ -220,7 +222,7 @@ export function LibraryPage(): ReactElement {
     importImages([...event.dataTransfer.files]);
   };
 
-  const reviewImportCandidates = async (files: File[]): Promise<void> => {
+  const reviewImportCandidates = useCallback(async (files: File[]): Promise<void> => {
     setBusy(true);
     setError(null);
     try {
@@ -239,7 +241,16 @@ export function LibraryPage(): ReactElement {
     } finally {
       setBusy(false);
     }
-  };
+  }, [application]);
+
+  useEffect(() => {
+    if (localModelPreparing || pendingLocalModelImportFiles === null) return;
+    const files = pendingLocalModelImportFiles;
+    setPendingLocalModelImportFiles(null);
+    setImportDialogOpen(false);
+    if (files.length === 1 && files[0] !== undefined) void createFromFile(files[0]);
+    if (files.length > 1) void reviewImportCandidates(files);
+  }, [createFromFile, localModelPreparing, pendingLocalModelImportFiles, reviewImportCandidates]);
 
   const continuePendingImport = (): void => {
     const files = pendingImportFiles;

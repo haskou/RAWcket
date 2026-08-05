@@ -27,6 +27,43 @@ describe('LibraryPage', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Import image' })).toBeEnabled());
   });
 
+  it('holds a selected photograph and imports it without automatic tags when local model preparation fails', async () => {
+    Object.defineProperty(globalThis, 'createImageBitmap', {
+      value: vi.fn(() => Promise.resolve({ width: 2, height: 1, close: vi.fn() })),
+      configurable: true
+    });
+    const application = createApplication(`rawcket-model-failure-${crypto.randomUUID()}`);
+    vi.spyOn(application.manageSemanticSegmentationModel, 'inspect').mockResolvedValue('not-installed');
+    let failInstallation: ((reason: Error) => void) | undefined;
+    vi.spyOn(application.manageSemanticSegmentationModel, 'install').mockImplementation((options) => {
+      options.onProgress?.(0.42);
+      return new Promise<void>((_resolve, reject) => { failInstallation = reject; });
+    });
+    const suggestTags = vi.spyOn(application.suggestPhotoTags, 'suggest');
+    const user = userEvent.setup();
+    render(
+      <ApplicationProvider application={application}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<LibraryPage />} />
+            <Route path="/editor/:projectId" element={<p>Editor open</p>} />
+          </Routes>
+        </MemoryRouter>
+      </ApplicationProvider>
+    );
+
+    expect(await screen.findByText('Local AI · 42%')).toBeInTheDocument();
+    await user.upload(
+      screen.getByLabelText('Select one or more JPEG, PNG, or Sony ARW images'),
+      new File(['png'], 'held.png', { type: 'image/png' })
+    );
+    expect(await screen.findByText(/Your selection is held/)).toBeInTheDocument();
+    failInstallation?.(new Error('Model download unavailable'));
+
+    expect(await screen.findByText('Editor open')).toBeInTheDocument();
+    expect(suggestTags).not.toHaveBeenCalled();
+  });
+
   it('shows the empty state and imports a local image into the editor', async () => {
     Object.defineProperty(globalThis, 'createImageBitmap', {
       value: vi.fn(() => Promise.resolve({ width: 2, height: 1, close: vi.fn() })),
