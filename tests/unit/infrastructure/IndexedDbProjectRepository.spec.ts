@@ -1,4 +1,6 @@
 import { deleteDB } from 'idb';
+import { Timestamp } from '@haskou/value-objects';
+import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import { ProjectMigrator } from '@/contexts/projects/infrastructure/migrations/ProjectMigrator';
 import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionZeroToOneProjectMigration';
 import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
@@ -24,6 +26,60 @@ describe('IndexedDbProjectRepository', () => {
     await repository.delete(project.getId());
     expect(await repository.findById(project.getId())).toBeNull();
     (await connection).close();
+    await deleteDB(databaseName);
+  });
+
+  it('recovers the newest valid snapshot when the current project record is corrupt', async () => {
+    const databaseName = `rawcket-project-recovery-${crypto.randomUUID()}`;
+    const connection = RawcketDatabase.open(databaseName);
+    const repository = new IndexedDbProjectRepository(
+      connection,
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration()])
+    );
+    const project = PhotoProjectMother.create();
+
+    await repository.save(project);
+    project.apply({
+      kind: EDIT_OPERATION.RENAME_PROJECT,
+      name: 'Updated project',
+      groupId: null
+    }, Timestamp.new(1_750_000_001_000));
+    await repository.save(project);
+
+    const database = await connection;
+    await database.put('projects', { corrupted: true }, project.getId().valueOf());
+
+    const recovered = await repository.findById(project.getId());
+    expect(recovered?.getName().valueOf()).toBe('Test project');
+
+    database.close();
+    await deleteDB(databaseName);
+  });
+
+  it('retains only the five newest snapshots per project', async () => {
+    const databaseName = `rawcket-project-snapshots-${crypto.randomUUID()}`;
+    const connection = RawcketDatabase.open(databaseName);
+    const repository = new IndexedDbProjectRepository(
+      connection,
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration()])
+    );
+    const project = PhotoProjectMother.create();
+
+    await repository.save(project);
+    for (let index = 1; index <= 7; index += 1) {
+      project.apply({
+        kind: EDIT_OPERATION.RENAME_PROJECT,
+        name: `Project version ${index}`,
+        groupId: null
+      }, Timestamp.new(1_750_000_000_000 + index));
+      await repository.save(project);
+    }
+
+    const database = await connection;
+    const snapshots = await database.getAllFromIndex('projectSnapshots', 'by-project', project.getId().valueOf());
+    expect(snapshots).toHaveLength(5);
+
+    database.close();
     await deleteDB(databaseName);
   });
 });
