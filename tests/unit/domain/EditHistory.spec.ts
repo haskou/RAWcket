@@ -55,4 +55,17 @@ describe('PhotoProject edit history', () => {
     expect(project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).valueOf()).toBe(0);
     expect(project.getGlobalAdjustment(AdjustmentKey.VIGNETTE).valueOf()).toBe(0);
   });
+
+  it('exposes cloned applied and redo operations for a visual timeline', () => {
+    const project = PhotoProjectMother.create();
+    project.apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'contrast', value: 10, groupId: null }, Timestamp.now());
+    project.apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'exposure', value: 1, groupId: null }, Timestamp.now());
+    project.undo(Timestamp.now());
+
+    const timeline = project.getHistoryTimeline();
+    expect(timeline.applied.map((operation) => operation.kind)).toEqual([EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT]);
+    expect(timeline.availableRedo.map((operation) => operation.kind)).toEqual([EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT]);
+    if (timeline.applied[0]?.kind === EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT) timeline.applied[0].value = 99;
+    expect(project.getHistoryTimeline().applied[0]).toMatchObject({ value: 10 });
+  });
 });

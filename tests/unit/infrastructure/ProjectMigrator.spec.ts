@@ -5,6 +5,7 @@ import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastruct
 import { VersionTwoToThreeProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTwoToThreeProjectMigration';
 import { VersionThreeToFourProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionThreeToFourProjectMigration';
 import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFourToFiveProjectMigration';
+import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFiveToSixProjectMigration';
 import { photoProjectSchema } from '@/contexts/projects/infrastructure/serialization/ProjectSchemas';
 
 describe('ProjectMigrator', () => {
@@ -13,7 +14,8 @@ describe('ProjectMigrator', () => {
     new VersionOneToTwoProjectMigration(),
     new VersionTwoToThreeProjectMigration(),
     new VersionThreeToFourProjectMigration(),
-    new VersionFourToFiveProjectMigration()
+    new VersionFourToFiveProjectMigration(),
+    new VersionFiveToSixProjectMigration()
   ]);
 
   it('migrates a demo project from schema 0 to the current schema', () => {
@@ -21,12 +23,12 @@ describe('ProjectMigrator', () => {
     const legacy = { ...current, schemaVersion: 0 };
     delete (legacy as Partial<typeof legacy>).uiState;
     const migrated = photoProjectSchema.parse(migrator.migrate(legacy));
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
     expect(migrated.uiState.mode).toBe('simple');
     expect(migrated.recipe.disabledGlobalAdjustments).toEqual([]);
     expect(migrated.recipe.globalAdjustments.texture).toBe(0);
     expect(migrated.recipe.globalAdjustments.vignette).toBe(0);
-    expect(migrated.organization).toEqual({ rating: 0, tags: [] });
+    expect(migrated.organization).toEqual({ rating: 0, tags: [], favorite: false });
     expect(Object.values(migrated.captureMetadata)).toEqual(Array(14).fill(null));
   });
 

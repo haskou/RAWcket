@@ -4,7 +4,8 @@ import type { ProjectTags } from './value-objects/ProjectTags';
 export class ProjectOrganization {
   public constructor(
     private rating: ProjectRating,
-    private tags: ProjectTags
+    private tags: ProjectTags,
+    private favorite: boolean
   ) {}
 
   public changeRating(rating: ProjectRating): void {
@@ -22,4 +23,6 @@ export class ProjectOrganization {
   public getTags(): ProjectTags {
     return this.tags;
   }
+  public chooseFavorite(favorite: boolean): void { this.favorite = favorite; }
+  public isFavorite(): boolean { return this.favorite; }
 }

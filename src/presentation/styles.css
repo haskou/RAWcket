@@ -63,9 +63,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .section-heading { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 18px; }
 .section-heading h2 { margin: 0; font-size: 1.15rem; }
 .section-heading span { color: var(--muted); font-size: .82rem; }
-.library-filters { display: grid; grid-template-columns: minmax(220px, 1fr) 190px auto; gap: 9px; align-items: end; margin-bottom: 18px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: #111312; }
+.library-filters { display: grid; grid-template-columns: minmax(220px, 1fr) 190px 130px auto; gap: 9px; align-items: end; margin-bottom: 18px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: #111312; }
 .library-filters label { display: grid; gap: 5px; color: #8f9791; font-size: .64rem; }
 .library-filters input, .library-filters select { height: 36px; padding: 0 10px; border: 1px solid #353b36; border-radius: 7px; background: #0b0d0c; color: #d7ddd8; }
+.library-filters .favorite-filter { height: 36px; display: flex; flex-direction: row; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid #353b36; border-radius: 7px; background: #0b0d0c; }
+.library-filters .favorite-filter input { width: 15px; height: 15px; padding: 0; accent-color: var(--accent); }
 .library-filters > button { height: 36px; padding: 0 12px; border: 1px solid #3a403b; border-radius: 7px; background: #1a1d1b; color: #b8c0ba; cursor: pointer; font-size: .65rem; }
 .project-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .project-card { overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); transition: border .2s ease, transform .2s ease; }
@@ -79,6 +81,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .project-meta strong, .project-meta small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-meta small { margin-top: 5px; color: var(--muted); }
 .project-organization { display: grid; gap: 8px; padding: 0 16px 11px; }
+.project-favorite { justify-self: start; padding: 3px 0; border: 0; background: transparent; color: #636a65; cursor: pointer; font-size: .6rem; }
+.project-favorite span { margin-left: 4px; }
+.project-favorite.active { color: #d9858e; }
 .project-rating { display: flex; gap: 2px; }
 .project-rating button { padding: 0 1px; border: 0; background: transparent; color: #444a46; cursor: pointer; font-size: .92rem; }
 .project-rating button.rated { color: #e5c65f; text-shadow: 0 0 8px rgba(229,198,95,.2); }
@@ -387,6 +392,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .photo-information-dialog dt { color: #838c85; font-size: .7rem; }
 .photo-information-dialog dd { margin: 0; color: #d4dad5; font-size: .76rem; overflow-wrap: anywhere; }
 .photo-information-dialog .notice { margin-top: 16px; font-size: .7rem; line-height: 1.5; }
+.history-actions { display: flex; gap: 7px; margin-bottom: 14px; }
+.history-actions button { min-height: 34px; padding: 0 11px; border: 1px solid #3a413b; border-radius: 7px; background: #141715; color: #bcc4bd; }
+.history-actions button:disabled { opacity: .4; }
+.history-dialog ol { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line-soft); }
+.history-dialog li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.history-dialog li span { color: #747d76; font-size: .55rem; text-transform: uppercase; letter-spacing: .08em; }
+.history-dialog li strong { color: #bbc3bc; font-size: .7rem; font-weight: 550; }
+.history-dialog li.current strong, .history-dialog li.current span { color: var(--accent); }
+.history-dialog h3 { margin: 20px 0 8px; color: #929a94; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+.history-dialog .redo-list { opacity: .65; }
 .import-selection-dialog { width: min(980px, 100%); }
 .import-candidate-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 18px 0; }
 .import-candidate { min-width: 0; padding: 9px; border: 1px solid #333a35; border-radius: 12px; background: #101311; color: #cfd5d0; text-align: left; }

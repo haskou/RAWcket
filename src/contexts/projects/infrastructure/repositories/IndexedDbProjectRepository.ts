@@ -38,7 +38,8 @@ export class IndexedDbProjectRepository implements ProjectRepository {
       Timestamp.new(record.updatedAt),
       new StringValueObject(record.sourceMimeType),
       new ProjectRating(record.rating ?? 0),
-      ProjectTags.fromPrimitives(record.tags ?? [])
+      ProjectTags.fromPrimitives(record.tags ?? []),
+      record.favorite ?? false
     ));
   }
 
@@ -62,7 +63,8 @@ export class IndexedDbProjectRepository implements ProjectRepository {
         updatedAt: primitives.metadata.updatedAt,
         sourceMimeType: primitives.source.mimeType,
         rating: primitives.organization.rating,
-        tags: primitives.organization.tags
+        tags: primitives.organization.tags,
+        favorite: primitives.organization.favorite
       })
     ];
     if (snapshot !== null) writes.push(transaction.objectStore('projectSnapshots').put(snapshot));

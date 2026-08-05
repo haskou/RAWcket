@@ -13,7 +13,8 @@ export class PhotoProjectSummary {
     private readonly updatedAt: Timestamp,
     private readonly sourceMimeType: StringValueObject,
     private readonly rating: ProjectRating,
-    private readonly tags: ProjectTags
+    private readonly tags: ProjectTags,
+    private readonly favorite: boolean
   ) {}
   public getId(): ProjectId {
     return this.id;
@@ -33,8 +34,10 @@ export class PhotoProjectSummary {
   public getTags(): ProjectTags {
     return this.tags;
   }
-  public matches(query: ProjectSearchQuery, minimumRating: ProjectRating): boolean {
+  public isFavorite(): boolean { return this.favorite; }
+  public matches(query: ProjectSearchQuery, minimumRating: ProjectRating, favoritesOnly = false): boolean {
     return this.rating.isGreaterOrEqualThan(minimumRating)
+      && (!favoritesOnly || this.favorite)
       && (query.matches(this.name) || this.tags.matches(query));
   }
 }

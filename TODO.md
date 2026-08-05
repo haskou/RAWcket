@@ -204,7 +204,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Five per-project SHA-256 snapshots, newest-valid corruption recovery without overwriting damaged data, portable checksummed bundles, OPFS/IndexedDB original storage, persistent-storage request, quota visibility, and import safety reserve.
 
-**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes.
+**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes. Schema version 6 adds reversible favorites and an indexed favorites-only filter.
 
 **Implemented.** Versioned `.rawcket.json` sidecars export only source dimensions and validated recipe data. They exclude the original, project identity, history, ratings, and tags; applying one is a single undoable aggregate operation with a 5 MB input limit.
 
@@ -260,9 +260,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Before/after comparison, histogram/clipping display, fixed dense composition guides, drag-to-crop with an outside veil, brush/radial/linear/smart-point overlays, per-mask workflow explanations, modified-control marks, and AI tutor explanations now join the keyboard, pan/zoom, responsive, and Active Recipe work. Active Recipe can be cleared as one undoable operation. Luminance masks explicitly disclose that their per-pixel colored overlay is still pending even though their effect renders.
 
-**Implemented.** Multi-file import opens a local AI Companion contact sheet ranked by measurable clipping, tonal balance, detail, and resolution. Reasons are visible and the photographer can override the recommendation before any project is created.
+**Implemented.** Multi-file import opens a local AI Companion contact sheet ranked by measurable clipping, tonal balance, detail, and resolution. Reasons are visible and the photographer can override the recommendation before any project is created. The editor exposes a visual timeline derived directly from cloned undo/redo operations, while library favorites persist and filter instantly.
 
-**Remaining.** Visual history, favorites, onboarding, complete touch/trackpad polish, accessible non-visual alternatives for every canvas interaction, full responsive review, and WCAG audit.
+**Remaining.** Onboarding, complete touch/trackpad polish, accessible non-visual alternatives for every canvas interaction, full responsive review, and WCAG audit.
 
 **Acceptance.** Primary flows work entirely by keyboard; focus, labels, and live regions are correct; contrast is WCAG AA; meaning never relies on color alone; touch targets are adequate; pending features never appear active.
 

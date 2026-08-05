@@ -31,16 +31,18 @@ export function LibraryPage(): ReactElement {
   const [projects, setProjects] = useState<PhotoProjectSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [minimumRating, setMinimumRating] = useState(0);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState<ImportCapacityAssessment | null>(null);
   const [importCandidates, setImportCandidates] = useState<ReviewedImportCandidate[] | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState(0);
-  const projectFilter = useMemo(() => new ListProjectsMessage(searchQuery, minimumRating), [minimumRating, searchQuery]);
+  const projectFilter = useMemo(() => new ListProjectsMessage(searchQuery, minimumRating, favoritesOnly), [favoritesOnly, minimumRating, searchQuery]);
   const filteredProjects = useMemo(() => projects.filter((project) => project.matches(
     projectFilter.getQuery(),
-    projectFilter.getMinimumRating()
+    projectFilter.getMinimumRating(),
+    projectFilter.shouldListFavoritesOnly()
   )), [projectFilter, projects]);
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -163,6 +165,20 @@ export function LibraryPage(): ReactElement {
     });
   };
 
+  const changeFavorite = async (summary: PhotoProjectSummary, favorite: boolean): Promise<void> => {
+    await projectMutationQueue.run(async () => {
+      const project = await application.findProject.find(new FindProjectMessage(summary.getId().valueOf()));
+      if (project === null) return;
+      try {
+        application.applyEditOperation.apply(project, new ApplyEditOperationMessage(project.getId().valueOf(), { kind: EDIT_OPERATION.SET_PROJECT_FAVORITE, favorite, groupId: null }));
+        await application.saveProject.save(project);
+        await refresh();
+      } catch (caught: unknown) {
+        setError(caught instanceof Error ? caught.message : 'The project favorite could not be changed.');
+      }
+    });
+  };
+
   const duplicate = async (id: string): Promise<void> => {
     await application.duplicateProject.duplicate(new DuplicateProjectMessage(id));
     await refresh();
@@ -237,7 +253,8 @@ export function LibraryPage(): ReactElement {
             <option value={4}>★★★★ and above</option>
             <option value={5}>★★★★★ only</option>
           </select></label>
-          {(searchQuery.length > 0 || minimumRating > 0) && <button type="button" onClick={() => { setSearchQuery(''); setMinimumRating(0); }}>Clear filters</button>}
+          <label className="favorite-filter"><input type="checkbox" checked={favoritesOnly} onChange={(event) => setFavoritesOnly(event.target.checked)} /> Favorites only</label>
+          {(searchQuery.length > 0 || minimumRating > 0 || favoritesOnly) && <button type="button" onClick={() => { setSearchQuery(''); setMinimumRating(0); setFavoritesOnly(false); }}>Clear filters</button>}
         </div>}
         {projects.length === 0 ? (
           <div className="empty-state">
@@ -250,7 +267,7 @@ export function LibraryPage(): ReactElement {
           <div className="empty-state compact">
             <h3>No matching projects</h3>
             <p>Try another name, tag, or rating.</p>
-            <button className="button ghost" type="button" onClick={() => { setSearchQuery(''); setMinimumRating(0); }}>Clear filters</button>
+            <button className="button ghost" type="button" onClick={() => { setSearchQuery(''); setMinimumRating(0); setFavoritesOnly(false); }}>Clear filters</button>
           </div>
         ) : (
           <div className="project-grid">
@@ -263,7 +280,7 @@ export function LibraryPage(): ReactElement {
                     <ProjectThumbnail projectId={id} name={name} mimeType={project.getSourceMimeType().valueOf()} />
                     <span className="project-meta"><strong>{name}</strong><small>Edited {project.getUpdatedAt().toDate().toLocaleString('en')}</small></span>
                   </button>
-                  <ProjectOrganizationControls project={project} onRate={(rating) => void changeRating(project, rating)} onTags={(tags) => void changeTags(project, tags)} />
+                  <ProjectOrganizationControls project={project} onRate={(rating) => void changeRating(project, rating)} onTags={(tags) => void changeTags(project, tags)} onFavorite={(favorite) => void changeFavorite(project, favorite)} />
                   <div className="project-actions" aria-label={`Actions for ${name}`}>
                     <button type="button" onClick={() => void rename(project)}>Rename</button>
                     <button type="button" onClick={() => void duplicate(id)}>Duplicate</button>

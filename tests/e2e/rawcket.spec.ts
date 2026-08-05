@@ -66,6 +66,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: 'Light Shortcut 1' })).toHaveAttribute('aria-expanded', 'true');
   await page.getByLabel('Exposure numeric value').fill('0.25');
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Visual history' }).click();
+  await expect(page.getByRole('dialog', { name: 'Visual history' }).getByText('Exposure: +0.25')).toBeVisible();
+  await page.getByRole('button', { name: 'Close visual history' }).click();
   await expect(page.locator('.adjustment-control.modified').filter({ has: page.getByLabel('Exposure numeric value') }).getByLabel('Modified')).toBeVisible();
   await page.getByRole('button', { name: 'Reset Exposure' }).click();
   await expect(page.getByLabel('Active Recipe').getByRole('button', { name: /^Exposure / })).toHaveCount(0);
@@ -147,7 +150,11 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByLabel('Comma-separated tags').fill('night, client');
   await page.getByRole('button', { name: 'Save tags' }).click();
   await expect(page.getByText('client', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add night to favorites' }).click();
+  await expect(page.getByRole('button', { name: 'Remove night from favorites' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByLabel('Search names and tags').fill('client');
+  await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
+  await page.getByLabel('Favorites only').check();
   await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
   await page.getByLabel('Minimum rating').selectOption('5');
   await expect(page.getByText('No matching projects')).toBeVisible();

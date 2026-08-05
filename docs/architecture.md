@@ -23,11 +23,13 @@ Dependency arrows point toward the application and domain layers. The domain dep
 
 `PhotoProject` is the consistency boundary. It owns the name, original reference, project metadata, immutable validated `CaptureMetadata`, `DevelopmentRecipe`, `EditHistory`, and `ProjectUiState`. Every editorial mutation passes through an `EditOperation`; the aggregate computes the inverse before recording history and emits a domain event.
 
-Schema version 4 introduced `ProjectOrganization`: a bounded zero-to-five `ProjectRating` and at most twenty normalized `ProjectTag` values. Rating/tag changes use the same serializable history as photographic edits. `PhotoProjectSummary` exposes matching behavior so application-level library filters do not extract and compare primitive domain values.
+Schema version 4 introduced `ProjectOrganization`: a bounded zero-to-five `ProjectRating` and at most twenty normalized `ProjectTag` values. Schema version 6 adds the favorite decision to the same domain concept and lightweight index. Rating, tag, and favorite changes use serializable history. `PhotoProjectSummary` exposes matching behavior so library filters do not extract and compare primitive domain values.
 
 Schema version 5 adds immutable `CaptureMetadata`. The bounded TIFF reader extracts only validated, size-limited EXIF fields from Sony ARW containers; the aggregate persists those facts separately from editable project state. Missing fields remain explicitly null and the UI distinguishes embedded-preview development from future high-depth RAW demosaicing.
 
 `JsonProjectSidecarCodec` is an infrastructure boundary for recipe-only `.rawcket.json` files. Application messages validate project identity and file size; importing delegates to the aggregate’s `replace-recipe` operation so the entire change is validated, serializable, and undoable without copying source bytes or project identity.
+
+`EditHistory.getTimeline()` returns cloned applied and redo operations. The visual history renders those same operations, so it cannot drift from actual undo/redo state or mutate recorded history through presentation references.
 
 `DevelopmentRecipe` contains:
 

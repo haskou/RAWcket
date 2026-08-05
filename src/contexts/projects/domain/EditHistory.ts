@@ -61,6 +61,13 @@ export class EditHistory {
     return this.redoEntries.length > 0;
   }
 
+  public getTimeline(): { applied: EditOperation[]; availableRedo: EditOperation[] } {
+    return {
+      applied: this.undoEntries.map((entry) => structuredClone(entry.operation)),
+      availableRedo: this.redoEntries.map((entry) => structuredClone(entry.operation))
+    };
+  }
+
   public toPrimitives(): EditHistoryPrimitives {
     return structuredClone({ limit: this.limit, undo: this.undoEntries, redo: this.redoEntries });
   }

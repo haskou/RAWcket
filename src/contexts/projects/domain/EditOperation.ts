@@ -16,7 +16,8 @@ export const EDIT_OPERATION = {
   REPLACE_RECIPE: 'replace-recipe',
   RENAME_PROJECT: 'rename-project',
   SET_PROJECT_RATING: 'set-project-rating',
-  SET_PROJECT_TAGS: 'set-project-tags'
+  SET_PROJECT_TAGS: 'set-project-tags',
+  SET_PROJECT_FAVORITE: 'set-project-favorite'
 } as const;
 
 type OperationMetadata = { groupId: string | null };
@@ -72,6 +73,10 @@ export type SetProjectTagsOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.SET_PROJECT_TAGS;
   tags: string[];
 };
+export type SetProjectFavoriteOperation = OperationMetadata & {
+  kind: typeof EDIT_OPERATION.SET_PROJECT_FAVORITE;
+  favorite: boolean;
+};
 
 export type EditOperation =
   | SetGlobalAdjustmentOperation
@@ -85,4 +90,5 @@ export type EditOperation =
   | ReplaceRecipeOperation
   | RenameProjectOperation
   | SetProjectRatingOperation
-  | SetProjectTagsOperation;
+  | SetProjectTagsOperation
+  | SetProjectFavoriteOperation;

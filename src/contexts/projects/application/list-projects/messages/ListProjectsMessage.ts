@@ -5,7 +5,7 @@ export class ListProjectsMessage {
   private readonly query: ProjectSearchQuery;
   private readonly minimumRating: ProjectRating;
 
-  public constructor(query: string, minimumRating: number) {
+  public constructor(query: string, minimumRating: number, private readonly favoritesOnly = false) {
     this.query = new ProjectSearchQuery(query);
     this.minimumRating = new ProjectRating(minimumRating);
   }
@@ -17,4 +17,5 @@ export class ListProjectsMessage {
   public getMinimumRating(): ProjectRating {
     return this.minimumRating;
   }
+  public shouldListFavoritesOnly(): boolean { return this.favoritesOnly; }
 }

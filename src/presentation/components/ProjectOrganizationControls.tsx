@@ -1,10 +1,11 @@
 import { useState, type ReactElement } from 'react';
 import type { PhotoProjectSummary } from '@/contexts/projects/domain/PhotoProjectSummary';
 
-export function ProjectOrganizationControls({ project, onRate, onTags }: {
+export function ProjectOrganizationControls({ project, onRate, onTags, onFavorite }: {
   project: PhotoProjectSummary;
   onRate: (rating: number) => void;
   onTags: (tags: string[]) => void;
+  onFavorite: (favorite: boolean) => void;
 }): ReactElement {
   const name = project.getName().valueOf();
   const rating = project.getRating().valueOf();
@@ -23,6 +24,7 @@ export function ProjectOrganizationControls({ project, onRate, onTags }: {
   };
 
   return <div className="project-organization" onClick={(event) => event.stopPropagation()}>
+    <button className={`project-favorite ${project.isFavorite() ? 'active' : ''}`} type="button" aria-pressed={project.isFavorite()} aria-label={`${project.isFavorite() ? 'Remove' : 'Add'} ${name} ${project.isFavorite() ? 'from' : 'to'} favorites`} onClick={() => onFavorite(!project.isFavorite())}>♥ <span>{project.isFavorite() ? 'Favorite' : 'Add favorite'}</span></button>
     <div className="project-rating" role="group" aria-label={`Rating for ${name}`}>
       {[1, 2, 3, 4, 5].map((value) => <button
         type="button"

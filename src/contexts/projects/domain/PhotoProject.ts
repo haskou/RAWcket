@@ -28,7 +28,7 @@ export type PhotoProjectPrimitives = {
   source: { fileName: string; mimeType: SourceImageMimeType; size: number; storageKey: string };
   metadata: { createdAt: number; updatedAt: number; width: number; height: number };
   captureMetadata: CaptureMetadataPrimitives;
-  organization: { rating: number; tags: string[] };
+  organization: { rating: number; tags: string[]; favorite: boolean };
   recipe: DevelopmentRecipePrimitives;
   history: EditHistoryPrimitives;
   uiState: { mode: InterfaceModePrimitive };
@@ -68,7 +68,7 @@ export class PhotoProject {
       DevelopmentRecipe.neutral(),
       new EditHistory(historyLimit),
       new ProjectUiState(InterfaceMode.SIMPLE),
-      new ProjectOrganization(ProjectRating.UNRATED, ProjectTags.fromPrimitives([]))
+      new ProjectOrganization(ProjectRating.UNRATED, ProjectTags.fromPrimitives([]), false)
     );
     project.recordEvent('PhotoProjectWasCreated', metadata.getCreatedAt());
     return project;
@@ -97,7 +97,8 @@ export class PhotoProject {
       new ProjectUiState(InterfaceMode.fromPrimitives(input.uiState.mode)),
       new ProjectOrganization(
         new ProjectRating(input.organization.rating),
-        ProjectTags.fromPrimitives(input.organization.tags)
+        ProjectTags.fromPrimitives(input.organization.tags),
+        input.organization.favorite
       )
     );
   }
@@ -115,7 +116,8 @@ export class PhotoProject {
       new ProjectUiState(this.uiState.getMode()),
       new ProjectOrganization(
         new ProjectRating(this.organization.getRating()),
-        ProjectTags.fromPrimitives(this.organization.getTags().toPrimitives())
+        ProjectTags.fromPrimitives(this.organization.getTags().toPrimitives()),
+        this.organization.isFavorite()
       )
     );
     duplicate.recordEvent('PhotoProjectWasCreated', metadata.getCreatedAt());
@@ -176,6 +178,8 @@ export class PhotoProject {
     return this.organization.getTags();
   }
 
+  public isFavorite(): boolean { return this.organization.isFavorite(); }
+
   public getSummary(): PhotoProjectSummary {
     return new PhotoProjectSummary(
       this.id,
@@ -183,7 +187,8 @@ export class PhotoProject {
       this.metadata.getUpdatedAt(),
       this.source.getMimeType(),
       this.organization.getRating(),
-      this.organization.getTags()
+      this.organization.getTags(),
+      this.organization.isFavorite()
     );
   }
 
@@ -240,6 +245,10 @@ export class PhotoProject {
     return this.history.canRedo();
   }
 
+  public getHistoryTimeline(): { applied: EditOperation[]; availableRedo: EditOperation[] } {
+    return this.history.getTimeline();
+  }
+
   public pullDomainEvents(): ProjectDomainEvent[] {
     const events = [...this.events];
     this.events = [];
@@ -266,7 +275,8 @@ export class PhotoProject {
       captureMetadata: this.captureMetadata.toPrimitives(),
       organization: {
         rating: this.organization.getRating().valueOf(),
-        tags: this.organization.getTags().toPrimitives()
+        tags: this.organization.getTags().toPrimitives(),
+        favorite: this.organization.isFavorite()
       },
       recipe: this.recipe.toPrimitives(),
       history: this.history.toPrimitives(),
@@ -332,6 +342,11 @@ export class PhotoProject {
       const previous = this.organization.getTags();
       this.organization.replaceTags(ProjectTags.fromPrimitives(operation.tags));
       return { ...operation, tags: previous.toPrimitives() };
+    }
+    if (operation.kind === EDIT_OPERATION.SET_PROJECT_FAVORITE) {
+      const previous = this.organization.isFavorite();
+      this.organization.chooseFavorite(operation.favorite);
+      return { ...operation, favorite: previous };
     }
     const previousName = this.name;
     this.name = new ProjectName(operation.name);

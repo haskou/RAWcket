@@ -167,6 +167,7 @@ export function EditorPage(): ReactElement {
   const [exportMessage, setExportMessage] = useState('Choose a photographic format and output size.');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [photoInformationOpen, setPhotoInformationOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [recipeTransferMessage, setRecipeTransferMessage] = useState<string | undefined>();
   const [aiPrompt, setAiPrompt] = useState('Give this photograph a refined cinematic look while preserving natural skin tones.');
   const [aiMessage, setAiMessage] = useState('Local Smart Edit is ready. No photograph or metadata will leave this browser.');
@@ -342,6 +343,7 @@ export function EditorPage(): ReactElement {
       else if (event.key.toLowerCase() === 'm') openPanel('masks');
       else if (event.key.toLowerCase() === 'r') setRecipeCollapsed((value) => !value);
       else if (event.key.toLowerCase() === 'i') setPhotoInformationOpen(true);
+      else if (event.key.toLowerCase() === 'h') setHistoryOpen(true);
       else if (event.key === 'Escape') { setBrushActive(false); setAiPointActive(false); }
       else if (event.key === '?') setShortcutsOpen((value) => !value);
       else return;
@@ -949,6 +951,7 @@ export function EditorPage(): ReactElement {
           <button className="icon-button" type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')} aria-label="Redo">↷</button>
           <button className="icon-button shortcut-button" type="button" onClick={() => setShortcutsOpen(true)} aria-label="Keyboard shortcuts">⌨</button>
           <button className="icon-button" type="button" onClick={() => setPhotoInformationOpen(true)} aria-label="Photo information">ⓘ</button>
+          <button className="icon-button" type="button" onClick={() => setHistoryOpen(true)} aria-label="Visual history">≡</button>
         </div>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
@@ -1135,6 +1138,7 @@ export function EditorPage(): ReactElement {
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <PhotoInformationDialog project={project} open={photoInformationOpen} onClose={() => setPhotoInformationOpen(false)} />
+      {historyOpen && <HistoryDialog project={project} onClose={() => setHistoryOpen(false)} onUndo={() => changeHistory('undo')} onRedo={() => changeHistory('redo')} />}
       <ExportPhotoDialog
         open={exportOpen}
         busy={exportBusy}
@@ -1181,6 +1185,7 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
     ['Cycle composition guides', 'G'],
     ['Collapse / expand recipe', 'R'],
     ['Photo information', 'I'],
+    ['Visual history', 'H'],
     ['Masks', 'M'],
     ['Shortcut guide', '?']
   ];
@@ -1248,9 +1253,31 @@ function describeOperation(operation: EditOperation): string {
   if (operation.kind === EDIT_OPERATION.SET_CURVE) return `Update ${operation.channel.toUpperCase()} curve`;
   if (operation.kind === EDIT_OPERATION.SET_VIEWPORT_TRANSFORM) return 'Update crop and geometry';
   if (operation.kind === EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS) return 'Replace development settings';
+  if (operation.kind === EDIT_OPERATION.REPLACE_RECIPE) return 'Replace complete recipe';
   if (operation.kind === EDIT_OPERATION.RENAME_PROJECT) return `Rename project to ${operation.name}`;
   if (operation.kind === EDIT_OPERATION.SET_PROJECT_RATING) return `Rate project ${operation.rating} stars`;
   if (operation.kind === EDIT_OPERATION.SET_PROJECT_TAGS) return `Replace project tags`;
+  if (operation.kind === EDIT_OPERATION.SET_PROJECT_FAVORITE) return operation.favorite ? 'Add project to favorites' : 'Remove project from favorites';
   if (operation.kind === EDIT_OPERATION.REMOVE_MASK) return 'Remove local mask';
   return operation.kind === EDIT_OPERATION.ADD_MASK ? 'Add local mask' : 'Update local mask';
+}
+
+function HistoryDialog({ project, onClose, onUndo, onRedo }: {
+  project: PhotoProject;
+  onClose: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+}): ReactElement {
+  const timeline = project.getHistoryTimeline();
+  const applied = [...timeline.applied].reverse();
+  const redo = [...timeline.availableRedo].reverse();
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
+    <section className="dialog history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="dialog-heading"><div><span className="eyebrow">Non-destructive timeline</span><h2 id="history-title">Visual history</h2></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close visual history">×</button></div>
+      <div className="history-actions"><button type="button" disabled={!project.canUndo()} onClick={onUndo}>Undo latest</button><button type="button" disabled={!project.canRedo()} onClick={onRedo}>Redo</button></div>
+      {applied.length === 0 && redo.length === 0 && <p className="muted">No edits have been recorded yet.</p>}
+      {applied.length > 0 && <ol aria-label="Applied edits">{applied.map((operation, index) => <li className={index === 0 ? 'current' : ''} key={`${operation.kind}-${index}`}><span>{index === 0 ? 'Current' : `${applied.length - index}`}</span><strong>{describeOperation(operation)}</strong></li>)}</ol>}
+      {redo.length > 0 && <><h3>Available redo</h3><ol className="redo-list" aria-label="Available redo edits">{redo.map((operation, index) => <li key={`${operation.kind}-${index}`}><span>Future</span><strong>{describeOperation(operation)}</strong></li>)}</ol></>}
+    </section>
+  </div>;
 }

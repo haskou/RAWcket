@@ -7,6 +7,7 @@ export type ProjectIndexRecord = {
   sourceMimeType: string;
   rating?: number;
   tags?: string[];
+  favorite?: boolean;
 };
 
 export type ProjectSnapshotRecord = {

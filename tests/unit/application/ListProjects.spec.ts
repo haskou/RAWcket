@@ -12,8 +12,9 @@ describe('ListProjects', () => {
     night.apply({ kind: EDIT_OPERATION.RENAME_PROJECT, name: 'Night portrait', groupId: null }, Timestamp.new(1_750_000_000_001));
     night.apply({ kind: EDIT_OPERATION.SET_PROJECT_TAGS, tags: ['client', 'portrait'], groupId: null }, Timestamp.new(1_750_000_000_002));
     night.apply({ kind: EDIT_OPERATION.SET_PROJECT_RATING, rating: 4, groupId: null }, Timestamp.new(1_750_000_000_003));
+    night.apply({ kind: EDIT_OPERATION.SET_PROJECT_FAVORITE, favorite: true, groupId: null }, Timestamp.new(1_750_000_000_004));
     const landscape = PhotoProjectMother.create();
-    landscape.apply({ kind: EDIT_OPERATION.RENAME_PROJECT, name: 'Coast', groupId: null }, Timestamp.new(1_750_000_000_004));
+    landscape.apply({ kind: EDIT_OPERATION.RENAME_PROJECT, name: 'Coast', groupId: null }, Timestamp.new(1_750_000_000_005));
     await repository.save(night);
     await repository.save(landscape);
     const list = new ListProjects(repository);
@@ -21,5 +22,6 @@ describe('ListProjects', () => {
     expect(await list.list(new ListProjectsMessage('portrait', 3))).toHaveLength(1);
     expect(await list.list(new ListProjectsMessage('client', 4))).toHaveLength(1);
     expect(await list.list(new ListProjectsMessage('coast', 3))).toHaveLength(0);
+    expect(await list.list(new ListProjectsMessage('', 0, true))).toHaveLength(1);
   });
 });

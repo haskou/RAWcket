@@ -109,6 +109,7 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('remove-mask'), maskId: z.uuid(), groupId: z.string().nullable() }),
   z.object({ kind: z.literal('set-project-rating'), rating: z.int().min(0).max(5), groupId: z.string().nullable() }),
   z.object({ kind: z.literal('set-project-tags'), tags: z.array(z.string().min(1).max(32)).max(20), groupId: z.string().nullable() }),
+  z.object({ kind: z.literal('set-project-favorite'), favorite: z.boolean(), groupId: z.string().nullable() }),
   z.object({
     kind: z.literal('replace-development-settings'),
     settings: developmentSettingsSchema,
@@ -185,7 +186,8 @@ export const photoProjectSchema = z.object({
   }),
   organization: z.object({
     rating: z.int().min(0).max(5),
-    tags: z.array(z.string().min(1).max(32)).max(20)
+    tags: z.array(z.string().min(1).max(32)).max(20),
+    favorite: z.boolean()
   }),
   recipe: z.object({
     globalAdjustments: adjustmentSchema,
