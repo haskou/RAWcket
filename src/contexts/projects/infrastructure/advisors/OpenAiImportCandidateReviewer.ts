@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ImportCandidateAssessment, ImportCandidateForReview, ImportCandidateReviewer } from '../../application/ports/ImportCandidateReviewer';
 import type { OpenAiResponsesClient } from '@/contexts/ai/infrastructure/openai/OpenAiResponsesClient';
+import { parseAiStructuredResult } from '@/contexts/ai/infrastructure/validation/parseAiStructuredResult';
 
 const assessmentSchema = z.object({
   candidateId: z.string().min(1).max(100), score: z.int().min(0).max(100), rank: z.int().positive(),
@@ -18,10 +19,10 @@ const resultJsonSchema = {
         type: 'object', additionalProperties: false,
         required: ['candidateId', 'score', 'rank', 'reasons', 'focusPotential', 'reframingPotential', 'editingPotential', 'visualInterest', 'story'],
         properties: {
-          candidateId: { type: 'string' }, score: { type: 'integer', minimum: 0, maximum: 100 }, rank: { type: 'integer', minimum: 1 },
-          reasons: { type: 'array', minItems: 3, maxItems: 5, items: { type: 'string' } },
-          focusPotential: { type: 'string' }, reframingPotential: { type: 'string' }, editingPotential: { type: 'string' },
-          visualInterest: { type: 'string' }, story: { type: 'string' }
+          candidateId: { type: 'string', minLength: 1, maxLength: 100 }, score: { type: 'integer', minimum: 0, maximum: 100 }, rank: { type: 'integer', minimum: 1 },
+          reasons: { type: 'array', minItems: 3, maxItems: 5, items: { type: 'string', minLength: 1, maxLength: 300 } },
+          focusPotential: { type: 'string', minLength: 1, maxLength: 300 }, reframingPotential: { type: 'string', minLength: 1, maxLength: 300 }, editingPotential: { type: 'string', minLength: 1, maxLength: 300 },
+          visualInterest: { type: 'string', minLength: 1, maxLength: 300 }, story: { type: 'string', minLength: 1, maxLength: 300 }
         }
       }
     }
@@ -33,7 +34,7 @@ export class OpenAiImportCandidateReviewer implements ImportCandidateReviewer {
 
   public async review(candidates: ImportCandidateForReview[]): Promise<ImportCandidateAssessment[]> {
     const candidateFacts = candidates.map(({ candidateId, fileName, width, height }) => ({ candidateId, fileName, width, height }));
-    const result = resultSchema.parse(await this.client.reason({
+    const result = parseAiStructuredResult(resultSchema, await this.client.reason({
       schemaName: 'rawcket_import_comparison', schema: resultJsonSchema,
       images: candidates.map(({ candidateId, preview }) => ({ label: candidateId, preview })),
       instructions: [
@@ -43,7 +44,7 @@ export class OpenAiImportCandidateReviewer implements ImportCandidateReviewer {
         'Predict post-edit potential rather than rewarding the current brightness, contrast, file size, or pixel count. A technically imperfect but compelling and recoverable frame may outrank a clean but empty one.',
         'Use each exact candidateId once, assign unique ranks beginning at 1, and give concrete visible reasons. Never invent people, objects, or capture facts that are not visible.'
       ].join('\n')
-    }));
+    }), 'a photograph comparison');
     const expectedIds = new Set(candidates.map((candidate) => candidate.candidateId));
     const actualIds = new Set(result.assessments.map((assessment) => assessment.candidateId));
     const ranks = new Set(result.assessments.map((assessment) => assessment.rank));

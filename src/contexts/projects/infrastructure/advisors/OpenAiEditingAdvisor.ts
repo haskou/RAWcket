@@ -4,6 +4,7 @@ import { EDIT_OPERATION } from '../../domain/EditOperation';
 import { AdjustmentKey } from '../../domain/value-objects/AdjustmentKey';
 import { GlobalAdjustmentValue } from '../../domain/value-objects/GlobalAdjustmentValue';
 import type { OpenAiResponsesClient } from '@/contexts/ai/infrastructure/openai/OpenAiResponsesClient';
+import { parseAiStructuredResult } from '@/contexts/ai/infrastructure/validation/parseAiStructuredResult';
 
 const adjustmentKeys = ['exposure', 'temperature', 'tint', 'contrast', 'highlights', 'shadows', 'whites', 'blacks', 'saturation', 'vibrance', 'clarity', 'texture', 'dehaze', 'sharpness', 'noiseReduction', 'vignette'] as const;
 const proposalSchema = z.object({
@@ -16,7 +17,7 @@ const proposalJsonSchema = {
   additionalProperties: false,
   required: ['explanation', 'operations'],
   properties: {
-    explanation: { type: 'string' },
+    explanation: { type: 'string', minLength: 1, maxLength: 1200 },
     operations: {
       type: 'array', minItems: 1, maxItems: 16,
       items: {
@@ -31,7 +32,7 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
   public constructor(private readonly client: OpenAiResponsesClient) {}
 
   public async propose(context: EditingContext): Promise<EditProposal> {
-    const result = proposalSchema.parse(await this.client.reason({
+    const result = parseAiStructuredResult(proposalSchema, await this.client.reason({
       schemaName: 'rawcket_edit_proposal',
       schema: proposalJsonSchema,
       images: [{ label: 'current-render', preview: context.preview }],
@@ -43,7 +44,7 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
         'Return absolute slider values, not deltas. Exposure must be between -5 and 5. Sharpness and noiseReduction must be between 0 and 100; every other value must be between -100 and 100.',
         'Do not claim that edits were applied. Explain the visual reasoning so every proposed value remains reviewable.'
       ].join('\n')
-    }));
+    }), 'an editing proposal');
     if (new Set(result.operations.map((operation) => operation.key)).size !== result.operations.length) {
       throw new Error('OpenAI returned the same adjustment more than once.');
     }
