@@ -1,5 +1,6 @@
-import type { ReactElement } from 'react';
+import { useState, type FormEvent, type ReactElement } from 'react';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
+import type { RecipePreset } from '@/contexts/projects/domain/RecipePreset';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { adjustmentDefinitions, type AdjustmentSection } from '../editor/adjustmentDefinitions';
 
@@ -10,13 +11,17 @@ export function ActiveRecipePanel({
   onNavigate,
   onToggle,
   onNavigateTool,
-  onCopy,
-  onPaste,
   onApplyPreset,
   onClear,
-  onExportSidecar,
-  onImportSidecar,
-  transferMessage,
+  customPresets,
+  onCreatePreset,
+  onApplyCustomPreset,
+  onRenameCustomPreset,
+  onUpdateCustomPreset,
+  onExportCustomPreset,
+  onDeleteCustomPreset,
+  onImportPreset,
+  presetMessage,
   collapsed,
   onToggleCollapsed
 }: {
@@ -24,22 +29,36 @@ export function ActiveRecipePanel({
   onNavigate: (section: AdjustmentSection) => void;
   onToggle: (key: AdjustmentKeyPrimitive, enabled: boolean) => void;
   onNavigateTool?: (tool: 'curves' | 'crop' | 'masks') => void;
-  onCopy?: () => void;
-  onPaste?: () => void;
   onApplyPreset?: (name: 'Natural' | 'Cinematic' | 'Monochrome') => void;
   onClear: () => void;
-  onExportSidecar: () => void;
-  onImportSidecar: () => void;
-  transferMessage?: string;
+  customPresets: RecipePreset[];
+  onCreatePreset: (name: string) => void;
+  onApplyCustomPreset: (preset: RecipePreset) => void;
+  onRenameCustomPreset: (preset: RecipePreset, name: string) => void;
+  onUpdateCustomPreset: (preset: RecipePreset) => void;
+  onExportCustomPreset: (preset: RecipePreset) => void;
+  onDeleteCustomPreset: (preset: RecipePreset) => void;
+  onImportPreset: () => void;
+  presetMessage?: string;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }): ReactElement {
+  const [newPresetName, setNewPresetName] = useState('');
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [editingPresetName, setEditingPresetName] = useState('');
   const modifiedAdjustments = adjustmentDefinitions.filter((definition) => project.isGlobalAdjustmentModified(AdjustmentKey.fromPrimitives(definition.key)));
   const recipeBlocks: RecipeBlock[] = [];
   if (project.hasCurveAdjustments()) recipeBlocks.push(['curves', 'Tone Curve']);
   if (project.hasGeometryAdjustments()) recipeBlocks.push(['crop', 'Crop & Geometry']);
   if (project.hasMasks()) recipeBlocks.push(['masks', 'Local Masks']);
   const hasActiveRecipe = modifiedAdjustments.length > 0 || recipeBlocks.length > 0;
+
+  const createPreset = (event: FormEvent): void => {
+    event.preventDefault();
+    if (newPresetName.trim().length === 0) return;
+    onCreatePreset(newPresetName);
+    setNewPresetName('');
+  };
 
   if (collapsed) {
     return <aside className="recipe-panel collapsed" aria-label="Active Recipe collapsed">
@@ -55,18 +74,28 @@ export function ActiveRecipePanel({
         <h2>Active Recipe</h2>
         <p>Toggle any instruction without losing its value. Select it to edit.</p>
         <div className="recipe-transfer-actions">
-          <button type="button" onClick={onCopy}>Copy</button>
-          <button type="button" onClick={onPaste}>Paste</button>
           <button type="button" disabled={!hasActiveRecipe} onClick={onClear}>Clear recipe</button>
-          <button type="button" onClick={onExportSidecar}>Save sidecar</button>
-          <button type="button" onClick={onImportSidecar}>Load sidecar</button>
+          <button type="button" onClick={onImportPreset}>Import preset</button>
         </div>
-        <div className="recipe-preset-actions" aria-label="Built-in development presets">
+        <div className="recipe-preset-section"><strong>Built-in looks</strong><div className="recipe-preset-actions" aria-label="Built-in development presets">
           {(['Natural', 'Cinematic', 'Monochrome'] as const).map((name) => (
             <button type="button" key={name} onClick={() => onApplyPreset?.(name)}>{name}</button>
           ))}
-        </div>
-        {transferMessage !== undefined && <output className="recipe-transfer-message" aria-live="polite">{transferMessage}</output>}
+        </div></div>
+        <section className="custom-recipe-presets" aria-label="My recipe presets">
+          <strong>My presets</strong>
+          <form onSubmit={createPreset}><input aria-label="New preset name" value={newPresetName} maxLength={80} placeholder="Name current recipe" onChange={(event) => setNewPresetName(event.target.value)} /><button type="submit" disabled={newPresetName.trim().length === 0}>Save</button></form>
+          {customPresets.length === 0 && <small>No browser presets yet. Save the current recipe or import one.</small>}
+          {customPresets.map((preset) => {
+            const id = preset.getId().valueOf();
+            const editing = editingPresetId === id;
+            return <article key={id}>
+              {editing ? <form onSubmit={(event) => { event.preventDefault(); onRenameCustomPreset(preset, editingPresetName); setEditingPresetId(null); }}><input aria-label={`Rename ${preset.getName().valueOf()}`} value={editingPresetName} maxLength={80} onChange={(event) => setEditingPresetName(event.target.value)} /><button type="submit">Done</button></form> : <strong>{preset.getName().valueOf()}</strong>}
+              <div><button type="button" onClick={() => onApplyCustomPreset(preset)}>Apply</button><button type="button" onClick={() => onUpdateCustomPreset(preset)}>Update</button><button type="button" onClick={() => { setEditingPresetId(id); setEditingPresetName(preset.getName().valueOf()); }}>Rename</button><button type="button" onClick={() => onExportCustomPreset(preset)}>Export</button><button className="danger-text" type="button" onClick={() => onDeleteCustomPreset(preset)}>Delete</button></div>
+            </article>;
+          })}
+        </section>
+        {presetMessage !== undefined && <output className="recipe-transfer-message" aria-live="polite">{presetMessage}</output>}
       </div>
       <div className="recipe-items">
         {modifiedAdjustments.map((definition) => {

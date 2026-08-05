@@ -75,7 +75,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Exposure, temperature, tint, contrast, highlights, shadows, whites, blacks, saturation, vibrance, clarity, dehaze, sharpening, and noise reduction affect pixels in the reference renderer. Each has a slider, exact numeric entry, reset, undo/redo, and a non-destructive enable switch.
 
-**Implemented.** Texture and vignette render through the reference pipeline. Natural, Cinematic, and Monochrome presets replace portable development settings as one reversible operation. Copy/paste excludes source, geometry, masks, IDs, and caches.
+**Implemented.** Texture and vignette render through the reference pipeline. Natural, Cinematic, and Monochrome presets replace portable development settings as one reversible operation. The Recipe panel separates built-in looks from browser-owned presets; custom presets can capture the complete current recipe, apply reversibly, update from current, rename, delete, and use a versioned validated JSON import/export format. Copy/paste and sidecar controls are removed from the editor UI because project bundles already cover complete project transfer.
 
 **Remaining.** Lens profiles, chromatic aberration, distortion, stronger production-grade algorithms, and a future batch-editing foundation.
 
@@ -213,7 +213,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes. Schema version 6 adds reversible favorites and an indexed favorites-only filter. Schema version 7 adds horizontal/vertical perspective to the viewport and recursively migrates recorded recipe history. Schema version 8 adds brush erase mode, pressure, and mask expansion while migrating masks nested in active recipes and history. Schema version 9 adds a bounded AI development journal containing the photographer's request, suggested intent, critique, strengths, opportunities, explanation, reviewable operations, timestamp, and applied/rejected state. It persists locally and in checksummed bundles while excluding previews, credentials, and provider envelopes.
 
-**Implemented.** Versioned `.rawcket.json` sidecars export only source dimensions and validated recipe data. They exclude the original, project identity, history, ratings, and tags; applying one is a single undoable aggregate operation with a 5 MB input limit.
+**Compatibility infrastructure.** Versioned `.rawcket.json` sidecars still decode for backward compatibility, but their editor controls have been replaced by the browser preset library. New `.rawcket-recipe.json` files contain validated recipe data only, exclude originals, project identity, history, ratings, tags, AI history, and credentials, and import into My presets rather than changing the open project immediately.
 
 **Implemented.** A persistent write-ahead journal covers create, duplicate, bundle import, and delete across IndexedDB/OPFS. All mutations and startup reconciliation share one FIFO queue. Recovery completes interrupted deletes and removes only sources proven orphaned by journal state; missing referenced originals produce an actionable warning instead of deletion.
 

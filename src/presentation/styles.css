@@ -227,6 +227,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .recipe-transfer-actions button:hover, .recipe-preset-actions button:hover { border-color: #68724f; color: var(--accent); }
 .recipe-preset-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
 .recipe-preset-actions button:last-child { grid-column: 1 / -1; }
+.recipe-preset-section { margin-top: 12px; }
+.recipe-preset-section > strong, .custom-recipe-presets > strong { color: #7f8981; font-size: .56rem; text-transform: uppercase; letter-spacing: .08em; }
+.custom-recipe-presets { display: grid; gap: 6px; margin-top: 13px; padding-top: 11px; border-top: 1px solid #2b302c; }
+.custom-recipe-presets > form, .custom-recipe-presets article form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+.custom-recipe-presets input { min-width: 0; height: 29px; padding: 0 7px; border: 1px solid #353b36; border-radius: 6px; background: #0d0f0e; color: #d1d7d2; font-size: .59rem; }
+.custom-recipe-presets button { min-height: 27px; padding: 0 6px; border: 1px solid #343a35; border-radius: 5px; background: #1a1d1b; color: #aeb6b0; cursor: pointer; font-size: .53rem; }
+.custom-recipe-presets button:hover { border-color: #68724f; color: var(--accent); }
+.custom-recipe-presets button:disabled { cursor: default; opacity: .4; }
+.custom-recipe-presets > small { color: #6f7771; font-size: .54rem; line-height: 1.4; }
+.custom-recipe-presets article { padding: 7px; border: 1px solid #2f3530; border-radius: 7px; background: #151815; }
+.custom-recipe-presets article > strong { display: block; overflow: hidden; margin-bottom: 6px; color: #c6cdc7; font-size: .61rem; text-overflow: ellipsis; white-space: nowrap; }
+.custom-recipe-presets article > div { display: flex; flex-wrap: wrap; gap: 3px; }
+.custom-recipe-presets .danger-text:hover { border-color: #694345; color: #e59a9a; }
 .recipe-transfer-message { display: block; margin-top: 8px; color: #8e9989; font-size: .57rem; line-height: 1.4; }
 .recipe-items { padding: 7px; }
 .recipe-item { display: grid; grid-template-columns: 30px minmax(0,1fr); align-items: center; border-radius: 8px; }

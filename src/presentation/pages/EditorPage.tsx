@@ -12,22 +12,22 @@ import {
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
-import { ApplyProjectSidecarMessage } from '@/contexts/projects/application/apply-project-sidecar/messages/ApplyProjectSidecarMessage';
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
-import { CopyDevelopmentSettingsMessage } from '@/contexts/projects/application/copy-development-settings/messages/CopyDevelopmentSettingsMessage';
 import { CreateSemanticMaskMessage } from '@/contexts/projects/application/create-semantic-mask/messages/CreateSemanticMaskMessage';
 import { DecideAiDevelopmentAdviceMessage } from '@/contexts/projects/application/decide-ai-development-advice/messages/DecideAiDevelopmentAdviceMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { ExportProjectPhotoMessage } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
-import { ExportProjectSidecarMessage } from '@/contexts/projects/application/export-project-sidecar/messages/ExportProjectSidecarMessage';
 import { EstimateHorizonMessage } from '@/contexts/projects/application/estimate-horizon/messages/EstimateHorizonMessage';
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
+import { CreateRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/CreateRecipePresetMessage';
+import { DeleteRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/DeleteRecipePresetMessage';
+import { ExportRecipePresetMessage, ImportRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/TransferRecipePresetMessage';
+import { UpdateRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/UpdateRecipePresetMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RecordAiDevelopmentAdviceMessage } from '@/contexts/projects/application/record-ai-development-advice/messages/RecordAiDevelopmentAdviceMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
 import { ReviewDevelopmentMessage } from '@/contexts/projects/application/review-development/messages/ReviewDevelopmentMessage';
-import { PasteDevelopmentSettingsMessage } from '@/contexts/projects/application/paste-development-settings/messages/PasteDevelopmentSettingsMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
 import type { DevelopmentGuidanceItem } from '@/contexts/projects/application/ports/DevelopmentTutor';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
@@ -38,6 +38,7 @@ import { GlobalAdjustments } from '@/contexts/projects/domain/GlobalAdjustments'
 import { DevelopmentRecipe, type DevelopmentSettingsPrimitives } from '@/contexts/projects/domain/DevelopmentRecipe';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
+import type { RecipePreset } from '@/contexts/projects/domain/RecipePreset';
 import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
 import { CurveSet, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
@@ -151,7 +152,7 @@ export function EditorPage(): ReactElement {
   const cropDraftValue = useRef<ViewportTransformPrimitives['cropFrame'] | null>(null);
   const exportAbort = useRef<AbortController | null>(null);
   const horizonAbort = useRef<AbortController | null>(null);
-  const sidecarInput = useRef<HTMLInputElement>(null);
+  const recipePresetInput = useRef<HTMLInputElement>(null);
   const semanticAbort = useRef<AbortController | null>(null);
   const renderSequence = useRef(0);
   const [project, setProject] = useState<PhotoProject | null>(null);
@@ -187,7 +188,8 @@ export function EditorPage(): ReactElement {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [photoInformationOpen, setPhotoInformationOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [recipeTransferMessage, setRecipeTransferMessage] = useState<string | undefined>();
+  const [recipePresetMessage, setRecipePresetMessage] = useState<string | undefined>();
+  const [recipePresets, setRecipePresets] = useState<RecipePreset[]>([]);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiMessage, setAiMessage] = useState('Connect OpenAI API to request a visual opinion or an editable proposal. Cloud AI actions send only a reduced preview.');
   const [aiProposal, setAiProposal] = useState<EditProposal | null>(null);
@@ -211,6 +213,11 @@ export function EditorPage(): ReactElement {
 
   useEffect(() => {
     let mounted = true;
+    void application.manageRecipePresets.list().then((presets) => {
+      if (mounted) setRecipePresets(presets);
+    }).catch((error: unknown) => {
+      if (mounted) setRecipePresetMessage(error instanceof Error ? error.message : 'Recipe presets could not be loaded.');
+    });
     void application.manageSemanticSegmentationModel.inspect().then((status) => {
       if (mounted) setSemanticStatus(status);
     }).catch((error: unknown) => {
@@ -407,25 +414,16 @@ export function EditorPage(): ReactElement {
     downloadBlob(bundle, `${project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-')}.rawcket`);
   };
 
-  const exportSidecar = (): void => {
-    if (project === null) return;
-    const sidecar = application.exportProjectSidecar.export(project, new ExportProjectSidecarMessage(projectId));
-    const safeName = project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '');
-    downloadBlob(sidecar, `${safeName || 'recipe'}.rawcket.json`);
-    setRecipeTransferMessage('Versioned recipe sidecar exported without the original image.');
-  };
-
-  const importSidecar = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
-    const sidecar = event.target.files?.[0];
+  const importRecipePreset = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0];
     event.target.value = '';
-    if (project === null || sidecar === undefined) return;
+    if (file === undefined) return;
     try {
-      const updated = await application.applyProjectSidecar.apply(project, new ApplyProjectSidecarMessage(projectId, sidecar));
-      setProject(updated);
-      setRevision((value) => value + 1);
-      setRecipeTransferMessage('Sidecar applied as one undoable recipe operation.');
+      const preset = await application.manageRecipePresets.import(new ImportRecipePresetMessage(crypto.randomUUID(), file));
+      setRecipePresets((current) => [preset, ...current]);
+      setRecipePresetMessage(`${preset.getName().valueOf()} imported into My presets.`);
     } catch (error: unknown) {
-      setRecipeTransferMessage(error instanceof Error ? error.message : 'The sidecar could not be applied.');
+      setRecipePresetMessage(error instanceof Error ? error.message : 'The recipe preset could not be imported.');
     }
   };
 
@@ -484,34 +482,46 @@ export function EditorPage(): ReactElement {
     openPanel(section);
   };
 
-  const copyDevelopmentSettings = async (): Promise<void> => {
-    if (project === null) return;
-    try {
-      await application.copyDevelopmentSettings.copy(project, new CopyDevelopmentSettingsMessage(projectId));
-      setRecipeTransferMessage('Development settings copied. Masks, crop, source, and cache data were excluded.');
-    } catch (error: unknown) {
-      setRecipeTransferMessage(error instanceof Error ? error.message : 'The development settings could not be copied.');
-    }
-  };
-
-  const pasteDevelopmentSettings = async (): Promise<void> => {
-    if (project === null) return;
-    try {
-      await application.pasteDevelopmentSettings.paste(project, new PasteDevelopmentSettingsMessage(projectId));
-      setRevision((current) => current + 1);
-      setRecipeTransferMessage('Development settings pasted as one undoable recipe change.');
-    } catch (error: unknown) {
-      setRecipeTransferMessage(error instanceof Error ? error.message : 'The development settings could not be pasted.');
-    }
-  };
-
   const applyBuiltInPreset = (name: BuiltInPresetName): void => {
     apply({
       kind: EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS,
       settings: builtInPreset(name),
       groupId: null
     });
-    setRecipeTransferMessage(`${name} applied as one reversible recipe operation.`);
+    setRecipePresetMessage(`${name} applied as one reversible recipe operation.`);
+  };
+
+  const createRecipePreset = async (name: string): Promise<void> => {
+    if (project === null) return;
+    try {
+      const preset = await application.manageRecipePresets.create(project, new CreateRecipePresetMessage(projectId, crypto.randomUUID(), name));
+      setRecipePresets((current) => [preset, ...current]);
+      setRecipePresetMessage(`${preset.getName().valueOf()} saved in this browser.`);
+    } catch (error: unknown) { setRecipePresetMessage(error instanceof Error ? error.message : 'The preset could not be saved.'); }
+  };
+
+  const updateRecipePreset = async (preset: RecipePreset, name: string, replaceRecipe: boolean): Promise<void> => {
+    if (project === null) return;
+    try {
+      await application.manageRecipePresets.update(project, preset, new UpdateRecipePresetMessage(projectId, preset.getId().valueOf(), name, replaceRecipe));
+      setRecipePresets((current) => [...current]);
+      setRecipePresetMessage(`${preset.getName().valueOf()} ${replaceRecipe ? 'updated from the active recipe' : 'renamed'}.`);
+    } catch (error: unknown) { setRecipePresetMessage(error instanceof Error ? error.message : 'The preset could not be updated.'); }
+  };
+
+  const deleteRecipePreset = async (preset: RecipePreset): Promise<void> => {
+    try {
+      await application.manageRecipePresets.remove(new DeleteRecipePresetMessage(preset.getId().valueOf()));
+      setRecipePresets((current) => current.filter((candidate) => !candidate.isIdentifiedBy(preset.getId())));
+      setRecipePresetMessage(`${preset.getName().valueOf()} deleted from this browser.`);
+    } catch (error: unknown) { setRecipePresetMessage(error instanceof Error ? error.message : 'The preset could not be deleted.'); }
+  };
+
+  const exportRecipePreset = (preset: RecipePreset): void => {
+    const blob = application.manageRecipePresets.export(preset, new ExportRecipePresetMessage(preset.getId().valueOf()));
+    const safeName = preset.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'recipe';
+    downloadBlob(blob, `${safeName}.rawcket-recipe.json`);
+    setRecipePresetMessage(`${preset.getName().valueOf()} exported without a source image or project history.`);
   };
 
   const chooseCurvePreset = (name: keyof typeof curvePresets): void => {
@@ -1119,7 +1129,7 @@ export function EditorPage(): ReactElement {
         </div>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
-      <input ref={sidecarInput} className="visually-hidden" type="file" accept=".rawcket.json,application/json" aria-label="Select a RAWcket recipe sidecar" onChange={(event) => void importSidecar(event)} />
+      <input ref={recipePresetInput} className="visually-hidden" type="file" accept=".rawcket-recipe.json,application/json" aria-label="Select a RAWcket recipe preset" onChange={(event) => void importRecipePreset(event)} />
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
       <section className={`editor-workspace ${recipeCollapsed ? 'recipe-collapsed' : ''}`}>
         <ActiveRecipePanel
@@ -1127,13 +1137,17 @@ export function EditorPage(): ReactElement {
           onNavigate={showAdjustment}
           onToggle={toggleAdjustment}
           onNavigateTool={openPanel}
-          onCopy={() => void copyDevelopmentSettings()}
-          onPaste={() => void pasteDevelopmentSettings()}
           onApplyPreset={applyBuiltInPreset}
           onClear={() => apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: DevelopmentRecipe.neutral().toPrimitives(), groupId: null })}
-          onExportSidecar={exportSidecar}
-          onImportSidecar={() => sidecarInput.current?.click()}
-          transferMessage={recipeTransferMessage}
+          customPresets={recipePresets}
+          onCreatePreset={(name) => void createRecipePreset(name)}
+          onApplyCustomPreset={(preset) => { apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: preset.getRecipe().toPrimitives(), groupId: null }); setRecipePresetMessage(`${preset.getName().valueOf()} applied as one reversible recipe operation.`); }}
+          onRenameCustomPreset={(preset, name) => void updateRecipePreset(preset, name, false)}
+          onUpdateCustomPreset={(preset) => void updateRecipePreset(preset, preset.getName().valueOf(), true)}
+          onExportCustomPreset={exportRecipePreset}
+          onDeleteCustomPreset={(preset) => void deleteRecipePreset(preset)}
+          onImportPreset={() => recipePresetInput.current?.click()}
+          presetMessage={recipePresetMessage}
           collapsed={recipeCollapsed}
           onToggleCollapsed={() => setRecipeCollapsed((value) => !value)}
         />

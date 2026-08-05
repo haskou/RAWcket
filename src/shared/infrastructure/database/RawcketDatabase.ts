@@ -23,6 +23,14 @@ export type ProjectAssetJournalRecord = {
   startedAt: number;
 };
 
+export type RecipePresetRecord = {
+  id: string;
+  name: string;
+  recipe: unknown;
+  createdAt: number;
+  updatedAt: number;
+};
+
 interface RawcketSchema extends DBSchema {
   projects: { key: string; value: unknown };
   projectIndex: { key: string; value: ProjectIndexRecord; indexes: { 'by-updatedAt': number } };
@@ -30,13 +38,14 @@ interface RawcketSchema extends DBSchema {
   projectAssetJournal: { key: string; value: ProjectAssetJournalRecord };
   sources: { key: string; value: Blob };
   settings: { key: string; value: unknown };
+  recipePresets: { key: string; value: RecipePresetRecord; indexes: { 'by-updatedAt': number } };
 }
 
 export type RawcketDatabaseConnection = IDBPDatabase<RawcketSchema>;
 
 export class RawcketDatabase {
   public static open(name = 'rawcket'): Promise<RawcketDatabaseConnection> {
-    return openDB<RawcketSchema>(name, 3, {
+    return openDB<RawcketSchema>(name, 4, {
       upgrade(database): void {
         if (!database.objectStoreNames.contains('projects')) database.createObjectStore('projects');
         if (!database.objectStoreNames.contains('sources')) database.createObjectStore('sources');
@@ -50,6 +59,10 @@ export class RawcketDatabase {
           snapshots.createIndex('by-project', 'projectId');
         }
         if (!database.objectStoreNames.contains('projectAssetJournal')) database.createObjectStore('projectAssetJournal', { keyPath: 'projectId' });
+        if (!database.objectStoreNames.contains('recipePresets')) {
+          const presets = database.createObjectStore('recipePresets', { keyPath: 'id' });
+          presets.createIndex('by-updatedAt', 'updatedAt');
+        }
       }
     });
   }

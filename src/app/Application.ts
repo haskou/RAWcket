@@ -23,6 +23,7 @@ import { ExportProjectSidecar } from '@/contexts/projects/application/export-pro
 import { FindProject } from '@/contexts/projects/application/find-project/FindProject';
 import { ListProjects } from '@/contexts/projects/application/list-projects/ListProjects';
 import { ManageSemanticSegmentationModel } from '@/contexts/projects/application/manage-semantic-segmentation-model/ManageSemanticSegmentationModel';
+import { ManageRecipePresets } from '@/contexts/projects/application/manage-recipe-presets/ManageRecipePresets';
 import { InspectSourceImage } from '@/contexts/projects/application/inspect-source-image/InspectSourceImage';
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
 import { SuggestPhotoTags } from '@/contexts/projects/application/suggest-photo-tags/SuggestPhotoTags';
@@ -53,6 +54,8 @@ import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrast
 import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
+import { IndexedDbRecipePresetRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbRecipePresetRepository';
+import { JsonRecipePresetCodec } from '@/contexts/projects/infrastructure/presets/JsonRecipePresetCodec';
 import { IndexedDbProjectAssetJournal } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectAssetJournal';
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
 import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/CachingPreviewRenderer';
@@ -79,6 +82,7 @@ export type Application = {
   findProject: FindProject;
   listProjects: ListProjects;
   manageSemanticSegmentationModel: ManageSemanticSegmentationModel;
+  manageRecipePresets: ManageRecipePresets;
   applyEditOperation: ApplyEditOperation;
   applyProjectSidecar: ApplyProjectSidecar;
   changeHistory: ChangeHistory;
@@ -125,6 +129,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     new VersionEightToNineProjectMigration()
   ]);
   const projects = new IndexedDbProjectRepository(database, migrator);
+  const recipePresets = new IndexedDbRecipePresetRepository(database);
   const sourceFiles = new BrowserSourceFileRepository(database);
   const projectAssetJournal = new IndexedDbProjectAssetJournal(database);
   const projectAssetQueue = new Queue(QueueOptions.withConcurrency(1));
@@ -152,6 +157,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     findProject: new FindProject(projects),
     listProjects: new ListProjects(projects),
     manageSemanticSegmentationModel: new ManageSemanticSegmentationModel(semanticSegmentationModel),
+    manageRecipePresets: new ManageRecipePresets(recipePresets, new JsonRecipePresetCodec()),
     applyEditOperation: new ApplyEditOperation(),
     applyProjectSidecar: new ApplyProjectSidecar(projectSidecarCodec),
     changeHistory: new ChangeHistory(),

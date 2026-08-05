@@ -34,7 +34,7 @@ Schema version 9 adds the bounded `AiDevelopmentJournal` to the aggregate. Each 
 
 Schema version 5 adds immutable `CaptureMetadata`. The bounded TIFF reader extracts only validated, size-limited EXIF fields from Sony ARW containers; the aggregate persists those facts separately from editable project state. Missing fields remain explicitly null and the UI distinguishes embedded-preview development from future high-depth RAW demosaicing.
 
-`JsonProjectSidecarCodec` is an infrastructure boundary for recipe-only `.rawcket.json` files. Application messages validate project identity and file size; importing delegates to the aggregate’s `replace-recipe` operation so the entire change is validated, serializable, and undoable without copying source bytes or project identity.
+`JsonProjectSidecarCodec` remains an infrastructure compatibility boundary for legacy recipe-only `.rawcket.json` files. The active workflow uses the `RecipePreset` aggregate, its domain repository, and `JsonRecipePresetCodec`: IndexedDB stores browser-owned presets independently from projects, while versioned `.rawcket-recipe.json` transfer excludes source bytes, project identity, history, and credentials. Applying a preset delegates to the project's existing `replace-recipe` operation, so the change is validated and undoable.
 
 `EditHistory.getTimeline()` returns cloned applied and redo operations. The visual history renders those same operations, so it cannot drift from actual undo/redo state or mutate recorded history through presentation references.
 
@@ -57,7 +57,7 @@ Project/source mutations cross IndexedDB and OPFS, so `projectAssetJournal` reco
 - `RecordAiDevelopmentAdvice` and `DecideAiDevelopmentAdvice` are explicit application entrypoints. They validate identifiers and bounded narrative Value Objects before the aggregate records or decides an AI journal entry and emits its normal changed event.
 - `SemanticSegmentationModel` owns the optional model lifecycle and returns only normalized suggestions. `CreateSemanticMask` converts region suggestions into domain-owned, versioned `MaskDefinition` values; `SuggestPhotoTags` validates category suggestions as `ProjectTags` before the import flow records the normal reversible tag operation.
 - `HorizonEstimator` reads only a bounded local preview and returns correction/confidence evidence. `EstimateHorizon` validates that result before presentation can convert it into the existing reversible viewport operation.
-- Portable development settings exclude source identity, geometry, masks, and disposable caches; paste and presets use one reversible aggregate operation.
+- Recipe presets contain validated recipe data but exclude source identity, project history, organization, AI history, credentials, and disposable caches; applying one uses the reversible `replace-recipe` aggregate operation.
 
 ## Save flow
 

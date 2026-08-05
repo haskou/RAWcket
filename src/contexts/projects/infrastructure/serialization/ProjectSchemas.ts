@@ -98,6 +98,14 @@ export const maskSchema: z.ZodType<MaskDefinitionPrimitives> = z.lazy(() =>
   })
 );
 
+export const developmentRecipeSchema = z.object({
+  globalAdjustments: adjustmentSchema,
+  curves: curveSetSchema,
+  viewport: viewportSchema,
+  masks: z.array(maskSchema),
+  disabledGlobalAdjustments: z.array(adjustmentKeySchema)
+});
+
 export const editOperationSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('set-global-adjustment'),
@@ -130,13 +138,7 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('replace-recipe'),
-    recipe: z.object({
-      globalAdjustments: adjustmentSchema,
-      curves: curveSetSchema,
-      viewport: viewportSchema,
-      masks: z.array(maskSchema),
-      disabledGlobalAdjustments: z.array(adjustmentKeySchema)
-    }),
+    recipe: developmentRecipeSchema,
     groupId: z.string().nullable()
   }),
   z.object({
@@ -199,13 +201,7 @@ export const photoProjectSchema = z.object({
     favorite: z.boolean()
   }),
   aiDevelopment: z.object({ advice: z.array(aiDevelopmentAdviceSchema).max(50) }),
-  recipe: z.object({
-    globalAdjustments: adjustmentSchema,
-    curves: curveSetSchema,
-    viewport: viewportSchema,
-    masks: z.array(maskSchema),
-    disabledGlobalAdjustments: z.array(adjustmentKeySchema)
-  }),
+  recipe: developmentRecipeSchema,
   history: z.object({
     limit: z.int().min(1).max(1000),
     undo: z.array(historyEntrySchema),

@@ -250,6 +250,10 @@ export class PhotoProject {
     return this.recipe.getDevelopmentSettings();
   }
 
+  public getRecipe(): DevelopmentRecipe {
+    return DevelopmentRecipe.fromPrimitives(this.recipe.toPrimitives());
+  }
+
   public getCurve(channel: CurveChannel): ToneCurve | null {
     const curve = this.recipe.getCurve(channel);
     return curve === null ? null : ToneCurve.fromPrimitives(curve.toPrimitives());
