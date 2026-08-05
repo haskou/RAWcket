@@ -1,7 +1,7 @@
 import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments';
 import type { CpuDevelopmentSettings } from './CpuPixelDeveloper';
-import { CpuMaskWeightRasterizer } from './CpuMaskWeightRasterizer';
 import { ToneCurveLut } from './ToneCurveLut';
+import { WebGl2MaskWeightRasterizer } from './WebGl2MaskWeightRasterizer';
 
 const adjustmentOrder = [
   'exposure', 'temperature', 'tint', 'contrast', 'highlights', 'shadows', 'whites', 'blacks',
@@ -10,7 +10,7 @@ const adjustmentOrder = [
 const maximumWebGlMasks = 4;
 
 export class WebGl2PixelDeveloper {
-  private readonly maskRasterizer = new CpuMaskWeightRasterizer();
+  private readonly maskRasterizer = new WebGl2MaskWeightRasterizer();
 
   public develop(
     source: Uint8ClampedArray,
@@ -72,7 +72,10 @@ export class WebGl2PixelDeveloper {
     gl.uniform1fv(location, new Float32Array(adjustmentOrder.map((key) => adjustments[key])));
     this.uniform1i(gl, program, 'uHasLuminanceCurve', curves.luminance === null ? 0 : 1);
     this.uniform2f(gl, program, 'uDimensions', width, height);
-    const maskTexture = this.createMaskWeightTexture(gl, source, width, height, settings);
+    const maskTexture = this.maskRasterizer.rasterize(gl, sourceTexture, width, height, settings.masks);
+    if (maskTexture === null) throw new Error('The WebGL2 vector masks exceeded the accelerated rasterizer limits.');
+    this.assertNoGraphicsError(gl, 'vector-mask rasterization');
+    gl.useProgram(program);
     textures.push(maskTexture);
     this.bindTexture(gl, program, maskTexture, 'uMaskWeights', 6);
     this.uniform1i(gl, program, 'uMaskCount', settings.masks.length);
@@ -87,6 +90,7 @@ export class WebGl2PixelDeveloper {
     this.attachOutput(gl, inputTexture);
     gl.viewport(0, 0, width, height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.assertNoGraphicsError(gl, 'global development');
     const spatialProgram = this.createProgram(gl, spatialFragmentShader);
     const spatialPasses = [
       { mode: 0, amount: adjustments.noiseReduction / 100 },
@@ -102,13 +106,14 @@ export class WebGl2PixelDeveloper {
         this.uniform1f(gl, spatialProgram, 'uAmount', definition.amount);
         this.attachOutput(gl, outputTexture);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
+        this.assertNoGraphicsError(gl, 'spatial development');
         [inputTexture, outputTexture] = [outputTexture, inputTexture];
       }
     }
     this.attachOutput(gl, inputTexture);
     const outputPixels = new Uint8ClampedArray(new ArrayBuffer(source.length));
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, outputPixels);
-    if (gl.getError() !== gl.NO_ERROR) throw new Error('The WebGL2 development pass failed.');
+    this.assertNoGraphicsError(gl, 'pixel readback');
     textures.forEach((texture) => gl.deleteTexture(texture));
     gl.deleteVertexArray(vertexArray);
     gl.deleteProgram(program);
@@ -121,6 +126,11 @@ export class WebGl2PixelDeveloper {
     const active = { ...settings.adjustments };
     for (const key of settings.disabledAdjustments) active[key] = 0;
     return active;
+  }
+
+  private assertNoGraphicsError(gl: WebGL2RenderingContext, stage: string): void {
+    const error = gl.getError();
+    if (error !== gl.NO_ERROR) throw new Error(`The WebGL2 ${stage} pass failed with graphics error ${error}.`);
   }
 
   private createProgram(gl: WebGL2RenderingContext, fragmentSource: string): WebGLProgram {
@@ -174,28 +184,6 @@ export class WebGl2PixelDeveloper {
   private createOutputTexture(gl: WebGL2RenderingContext, width: number, height: number): WebGLTexture {
     const texture = this.texture(gl);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    return texture;
-  }
-
-  private createMaskWeightTexture(
-    gl: WebGL2RenderingContext,
-    source: Uint8ClampedArray,
-    width: number,
-    height: number,
-    settings: CpuDevelopmentSettings
-  ): WebGLTexture {
-    const texture = this.texture(gl);
-    const packed = new Float32Array(new ArrayBuffer(width * height * maximumWebGlMasks * Float32Array.BYTES_PER_ELEMENT));
-    if (settings.masks.length > 0) {
-      const weights = this.maskRasterizer.rasterize(source, width, height, settings.masks);
-      const pixelCount = width * height;
-      settings.masks.forEach((_, maskIndex) => {
-        for (let pixel = 0; pixel < pixelCount; pixel += 1) {
-          packed[pixel * maximumWebGlMasks + maskIndex] = weights[maskIndex * pixelCount + pixel] ?? 0;
-        }
-      });
-    }
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, packed);
     return texture;
   }
 

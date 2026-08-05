@@ -25,15 +25,15 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [ ] Sony A6600-specific redistributable fixture and trusted-reference color/matrix golden verification.
 - [x] WebGPU-first global-development/curve/spatial pipeline, WebGL2 fallback, GPU device-loss recovery, and bounded masked local-development passes from deterministic weight rasters.
 - [x] SHA-256 CPU goldens for neutral, tonal/channel, and masked-spatial recipes plus live accelerated parity with an eight-value per-channel tolerance.
-- [ ] Move vector-mask rasterization itself to GPU and complete the remaining capabilities below.
+- [x] Native WebGPU/WebGL2 vector-mask rasterization for every current mask family and nested boolean composition, with bounded CPU fallback.
 
 ## Recommended implementation order
 
 1. Secure a redistributable Sony A6600 ARW fixture and establish trusted color/matrix golden references for the working LibRaw path.
 2. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
-3. Move disposable vector-mask weight rasterization to WebGPU/WebGL2 and broaden the current masked spatial parity corpus.
-4. Extend semantic selection with embedding reuse, model tiers, more categories, and mask composition.
-5. Add per-request cost estimates, cancellation, and capability discovery to the implemented optional OpenAI adapter.
+3. Extend semantic selection with embedding reuse, model tiers, more categories, and mask composition.
+4. Add per-request cost estimates, cancellation, and capability discovery to the implemented optional OpenAI adapter.
+5. Add color-target/real-camera accelerated parity once the redistributable fixture is available.
 
 ---
 
@@ -59,9 +59,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Scope.** Use WebGPU first, WebGL2 as the graphics fallback, and CPU/WASM where appropriate. Produce 512 px thumbnails, 2048–3072 px interactive previews, and full resolution only for final export. Add 1024/4096-entry curve LUTs, initial sRGB color management, future Display P3 support, clipping warnings, RGB/luminance histograms, optional scopes, before/after comparison, intelligent caches, and incremental rendering.
 
-**Implemented.** The worker now selects WebGPU compute shaders first for compatible global adjustments, ordered local masked adjustments, RGB/R/G/B/luminance LUTs, vignette, denoise, texture, and sharpening, then real WebGL2 fragment shaders when WebGPU is unavailable. `CpuMaskWeightRasterizer` produces disposable weights from every current brush, gradient, range, AI, and composite source using the unchanged image luminance; no raster enters the project recipe. WebGL2 packs up to four mask planes into one RGBA32F texture and WebGPU accepts up to 32 storage-buffer planes, with an explicit CPU fallback beyond those bounds. SHA-256 CPU goldens lock neutral, tonal/channel, and masked-spatial output. A Chromium parity fixture combines radial and luminance masks with spatial filters and enforces a maximum eight-channel-value delta from the CPU reference. Device acquisition, loss, or a silently transparent/uniformly corrupt output returns control to the normal fallback pipeline. A visible-pixel E2E regression covers maximum Texture, Sharpness, and Noise Reduction. The active backend is visible in the canvas, and a prominent progress indicator keeps the previous frame visible while a new one renders. The same boundary already provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
+**Implemented.** The worker selects WebGPU compute shaders first for compatible global adjustments, ordered local masked adjustments, RGB/R/G/B/luminance LUTs, vignette, denoise, texture, and sharpening, then real WebGL2 fragment shaders when WebGPU is unavailable. A bounded numeric mask program now flattens every current brush, gradient, luminance/color-point range, AI point/box, modifier, and nested add/subtract/intersect source without placing a raster or prompt in GPU data. WebGPU computes up to 32 disposable storage-buffer planes and WebGL2 renders up to four planes into one RGBA32F texture, sampling smart-point luminance from the unchanged source. Programs outside node/data/plane limits use the authoritative CPU pipeline rather than dropping masks. SHA-256 CPU goldens lock neutral, tonal/channel, and masked-spatial output. A Chromium parity fixture explicitly disables CPU weight rasterization, covers all mask families plus nested boolean composition and spatial filters, and enforces a maximum eight-channel-value delta from the CPU reference on WebGL2 and available WebGPU adapters. WebGPU validation errors (including invalid WGSL), device acquisition/loss, WebGL errors, or suspicious alpha/uniform output return control to the normal fallback pipeline. A visible-pixel E2E regression covers maximum Texture, Sharpness, and Noise Reduction. The active backend is visible in the canvas, and a prominent progress indicator keeps the previous frame visible while a new one renders. The same boundary provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
 
-**Remaining.** Native WebGPU/WebGL2 vector-mask rasterization, a real-camera/color-target CPU/GPU golden corpus, Display P3/ICC work, optional scopes, and incremental tiled rendering.
+**Remaining.** A real-camera/color-target CPU/GPU golden corpus, Display P3/ICC work, optional scopes, and incremental tiled rendering.
 
 **Dependencies.** Linear RAW engine; capability detection; preview boundary and worker protocol; color fixtures; documented operation order; versioned caches.
 
@@ -123,9 +123,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Apply precise local changes from editable vector sources with disposable raster caches.
 
-**Implemented.** Editable brush strokes, ordered paint/erase strokes, pen pressure per point, radial and linear gradients, luminance ranges, local exposure, opacity, feather, density, expand/contract, invert, overlay, vector persistence, and deterministic CPU rasterization. The selected mask is visually emphasized while other overlays dim, and an on-canvas status names its index, enabled state, and current Paint/Erase or Include/Exclude interaction mode. Mouse input stays at full pressure; pen pressure changes both diameter and flow. Schema version 8 migrates old strokes to additive full-pressure data and updates masks recorded inside undo/redo history.
+**Implemented.** Editable brush strokes, ordered paint/erase strokes, pen pressure per point, radial and linear gradients, luminance ranges, local exposure, opacity, feather, density, expand/contract, invert, overlay, vector persistence, deterministic CPU rasterization, and native WebGPU/WebGL2 vector rasterization with bounded CPU fallback. GPU and CPU agree on feather, density, pressure, erasure, smart-point source luminance, and nested boolean composition within the documented tolerance. The selected mask is visually emphasized while other overlays dim, and an on-canvas status names its index, enabled state, and current Paint/Erase or Include/Exclude interaction mode. Mouse input stays at full pressure; pen pressure changes both diameter and flow. Schema version 8 migrates old strokes to additive full-pressure data and updates masks recorded inside undo/redo history.
 
-**Remaining.** Color sampling, local curves, composition UI, disposable raster caches, and native GPU vector rasterization.
+**Remaining.** True color sampling, local curves, composition UI, and reusable disposable raster caches across uncached renders.
 
 **Dependencies.** Existing `MaskDefinition`; local render stages; Pointer Events pressure; GPU/CPU rasterizer; versioned caches; curve editor.
 

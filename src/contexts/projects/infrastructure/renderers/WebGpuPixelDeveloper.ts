@@ -1,7 +1,7 @@
 import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments';
 import type { CpuDevelopmentSettings } from './CpuPixelDeveloper';
-import { CpuMaskWeightRasterizer } from './CpuMaskWeightRasterizer';
 import { ToneCurveLut } from './ToneCurveLut';
+import { WebGpuMaskWeightRasterizer } from './WebGpuMaskWeightRasterizer';
 
 const adjustmentOrder = [
   'exposure', 'temperature', 'tint', 'contrast', 'highlights', 'shadows', 'whites', 'blacks',
@@ -10,7 +10,7 @@ const adjustmentOrder = [
 const maximumGpuMasks = 32;
 
 export class WebGpuPixelDeveloper {
-  private readonly maskRasterizer = new CpuMaskWeightRasterizer();
+  private readonly maskRasterizer = new WebGpuMaskWeightRasterizer();
 
   public async develop(
     source: Uint8ClampedArray,
@@ -22,31 +22,35 @@ export class WebGpuPixelDeveloper {
     const gpu = this.gpu();
     if (gpu === null) return null;
     const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
-    const maskWeightBytes = width * height * settings.masks.length * Float32Array.BYTES_PER_ELEMENT;
-    if (adapter === null
-      || source.byteLength > adapter.limits.maxStorageBufferBindingSize
-      || maskWeightBytes > adapter.limits.maxStorageBufferBindingSize) return null;
+    if (adapter === null || source.byteLength > adapter.limits.maxStorageBufferBindingSize) return null;
     let device: GPUDevice | null = null;
+    let validationScopeActive = false;
     const buffers: GPUBuffer[] = [];
     try {
       device = await adapter.requestDevice();
+      device.pushErrorScope('validation');
+      validationScopeActive = true;
       const sourceWords = this.packSource(source);
       const sourceBuffer = this.buffer(device, sourceWords.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC);
       const outputBuffer = this.buffer(device, sourceWords.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
       const readBuffer = this.buffer(device, sourceWords.byteLength, GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ);
+      buffers.push(sourceBuffer, outputBuffer, readBuffer);
+      const encoder = device.createCommandEncoder({ label: 'RAWcket development commands' });
+      const maskRasterization = this.maskRasterizer.rasterize(device, encoder, sourceBuffer, width, height, settings.masks);
+      if (maskRasterization === null) return null;
+      buffers.push(...maskRasterization.resources);
       const parameters = this.parameters(settings, width, height);
       const parameterBuffer = this.buffer(device, parameters.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      buffers.push(parameterBuffer);
       const curves = this.curves(settings);
       const curveBuffer = this.buffer(device, curves.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-      const maskWeights = this.maskWeights(source, width, height, settings);
-      const maskWeightBuffer = this.buffer(device, maskWeights.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      buffers.push(curveBuffer);
       const localAdjustments = this.localAdjustments(settings);
       const localAdjustmentBuffer = this.buffer(device, localAdjustments.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-      buffers.push(sourceBuffer, outputBuffer, readBuffer, parameterBuffer, curveBuffer, maskWeightBuffer, localAdjustmentBuffer);
+      buffers.push(localAdjustmentBuffer);
       device.queue.writeBuffer(sourceBuffer, 0, sourceWords);
       device.queue.writeBuffer(parameterBuffer, 0, parameters);
       device.queue.writeBuffer(curveBuffer, 0, curves);
-      device.queue.writeBuffer(maskWeightBuffer, 0, maskWeights);
       device.queue.writeBuffer(localAdjustmentBuffer, 0, localAdjustments);
       const module = device.createShaderModule({ label: 'RAWcket global development', code: computeShader });
       const pipeline = device.createComputePipeline({
@@ -61,15 +65,14 @@ export class WebGpuPixelDeveloper {
           { binding: 1, resource: { buffer: outputBuffer } },
           { binding: 2, resource: { buffer: parameterBuffer } },
           { binding: 3, resource: { buffer: curveBuffer } },
-          { binding: 4, resource: { buffer: maskWeightBuffer } },
+          { binding: 4, resource: { buffer: maskRasterization.weights } },
           { binding: 5, resource: { buffer: localAdjustmentBuffer } }
         ]
       });
-      const encoder = device.createCommandEncoder({ label: 'RAWcket development commands' });
       const pass = encoder.beginComputePass({ label: 'RAWcket development pass' });
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, bindGroup);
-      pass.dispatchWorkgroups(Math.ceil(sourceWords.length / 256));
+      pass.dispatchWorkgroups(Math.ceil(width / 16), Math.ceil(height / 16));
       pass.end();
       const finalBuffer = this.encodeSpatialPasses(
         device,
@@ -83,6 +86,9 @@ export class WebGpuPixelDeveloper {
       );
       encoder.copyBufferToBuffer(finalBuffer, 0, readBuffer, 0, sourceWords.byteLength);
       device.queue.submit([encoder.finish()]);
+      const validationError = await device.popErrorScope();
+      validationScopeActive = false;
+      if (validationError !== null) throw new Error(`WebGPU validation failed: ${validationError.message}`);
       await Promise.race([
         readBuffer.mapAsync(GPUMapMode.READ),
         device.lost.then((loss) => Promise.reject(new Error(`WebGPU device lost: ${loss.message}`)))
@@ -94,6 +100,7 @@ export class WebGpuPixelDeveloper {
     } catch {
       return null;
     } finally {
+      if (validationScopeActive && device !== null) await device.popErrorScope().catch(() => null);
       buffers.forEach((buffer) => buffer.destroy());
       device?.destroy();
     }
@@ -123,7 +130,7 @@ export class WebGpuPixelDeveloper {
     const pipeline = device.createComputePipeline({
       label: 'RAWcket spatial development pipeline',
       layout: 'auto',
-      compute: { module, entryPoint: 'filter' }
+      compute: { module, entryPoint: 'spatialFilter' }
     });
     let input = globalOutput;
     let output = reusableSource;
@@ -143,7 +150,7 @@ export class WebGpuPixelDeveloper {
       const pass = encoder.beginComputePass({ label: definition.mode === 0 ? 'RAWcket denoise pass' : 'RAWcket sharpen pass' });
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, bindGroup);
-      pass.dispatchWorkgroups(Math.ceil(width * height / 256));
+      pass.dispatchWorkgroups(Math.ceil(width / 16), Math.ceil(height / 16));
       pass.end();
       [input, output] = [output, input];
     }
@@ -184,11 +191,6 @@ export class WebGpuPixelDeveloper {
     integers[18] = settings.curves.luminance === null ? 0 : 1;
     integers[19] = settings.masks.length;
     return buffer;
-  }
-
-  private maskWeights(source: Uint8ClampedArray, width: number, height: number, settings: CpuDevelopmentSettings): Float32Array<ArrayBuffer> {
-    if (settings.masks.length === 0) return new Float32Array(new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT));
-    return this.maskRasterizer.rasterize(source, width, height, settings.masks);
   }
 
   private localAdjustments(settings: CpuDevelopmentSettings): Float32Array<ArrayBuffer> {
@@ -314,11 +316,11 @@ fn developLocal(sourceRgb: vec3f, mask: u32) -> vec3f {
   return clamp(vec3f(light) + (rgb - vec3f(light)) * colorFactor, vec3f(0.0), vec3f(1.0));
 }
 
-@compute @workgroup_size(256)
+@compute @workgroup_size(16, 16)
 fn develop(@builtin(global_invocation_id) invocation: vec3u) {
-  let index = invocation.x;
+  if (invocation.x >= parameters.dimensions.x || invocation.y >= parameters.dimensions.y) { return; }
+  let index = invocation.y * parameters.dimensions.x + invocation.x;
   let pixelCount = parameters.dimensions.x * parameters.dimensions.y;
-  if (index >= pixelCount) { return; }
   let original = unpack(source[index]);
   var rgb = original.rgb * exp2(parameters.a0.x);
   let temperature = parameters.a0.y / 100.0;
@@ -356,9 +358,7 @@ fn develop(@builtin(global_invocation_id) invocation: vec3u) {
   rgb = clamp(rgb, vec3f(0.0), vec3f(1.0));
   let vignette = parameters.a3.w;
   if (vignette != 0.0) {
-    let x = index % parameters.dimensions.x;
-    let y = index / parameters.dimensions.x;
-    let point = (vec2f(f32(x), f32(y)) + vec2f(0.5)) / vec2f(parameters.dimensions);
+    let point = (vec2f(invocation.xy) + vec2f(0.5)) / vec2f(parameters.dimensions);
     let distanceFromCenter = length((point - vec2f(0.5)) * vec2f(1.25, 1.0)) * 1.6;
     let edge = shapedStep(0.28, 0.92, distanceFromCenter);
     let strength = select(0.45, 0.8, vignette < 0.0);
@@ -396,13 +396,12 @@ fn sourceAt(x: i32, y: i32) -> vec4f {
   return unpack(source[safeY * parameters.dimensions.x + safeX]);
 }
 
-@compute @workgroup_size(256)
-fn filter(@builtin(global_invocation_id) invocation: vec3u) {
-  let index = invocation.x;
-  let pixelCount = parameters.dimensions.x * parameters.dimensions.y;
-  if (index >= pixelCount) { return; }
-  let x = i32(index % parameters.dimensions.x);
-  let y = i32(index / parameters.dimensions.x);
+@compute @workgroup_size(16, 16)
+fn spatialFilter(@builtin(global_invocation_id) invocation: vec3u) {
+  if (invocation.x >= parameters.dimensions.x || invocation.y >= parameters.dimensions.y) { return; }
+  let index = invocation.y * parameters.dimensions.x + invocation.x;
+  let x = i32(invocation.x);
+  let y = i32(invocation.y);
   let center = sourceAt(x, y);
   var average = vec3f(0.0);
   for (var offsetY = -1; offsetY <= 1; offsetY += 1) {
