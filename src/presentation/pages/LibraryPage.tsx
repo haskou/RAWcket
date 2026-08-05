@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Queue, QueueOptions } from '@haskou/flow';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
@@ -27,6 +27,7 @@ export function LibraryPage(): ReactElement {
   const navigate = useNavigate();
   const imageInput = useRef<HTMLInputElement>(null);
   const bundleInput = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
   const [projectMutationQueue] = useState(() => new Queue(QueueOptions.withConcurrency(1)));
   const [projects, setProjects] = useState<PhotoProjectSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,6 +40,7 @@ export function LibraryPage(): ReactElement {
   const [importCandidates, setImportCandidates] = useState<ReviewedImportCandidate[] | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState(0);
   const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
+  const [imageDropActive, setImageDropActive] = useState(false);
   const projectFilter = useMemo(() => new ListProjectsMessage(searchQuery, minimumRating, favoritesOnly), [favoritesOnly, minimumRating, searchQuery]);
   const filteredProjects = useMemo(() => projects.filter((project) => project.matches(
     projectFilter.getQuery(),
@@ -88,10 +90,43 @@ export function LibraryPage(): ReactElement {
   };
 
   const onImage = (event: ChangeEvent<HTMLInputElement>): void => {
-    const files = [...event.target.files ?? []];
+    importImages([...event.target.files ?? []]);
+    event.target.value = '';
+  };
+
+  const importImages = (files: File[]): void => {
+    if (files.length === 0) return;
     if (files.length === 1 && files[0] !== undefined) void createFromFile(files[0]);
     if (files.length > 1) void reviewImportCandidates(files);
-    event.target.value = '';
+  };
+
+  const dragImagesIntoLibrary = (event: DragEvent<HTMLElement>): void => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    dragDepth.current += 1;
+    event.dataTransfer.dropEffect = busy ? 'none' : 'copy';
+    setImageDropActive(true);
+  };
+
+  const dragImagesOverLibrary = (event: DragEvent<HTMLElement>): void => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = busy ? 'none' : 'copy';
+  };
+
+  const dragImagesOutOfLibrary = (event: DragEvent<HTMLElement>): void => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setImageDropActive(false);
+  };
+
+  const dropImagesIntoLibrary = (event: DragEvent<HTMLElement>): void => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    dragDepth.current = 0;
+    setImageDropActive(false);
+    if (busy) return;
+    importImages([...event.dataTransfer.files]);
   };
 
   const reviewImportCandidates = async (files: File[]): Promise<void> => {
@@ -218,7 +253,20 @@ export function LibraryPage(): ReactElement {
   };
 
   return (
-    <main className="library-shell">
+    <main
+      className="library-shell"
+      onDragEnter={dragImagesIntoLibrary}
+      onDragOver={dragImagesOverLibrary}
+      onDragLeave={dragImagesOutOfLibrary}
+      onDrop={dropImagesIntoLibrary}
+    >
+      {imageDropActive && (
+        <div className={`library-drop-overlay ${busy ? 'blocked' : ''}`} role="status" aria-live="polite">
+          <span className="drop-target-icon" aria-hidden="true">↓</span>
+          <strong>{busy ? 'Finish the current import first' : 'Drop photographs to import'}</strong>
+          <small>{busy ? 'RAWcket is already processing a photograph.' : 'JPEG, PNG, or Sony ARW · drop several to compare them first'}</small>
+        </div>
+      )}
       <header className="library-header">
         <a className="brand" href="/" aria-label="RAWcket library"><span className="brand-mark">R</span><span>RAWcket</span></a>
         <div className="header-actions">
@@ -266,7 +314,7 @@ export function LibraryPage(): ReactElement {
           <div className="empty-state">
             <div className="empty-icon" aria-hidden="true">+</div>
             <h3>Start with a photograph</h3>
-            <p>Import a JPEG, PNG, or Sony ARW. The original remains untouched and local.</p>
+            <p>Click Choose image or drop JPEG, PNG, or Sony ARW files here. The original remains untouched and local.</p>
             <button className="button primary" type="button" onClick={() => imageInput.current?.click()}>Choose image</button>
           </div>
         ) : filteredProjects.length === 0 ? (

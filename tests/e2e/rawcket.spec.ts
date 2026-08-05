@@ -15,7 +15,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
     return canvas.toDataURL('image/png').split(',')[1] ?? '';
   });
   const png = Buffer.from(pngBase64, 'base64');
-  await page.getByLabel('Select one or more JPEG, PNG, or Sony ARW images').setInputFiles({
+  const imageChooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Import image' }).click();
+  await (await imageChooser).setFiles({
     name: 'night.png',
     mimeType: 'image/png',
     buffer: png
@@ -185,6 +187,30 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'Export PNG' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('night.png');
+});
+
+test('imports a photograph by dropping it onto the library', async ({ page }) => {
+  await page.goto('/');
+  const dataTransfer = await page.evaluateHandle(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 2;
+    const context = canvas.getContext('2d');
+    if (context === null) throw new Error('Canvas is unavailable in the test.');
+    context.fillStyle = '#718c53';
+    context.fillRect(0, 0, 2, 2);
+    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result === null ? reject(new Error('PNG creation failed.')) : resolve(result), 'image/png'));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([blob], 'dropped.png', { type: 'image/png' }));
+    return transfer;
+  });
+
+  await page.dispatchEvent('.library-shell', 'dragenter', { dataTransfer });
+  await expect(page.getByText('Drop photographs to import')).toBeVisible();
+  await page.dispatchEvent('.library-shell', 'drop', { dataTransfer });
+  await expect(page.getByText('Drop photographs to import')).toHaveCount(0);
+  await expect(page.getByLabel('Project name')).toHaveValue('dropped');
+  await dataTransfer.dispose();
 });
 
 test('compares multiple local imports and lets the photographer override the recommendation', async ({ page }) => {

@@ -1017,9 +1017,6 @@ export function EditorPage(): ReactElement {
             <button role="tab" aria-selected={toolWorkspace === 'develop'} className={toolWorkspace === 'develop' ? 'active' : ''} type="button" onClick={() => { setToolWorkspace('develop'); if (activePanel === 'ai') setActivePanel('light'); }}>Manual</button>
           </div>
           {toolWorkspace === 'ai' ? <>
-          <section className="ai-hero">
-            <div><span className="ai-orb" aria-hidden="true">✦</span><span><strong>RAWcket AI Companion</strong><small>Local, measured, and reviewable</small></span></div>
-          </section>
           <ToolSection id="ai" title="AI Companion" active onToggle={openPanel} badge="Core workflow">
             <div className="development-tutor" aria-label="Local development tutor">
               <div className="development-tutor-heading"><span aria-hidden="true">◇</span><div><strong>Local Development Tutor</strong><small>Measured, explainable, never auto-applied</small></div></div>
