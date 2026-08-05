@@ -27,6 +27,7 @@ import { DeleteRecipePresetMessage } from '@/contexts/projects/application/manag
 import { ExportRecipePresetMessage, ImportRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/TransferRecipePresetMessage';
 import { UpdateRecipePresetMessage } from '@/contexts/projects/application/manage-recipe-presets/messages/UpdateRecipePresetMessage';
 import { RenderProjectBaselineMessage } from '@/contexts/projects/application/render-project-baseline/messages/RenderProjectBaselineMessage';
+import { RenderProjectCropPreviewMessage } from '@/contexts/projects/application/render-project-crop-preview/messages/RenderProjectCropPreviewMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RecordAiDevelopmentAdviceMessage } from '@/contexts/projects/application/record-ai-development-advice/messages/RecordAiDevelopmentAdviceMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
@@ -126,6 +127,16 @@ function clampZoom(value: number): number {
   return Math.min(maximumZoom, Math.max(minimumZoom, value));
 }
 
+function availablePhotoStageSize(stage: HTMLDivElement): ImageDimensions {
+  const styles = window.getComputedStyle(stage);
+  const horizontalPadding = Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
+  const verticalPadding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+  return {
+    width: Math.max(1, stage.clientWidth - horizontalPadding),
+    height: Math.max(1, stage.clientHeight - verticalPadding)
+  };
+}
+
 function isTextEntryTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLInputElement
     || target instanceof HTMLTextAreaElement
@@ -166,6 +177,8 @@ export function EditorPage(): ReactElement {
   const [loadingSource, setLoadingSource] = useState<Blob | null>(null);
   const [beforeSource, setBeforeSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
+  const [cropPreview, setCropPreview] = useState<Blob | null>(null);
+  const [cropPreviewBusy, setCropPreviewBusy] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const [renderProgress, setRenderProgress] = useState('Preparing preview');
   const [renderBusy, setRenderBusy] = useState(true);
@@ -218,7 +231,11 @@ export function EditorPage(): ReactElement {
   const [horizonBusy, setHorizonBusy] = useState(false);
   const [horizonMessage, setHorizonMessage] = useState('Local edge analysis can estimate a dominant horizon or architectural vertical.');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const sourceUrl = useObjectUrl(showOriginal ? beforeSource : preview ?? loadingSource);
+  const cropWorkspaceActive = toolWorkspace === 'develop' && activePanel === 'crop';
+  const displayedSource = showOriginal
+    ? beforeSource
+    : cropWorkspaceActive ? cropPreview ?? loadingSource : preview ?? loadingSource;
+  const sourceUrl = useObjectUrl(displayedSource);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
   const autosave = useProjectAutosave(project, revision, save);
   const semanticDescriptor = application.manageSemanticSegmentationModel.describe();
@@ -359,6 +376,27 @@ export function EditorPage(): ReactElement {
     return () => controller.abort();
   }, [application, previewRevision, project, projectId]);
 
+  useEffect(() => {
+    if (!cropWorkspaceActive || project === null) {
+      setCropPreview(null);
+      setCropPreviewBusy(false);
+      return;
+    }
+    const controller = new AbortController();
+    setCropPreviewBusy(true);
+    void application.renderProjectCropPreview.render(
+      project,
+      new RenderProjectCropPreviewMessage(projectId, 2560),
+      { signal: controller.signal }
+    ).then((result) => {
+      if (result instanceof Blob) setCropPreview(result);
+      setCropPreviewBusy(false);
+    }).catch((error: unknown) => {
+      if (!(error instanceof DOMException) || error.name !== 'AbortError') setCropPreviewBusy(false);
+    });
+    return () => controller.abort();
+  }, [application, cropWorkspaceActive, previewRevision, project, projectId]);
+
   useEffect(() => () => previewRenderDebouncer.current?.cancel(), []);
 
   useEffect(() => {
@@ -417,20 +455,40 @@ export function EditorPage(): ReactElement {
     setPreviewRevision((current) => current + 1);
   }, [application, project, projectId]);
 
-  const calculateFitDimensions = useCallback((dimensions: ImageDimensions | null = imageDimensions): void => {
-    const bounds = photoStage.current?.getBoundingClientRect();
-    if (bounds === undefined || dimensions === null) return;
-    const availableWidth = Math.max(1, bounds.width - 64);
-    const availableHeight = Math.max(1, bounds.height - 118);
-    const scale = Math.min(availableWidth / dimensions.width, availableHeight / dimensions.height, 1);
-    setFitDimensions({ width: Math.max(1, Math.round(dimensions.width * scale)), height: Math.max(1, Math.round(dimensions.height * scale)) });
+  const calculateFitDimensions = useCallback((dimensions: ImageDimensions | null = imageDimensions): ImageDimensions | null => {
+    const stage = photoStage.current;
+    if (stage === null || dimensions === null) return null;
+    const available = availablePhotoStageSize(stage);
+    const scale = Math.min(available.width / dimensions.width, available.height / dimensions.height, 1);
+    const fitted = { width: Math.max(1, dimensions.width * scale), height: Math.max(1, dimensions.height * scale) };
+    setFitDimensions(fitted);
+    return fitted;
   }, [imageDimensions]);
 
+  const frameCropPreview = useCallback((fitted: ImageDimensions): void => {
+    const stage = photoStage.current;
+    if (stage === null || project === null) return;
+    const crop = project.getViewportTransform().toPrimitives().cropFrame;
+    const available = availablePhotoStageSize(stage);
+    const nextZoom = clampZoom(Math.min(
+      available.width / Math.max(1, fitted.width * crop.width),
+      available.height / Math.max(1, fitted.height * crop.height)
+    ));
+    setZoom(nextZoom);
+    setPan({
+      x: -(crop.x + crop.width / 2 - 0.5) * fitted.width * nextZoom,
+      y: -(crop.y + crop.height / 2 - 0.5) * fitted.height * nextZoom
+    });
+  }, [project]);
+
   const fitPreview = useCallback((): void => {
-    calculateFitDimensions();
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  }, [calculateFitDimensions]);
+    const fitted = calculateFitDimensions();
+    if (fitted !== null && cropWorkspaceActive) frameCropPreview(fitted);
+    else {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    }
+  }, [calculateFitDimensions, cropWorkspaceActive, frameCropPreview]);
 
   useEffect(() => {
     const stage = photoStage.current;
@@ -1216,9 +1274,12 @@ export function EditorPage(): ReactElement {
     if (imageDimensions?.width === dimensions.width && imageDimensions.height === dimensions.height) return;
     setImageDimensions(dimensions);
     window.requestAnimationFrame(() => {
-      calculateFitDimensions(dimensions);
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
+      const fitted = calculateFitDimensions(dimensions);
+      if (fitted !== null && cropWorkspaceActive) frameCropPreview(fitted);
+      else {
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+      }
     });
   };
 
@@ -1332,6 +1393,7 @@ export function EditorPage(): ReactElement {
             </div>}
             <div className={`truth-badge ${previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' ? 'source-fallback' : ''}`} title={previewAnalysis?.rawFallbackReason ?? undefined}><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{sourcePrecisionLabel} · {renderProgress}</small></span></div>
             {renderBusy && <div className="render-busy-indicator" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>Updating preview</strong><small>{renderProgress} · previous frame remains visible</small></span></div>}
+            {cropWorkspaceActive && cropPreviewBusy && <div className="crop-preview-busy" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /> Preparing full-frame crop workspace…</div>}
             {previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' && <div className="raw-fallback-notice" role="status">Embedded RAW preview fallback · open Photo information for the decoder reason</div>}
             {baselineError !== null && beforeSource === null && <div className="raw-fallback-notice" role="status">Before preview unavailable · {baselineError}</div>}
             {rawSource && preview === null && loadingSource !== null && <div className="comparison-badge">Camera JPEG preview · developing RAW</div>}
@@ -1610,6 +1672,10 @@ function WorkspaceCompositionGuideOverlay({ guide }: { guide: CompositionGuide }
 
 function CropSelectionOverlay({ crop }: { crop: ViewportTransformPrimitives['cropFrame'] }): ReactElement {
   return <div className="crop-selection-overlay" role="img" aria-label={`Crop selection: left ${crop.x.toFixed(3)}, top ${crop.y.toFixed(3)}, width ${crop.width.toFixed(3)}, height ${crop.height.toFixed(3)}. Drag a corner to resize or drag elsewhere to draw a new crop.`}>
+    <span className="crop-selection-shade top" style={{ height: `${crop.y * 100}%` }} />
+    <span className="crop-selection-shade bottom" style={{ top: `${(crop.y + crop.height) * 100}%` }} />
+    <span className="crop-selection-shade left" style={{ top: `${crop.y * 100}%`, width: `${crop.x * 100}%`, height: `${crop.height * 100}%` }} />
+    <span className="crop-selection-shade right" style={{ top: `${crop.y * 100}%`, left: `${(crop.x + crop.width) * 100}%`, height: `${crop.height * 100}%` }} />
     <div className="crop-selection-frame" style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }}>
       <span className="top-left" data-crop-handle="top-left" /><span className="top-right" data-crop-handle="top-right" /><span className="bottom-left" data-crop-handle="bottom-left" /><span className="bottom-right" data-crop-handle="bottom-right" />
     </div>

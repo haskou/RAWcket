@@ -75,6 +75,14 @@ export class ViewportTransform {
     );
   }
 
+  public revealFullCropFrame(): ViewportTransform {
+    const current = this.toPrimitives();
+    return ViewportTransform.fromPrimitives({
+      ...current,
+      cropFrame: { x: 0, y: 0, width: 1, height: 1 }
+    });
+  }
+
   public toPrimitives(): ViewportTransformPrimitives {
     const origin = this.cropFrame.getOrigin();
     return {

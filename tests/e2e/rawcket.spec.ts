@@ -191,6 +191,35 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByLabel('Width numeric value').fill('0.3');
   await page.getByLabel('Height numeric value').fill('0.6');
   await expect(page.locator('.crop-selection-frame')).toHaveAttribute('style', /width: 30%/);
+  await expect(page.locator('.crop-selection-shade')).toHaveCount(4);
+  await expect.poll(() => page.evaluate(() => {
+    const preview = document.querySelector('.source-preview')?.getBoundingClientRect();
+    const guide = document.querySelector('.fixed-guide-frame')?.getBoundingClientRect();
+    if (preview === undefined || guide === undefined) return Number.POSITIVE_INFINITY;
+    return Math.max(
+      Math.abs(preview.left - guide.left),
+      Math.abs(preview.top - guide.top),
+      Math.abs(preview.right - guide.right),
+      Math.abs(preview.bottom - guide.bottom)
+    );
+  })).toBeLessThan(1);
+  await page.getByRole('button', { name: 'Fit', exact: true }).click();
+  const cropCenterDelta = await page.evaluate(() => {
+    const stageElement = document.querySelector<HTMLElement>('.photo-stage');
+    const crop = document.querySelector('.crop-selection-frame')?.getBoundingClientRect();
+    if (stageElement === null || crop === undefined) return Number.POSITIVE_INFINITY;
+    const stage = stageElement.getBoundingClientRect();
+    const styles = getComputedStyle(stageElement);
+    const left = Number.parseFloat(styles.paddingLeft);
+    const right = Number.parseFloat(styles.paddingRight);
+    const top = Number.parseFloat(styles.paddingTop);
+    const bottom = Number.parseFloat(styles.paddingBottom);
+    return Math.max(
+      Math.abs((stage.left + left + (stage.width - left - right) / 2) - (crop.left + crop.width / 2)),
+      Math.abs((stage.top + top + (stage.height - top - bottom) / 2) - (crop.top + crop.height / 2))
+    );
+  });
+  expect(cropCenterDelta).toBeLessThan(2);
   const widthBeforeCornerResize = Number(await page.getByLabel('Width numeric value').inputValue());
   const resizeHandleBounds = await page.locator('[data-crop-handle="bottom-right"]').boundingBox();
   if (resizeHandleBounds === null) throw new Error('The placed crop resize handle is unavailable.');

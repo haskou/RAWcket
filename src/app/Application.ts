@@ -34,6 +34,7 @@ import { SuggestPhotoTags } from '@/contexts/projects/application/suggest-photo-
 import { SuggestAutomaticEnhancement } from '@/contexts/projects/application/suggest-automatic-enhancement/SuggestAutomaticEnhancement';
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RenderProjectBaseline } from '@/contexts/projects/application/render-project-baseline/RenderProjectBaseline';
+import { RenderProjectCropPreview } from '@/contexts/projects/application/render-project-crop-preview/RenderProjectCropPreview';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
 import { RequestPhotoOpinion } from '@/contexts/projects/application/request-photo-opinion/RequestPhotoOpinion';
 import { ReviewDevelopment } from '@/contexts/projects/application/review-development/ReviewDevelopment';
@@ -116,6 +117,7 @@ export type Application = {
   persistentStorage: PersistentStorageRequest;
   renderProjectPreview: RenderProjectPreview;
   renderProjectBaseline: RenderProjectBaseline;
+  renderProjectCropPreview: RenderProjectCropPreview;
   requestEditingAdvice: RequestEditingAdvice;
   recordAiDevelopmentAdvice: RecordAiDevelopmentAdvice;
   requestPhotoOpinion: RequestPhotoOpinion;
@@ -200,6 +202,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     renderProjectBaseline: new RenderProjectBaseline(previewRenderer),
+    renderProjectCropPreview: new RenderProjectCropPreview(previewRenderer),
     requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi, new OpenAiEditProposalMapper())),
     recordAiDevelopmentAdvice: new RecordAiDevelopmentAdvice(),
     requestPhotoOpinion: new RequestPhotoOpinion(new OpenAiPhotoOpinionAdvisor(openAi)),

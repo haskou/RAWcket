@@ -144,8 +144,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .photo-stage { --stage-content-center-y: 17.5px; flex: 1; min-height: 0; position: relative; display: grid; place-items: center; overflow: hidden; padding: 70px 60px 35px; cursor: grab; touch-action: none; user-select: none; }
 .photo-stage.panning { cursor: grabbing; }
 .photo-stage.painting { cursor: crosshair; }
-.preview-surface { position: relative; display: grid; width: max-content; max-width: 86%; max-height: calc(100% - 105px); transform-origin: center; will-change: transform; box-shadow: 0 22px 70px rgba(0,0,0,.48); pointer-events: none; }
-.source-preview { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.preview-surface { position: relative; display: grid; width: max-content; min-width: 0; min-height: 0; max-width: 86%; max-height: calc(100% - 105px); overflow: hidden; transform-origin: center; will-change: transform; box-shadow: 0 22px 70px rgba(0,0,0,.48); pointer-events: none; }
+.source-preview { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: fill; pointer-events: none; }
 .fixed-guide-frame { position: absolute; z-index: 4; inset: 0; pointer-events: auto; overflow: hidden; }
 .composition-guide-overlay { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .composition-guide-overlay.workspace-guide { z-index: 3; }
@@ -153,7 +153,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .composition-guide-overlay .grid-minor { stroke: rgba(255,255,255,.28); stroke-width: .65; }
 .composition-guide-overlay .grid-major { stroke: rgba(255,255,255,.72); stroke-width: 1.1; }
 .crop-selection-overlay { position: absolute; z-index: 3; inset: 0; overflow: hidden; pointer-events: auto; }
-.crop-selection-frame { position: absolute; border: 1.5px solid rgba(255,255,255,.92); box-shadow: 0 0 0 9999px rgba(2,3,3,.58), 0 0 0 1px rgba(0,0,0,.7); }
+.crop-selection-shade { position: absolute; z-index: 0; display: block; background: rgba(2,3,3,.58); pointer-events: none; }
+.crop-selection-shade.top { inset: 0 0 auto; }
+.crop-selection-shade.bottom { inset: auto 0 0; }
+.crop-selection-shade.left { left: 0; }
+.crop-selection-shade.right { right: 0; }
+.crop-selection-frame { position: absolute; z-index: 1; border: 1.5px solid rgba(255,255,255,.92); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
 .crop-selection-frame > span { position: absolute; width: 14px; height: 14px; border-color: #fff; border-style: solid; filter: drop-shadow(0 1px 1px #000); pointer-events: auto; }
 .crop-selection-frame .top-left { left: -2px; top: -2px; border-width: 2px 0 0 2px; }
 .crop-selection-frame .top-right { right: -2px; top: -2px; border-width: 2px 2px 0 0; }
@@ -188,6 +193,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .render-busy-indicator strong, .render-busy-indicator small { display: block; }
 .render-busy-indicator strong { color: #e4ebdc; font-size: .7rem; }
 .render-busy-indicator small { margin-top: 2px; color: #aab3a5; font-size: .6rem; }
+.crop-preview-busy { position: absolute; z-index: 8; top: 104px; left: 50%; display: flex; align-items: center; gap: 8px; transform: translateX(-50%); padding: 7px 10px; border: 1px solid #526044; border-radius: 8px; background: rgba(16,19,16,.92); color: #cbd3c5; font-size: .62rem; pointer-events: none; }
 .mini-spinner { width: 15px; height: 15px; border: 2px solid rgba(201,240,107,.22); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
 .ai-prompt-shell { position: relative; }
 .ai-prompt-shell .ai-prompt { padding-right: 56px; padding-bottom: 48px; }
