@@ -32,11 +32,13 @@ export function ImportPhotosDialog(props: ImportPhotosDialogProps): ReactElement
   const dragOver = (event: DragEvent<HTMLDivElement>): void => {
     if (!event.dataTransfer.types.includes('Files')) return;
     event.preventDefault();
+    event.stopPropagation();
     event.dataTransfer.dropEffect = props.busy ? 'none' : 'copy';
     setDragActive(true);
   };
   const drop = (event: DragEvent<HTMLDivElement>): void => {
     event.preventDefault();
+    event.stopPropagation();
     setDragActive(false);
     if (!props.busy) props.onFiles([...event.dataTransfer.files]);
   };
@@ -51,7 +53,7 @@ export function ImportPhotosDialog(props: ImportPhotosDialogProps): ReactElement
         className={`import-dialog-dropzone ${dragActive ? 'active' : ''}`}
         onDragEnter={dragOver}
         onDragOver={dragOver}
-        onDragLeave={() => setDragActive(false)}
+        onDragLeave={(event) => { event.stopPropagation(); setDragActive(false); }}
         onDrop={drop}
       >
         <span className="drop-target-icon" aria-hidden="true">↓</span>

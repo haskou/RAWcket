@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
+import { UploadCloudAssetMessage } from '@/contexts/cloud-storage/application/manage-cloud-storage/messages/UploadCloudAssetMessage';
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { CreateSemanticMaskMessage } from '@/contexts/projects/application/create-semantic-mask/messages/CreateSemanticMaskMessage';
@@ -49,6 +50,7 @@ import { useApplication } from '../ApplicationContext';
 import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
 import { AdjustmentControls } from '../components/AdjustmentControls';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
+import { CloudStorageDialog } from '../components/CloudStorageDialog';
 import { GeometryControls } from '../components/GeometryControls';
 import { ExportPhotoDialog, type PhotoExportSettings } from '../components/ExportPhotoDialog';
 import { MaskControls } from '../components/MaskControls';
@@ -181,6 +183,7 @@ export function EditorPage(): ReactElement {
   const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
   const [toolWorkspace, setToolWorkspace] = useState<ToolWorkspace>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cloudStorageOpen, setCloudStorageOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -414,6 +417,21 @@ export function EditorPage(): ReactElement {
     downloadBlob(bundle, `${project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-')}.rawcket`);
   };
 
+  const uploadProjectBundleToDrive = async (): Promise<void> => {
+    if (project === null) return;
+    await autosave.flush();
+    const bundle = await application.projectExporter.exportProject(project.getId());
+    const name = `${project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-') || 'project'}.rawcket`;
+    await application.manageCloudStorage.upload(new UploadCloudAssetMessage(name, bundle, 'project-bundle'));
+  };
+
+  const uploadOriginalToDrive = async (): Promise<void> => {
+    if (project === null) return;
+    const original = await application.sourceFiles.find(project.getId());
+    if (original === null) throw new Error('The original photograph is unavailable locally.');
+    await application.manageCloudStorage.upload(new UploadCloudAssetMessage(project.getSource().getFileName().valueOf(), original, 'original'));
+  };
+
   const importRecipePreset = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -450,7 +468,17 @@ export function EditorPage(): ReactElement {
       const safeName = project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'rawcket-photo';
       const extension = settings.format === 'jpeg' ? 'jpg' : settings.format === 'tiff' ? 'tif' : 'png';
       downloadBlob(image, `${safeName}.${extension}`);
-      setExportMessage('Photo exported successfully.');
+      const cloud = await application.manageCloudStorage.inspect();
+      if (cloud.connected && cloud.autoUploadExports) {
+        setExportMessage('Photo exported locally · uploading to Google Drive…');
+        try {
+          await application.manageCloudStorage.upload(new UploadCloudAssetMessage(`${safeName}.${extension}`, image, 'photo-export'));
+          setExportMessage('Photo exported locally and uploaded to Google Drive.');
+        } catch (error: unknown) {
+          const detail = error instanceof Error ? error.message : 'The Drive copy could not be uploaded.';
+          setExportMessage(`Photo exported locally. Google Drive upload failed: ${detail}`);
+        }
+      } else setExportMessage('Photo exported successfully.');
       setExportProgress(1);
     } catch (error: unknown) {
       setExportMessage(error instanceof DOMException && error.name === 'AbortError' ? 'Export cancelled.' : error instanceof Error ? error.message : 'The photo could not be exported.');
@@ -1127,6 +1155,7 @@ export function EditorPage(): ReactElement {
           <button className="icon-button" type="button" onClick={() => setPhotoInformationOpen(true)} aria-label="Photo information">ⓘ</button>
           <button className="icon-button" type="button" onClick={() => setHistoryOpen(true)} aria-label="Visual history">≡</button>
         </div>
+        <button className="button ghost" type="button" onClick={() => setCloudStorageOpen(true)}>Drive</button>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
       <input ref={recipePresetInput} className="visually-hidden" type="file" accept=".rawcket-recipe.json,application/json" aria-label="Select a RAWcket recipe preset" onChange={(event) => void importRecipePreset(event)} />
@@ -1343,6 +1372,7 @@ export function EditorPage(): ReactElement {
         </aside>
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onConfigured={continuePendingAiAction} />
+      <CloudStorageDialog open={cloudStorageOpen} onClose={() => setCloudStorageOpen(false)} onUploadProject={uploadProjectBundleToDrive} onUploadOriginal={uploadOriginalToDrive} />
       <PhotoInformationDialog project={project} analysis={previewAnalysis} open={photoInformationOpen} onClose={() => setPhotoInformationOpen(false)} />
       {historyOpen && <HistoryDialog project={project} onClose={() => setHistoryOpen(false)} onUndo={() => changeHistory('undo')} onRedo={() => changeHistory('redo')} />}
       <ExportPhotoDialog

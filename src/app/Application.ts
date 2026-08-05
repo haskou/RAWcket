@@ -2,6 +2,8 @@ import { Queue, QueueOptions } from '@haskou/flow';
 import { ConfigureAi } from '@/contexts/ai/application/configure-ai/ConfigureAi';
 import { InspectAiConfiguration } from '@/contexts/ai/application/inspect-ai-configuration/InspectAiConfiguration';
 import { RemoveAi } from '@/contexts/ai/application/remove-ai/RemoveAi';
+import { ManageCloudStorage } from '@/contexts/cloud-storage/application/manage-cloud-storage/ManageCloudStorage';
+import { BrowserGoogleDriveGateway } from '@/contexts/cloud-storage/infrastructure/google/BrowserGoogleDriveGateway';
 import { UnlockAi } from '@/contexts/ai/application/unlock-ai/UnlockAi';
 import { BrowserAiImageEncoder } from '@/contexts/ai/infrastructure/openai/BrowserAiImageEncoder';
 import { OpenAiResponsesClient } from '@/contexts/ai/infrastructure/openai/OpenAiResponsesClient';
@@ -102,6 +104,7 @@ export type Application = {
   inspectAiConfiguration: InspectAiConfiguration;
   unlockAi: UnlockAi;
   removeAi: RemoveAi;
+  manageCloudStorage: ManageCloudStorage;
   persistentStorage: PersistentStorageRequest;
   renderProjectPreview: RenderProjectPreview;
   requestEditingAdvice: RequestEditingAdvice;
@@ -177,6 +180,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     inspectAiConfiguration: new InspectAiConfiguration(aiCredentialVault),
     unlockAi: new UnlockAi(aiCredentialVault),
     removeAi: new RemoveAi(aiCredentialVault),
+    manageCloudStorage: new ManageCloudStorage(new BrowserGoogleDriveGateway(settings)),
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi, new OpenAiEditProposalMapper())),

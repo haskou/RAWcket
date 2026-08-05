@@ -22,10 +22,11 @@ Implemented:
 - A persistent cross-store write-ahead journal reconciles interrupted create, duplicate, import, and delete operations and removes only originals proven orphaned.
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
-- Versioned schema migrations through version 8.
+- Versioned schema migrations through version 9.
 - Safe TIFF/EXIF inspection for Sony ARW camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern, with an honest in-editor source-information view.
 - AI-first workspace with a one-request OpenAI visual critique, suggested intent, and reviewable proposal for sliders, tone curves, crop/geometry, radial, linear-gradient, luminance-range, and point/box-guided smart masks; a measurement-backed local tutor; deterministic positive/negative-point smart masks; and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Cloud AI remains unconfigured by default.
 - Explicit OpenAI API provider and user-entered model configuration. Missing configuration opens the setup dialog and resumes the pending action after setup. The setup defaults to AES-GCM/PBKDF2 encrypted storage; the only alternative is tab memory that is explicitly never persisted. The master password is never stored.
+- Optional Google Drive integration with a user-configured OAuth Web Client ID, Google Identity Services account reuse, tab-only short-lived access tokens, visible RAWcket/Projects, Originals, and Exports folders, explicit bundle/original upload, and opt-in automatic upload of final photo exports. No shared Google client identity or token is hardcoded.
 - Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
 - Interactive curves with histogram and aligned black/shadow/midtone/highlight/white input regions; before/after; workspace-relative Fit; image-anchored thirds/golden guides; workspace-wide dense grid/diagonals; local edge-based auto straightening; and drag-to-crop with an outside veil, locked ratios, reusable corner handles, and a contextual canvas toolbar. Active masks are highlighted both on-canvas and in the mask list.
 - A clearly separated AI Companion and Manual workspace, visibly pending one-call Companion review, additive deterministic no-AI Auto Enhance, OpenAI-authored editable briefs, one-click recipe clearing, and comparative multi-photo review based on post-edit potential with photographer override.
@@ -106,9 +107,10 @@ Browser-owned recipe presets use the separate `.rawcket-recipe.json` format. The
 
 ## Privacy and security
 
-- There is no backend, account, authentication, analytics, or mandatory SaaS.
+- There is no RAWcket backend, mandatory account, analytics, or mandatory SaaS. Optional Google Drive storage uses Google Identity Services directly in the browser.
 - Manual editing, Auto Enhance, horizon estimation, the Development Tutor, point masks, installed Semantic Select, and automatic import tags run locally. The semantic model downloads pinned weights only after consent, verifies each resource, then performs inference on-device; automatic import tags are skipped unless that model is already installed and enabled.
 - OpenAI-powered opinions, editable proposals, and multi-photo comparison are optional cloud actions. They send reduced JPEG previews plus the visible task context to the OpenAI Responses API with response storage disabled; originals, RAW files, complete recipes, and API keys are not sent as request content.
+- Google Drive is a separate optional cloud action. Only an explicitly selected original/bundle or an export covered by the enabled auto-upload preference is sent. The OAuth Client ID is non-secret local configuration; access tokens remain memory-only and expire according to Google Identity Services.
 - RAWcket never silently selects an OpenAI model. The provider and user-entered model are visible in setup, which links directly to [OpenAI API key management](https://platform.openai.com/api-keys).
 - RAWcket never persists an unencrypted API key. Setup defaults to AES-GCM encrypted storage with a PBKDF2-SHA-256-derived key; the explicit session-only alternative stays in memory and is never saved. The master password is never stored. Browser-side keys remain exposed to the risks of the active page and installed browser extensions.
 - Keys never become part of projects, bundles, logs, or errors.

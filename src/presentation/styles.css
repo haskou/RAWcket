@@ -498,6 +498,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .provider-card strong { color: #dce9cf; }
 .provider-card p { margin: 5px 0 8px; color: #9ca69e; font-size: .7rem; line-height: 1.5; }
 .provider-card a { color: var(--accent); font-size: .7rem; text-underline-offset: 3px; }
+.provider-setup-link { display: inline-block; margin: 7px 0 12px; color: var(--accent); font-size: .68rem; text-underline-offset: 3px; }
+.cloud-connection-card { display: grid; gap: 8px; margin: 15px 0; padding: 13px; border: 1px solid #3d4b38; border-radius: 10px; background: #111611; }
+.cloud-connection-card strong { color: #dce9cf; font-size: .76rem; }
+.cloud-connection-card p { margin: 0; color: #9ca69e; font-size: .67rem; line-height: 1.5; }
+.cloud-upload-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.cloud-scope-note { display: block; margin-top: 10px; color: #758078; font-size: .6rem; line-height: 1.45; }
 .encrypted-key-panel { display: grid; gap: 7px; margin: 14px 0; padding: 12px; border: 1px solid #4a513d; border-radius: 10px; background: #14160f; }
 .encrypted-key-panel strong { color: #d4dab8; font-size: .72rem; }
 .encrypted-key-panel .field-label { margin-top: 4px; }

@@ -369,6 +369,20 @@ test('imports a photograph by dropping it into the import dialog', async ({ page
   await dataTransfer.dispose();
 });
 
+test('configures optional Google Drive without a hardcoded client', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Google Drive' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Google Drive' });
+  await expect(dialog.getByText(/ships with no shared Google credential/)).toBeVisible();
+  await expect(dialog.getByRole('link', { name: /Create or manage a Google OAuth client/ })).toHaveAttribute('href', 'https://console.cloud.google.com/auth/clients');
+  await expect(dialog.getByRole('button', { name: 'Connect Google Drive' })).toBeDisabled();
+  await dialog.getByLabel('Google OAuth Web Client ID').fill('123-e2e.apps.googleusercontent.com');
+  await dialog.getByLabel('Automatically upload future photo exports').check();
+  await dialog.getByRole('button', { name: 'Save Google configuration' }).click();
+  await expect(dialog.getByRole('button', { name: 'Connect Google Drive' })).toBeEnabled();
+  await expect(dialog.getByText(/short-lived and tab-only/)).toBeVisible();
+});
+
 test('keeps the preview visible at maximum spatial detail settings', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /Explore with a demo/ }).click();

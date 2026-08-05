@@ -19,6 +19,7 @@ import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import type { PhotoProjectSummary } from '@/contexts/projects/domain/PhotoProjectSummary';
 import { useApplication } from '../ApplicationContext';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
+import { CloudStorageDialog } from '../components/CloudStorageDialog';
 import { ProjectThumbnail } from '../components/ProjectThumbnail';
 import { ProjectOrganizationControls } from '../components/ProjectOrganizationControls';
 import { ImportSelectionDialog } from '../components/ImportSelectionDialog';
@@ -41,6 +42,7 @@ export function LibraryPage(): ReactElement {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cloudStorageOpen, setCloudStorageOpen] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState<ImportCapacityAssessment | null>(null);
   const [importCandidates, setImportCandidates] = useState<ReviewedImportCandidate[] | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState(0);
@@ -352,6 +354,7 @@ export function LibraryPage(): ReactElement {
         <a className="brand" href="/" aria-label="RAWcket library"><span className="brand-mark">R</span><span>RAWcket</span></a>
         <div className="header-actions">
           <PwaInstallButton />
+          <button className="button ghost" type="button" onClick={() => setCloudStorageOpen(true)}>Google Drive</button>
           <button className="button ai-header-button" type="button" onClick={() => setSettingsOpen(true)}>✦ AI Companion</button>
           <button className="button ghost" type="button" onClick={() => bundleInput.current?.click()}>Import .rawcket</button>
           <button className="button primary" type="button" onClick={openImportDialog} disabled={busy}>{busy ? 'Importing…' : 'Import image'}</button>
@@ -430,6 +433,7 @@ export function LibraryPage(): ReactElement {
         )}
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onConfigured={continuePendingImport} />
+      <CloudStorageDialog open={cloudStorageOpen} onClose={() => setCloudStorageOpen(false)} />
       <ImportPhotosDialog
         open={importDialogOpen}
         busy={busy}

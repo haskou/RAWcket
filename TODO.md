@@ -217,7 +217,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** A persistent write-ahead journal covers create, duplicate, bundle import, and delete across IndexedDB/OPFS. All mutations and startup reconciliation share one FIFO queue. Recovery completes interrupted deletes and removes only sources proven orphaned by journal state; missing referenced originals produce an actionable warning instead of deletion.
 
-**Remaining.** Optional File System Access links and future collections.
+**Implemented optional cloud backup.** A user-configured Google OAuth Web Client ID enables Google Identity Services without a bundled credential. The `drive.file` adapter holds its short-lived access token in memory only, reuses the browser's Google account session when Google permits it, creates visible RAWcket/Projects, Originals, and Exports folders, uploads bundles and originals explicitly, and can auto-upload future final photo exports after opt-in. Local projects remain authoritative.
+
+**Remaining.** Optional File System Access links, Drive conflict/version reconciliation, background resumable uploads for very large RAW files, and future collections.
 
 **Acceptance.** Interrupted saves recover the last consistent snapshot; corruption never overwrites the backup; cleanup never deletes a referenced original; quota errors are explained early; sidecars and bundles migrate by version; revoked file permissions fall back to OPFS.
 
@@ -227,9 +229,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Reduce local and optional-integration risk with understandable controls.
 
-**Implemented.** API keys are either session-only and never persisted or saved with AES-GCM/PBKDF2-SHA-256 encryption and a non-persisted master password. Encrypted storage is the setup default and no unencrypted persistence path exists. Removal clears session/device settings. RAWcket has no analytics and its production CSP excludes `unsafe-eval`, external scripts, frames, and objects.
+**Implemented.** API keys are either session-only and never persisted or saved with AES-GCM/PBKDF2-SHA-256 encryption and a non-persisted master password. Encrypted storage is the setup default and no unencrypted persistence path exists. Removal clears session/device settings. RAWcket has no analytics and its production CSP excludes `unsafe-eval`, objects, and all unlisted scripts, frames, and network origins. The only external script/frame allowance is the explicit Google Identity Services origin used by optional Drive storage.
 
-**Implemented.** The OpenAI adapter reduces previews to bounded JPEGs, sets API response storage off, keeps the model explicit, schema-validates every result, never reads keys from serializable project state, and returns provider failures without response bodies or secret-bearing errors. The CSP permits only the explicit OpenAI endpoint in addition to pinned local-model hosts.
+**Implemented.** The OpenAI adapter reduces previews to bounded JPEGs, sets API response storage off, keeps the model explicit, schema-validates every result, never reads keys from serializable project state, and returns provider failures without response bodies or secret-bearing errors. Google Drive stores only the non-secret Client ID and preference; its access token is tab-memory-only and revoked on disconnect. The CSP permits the explicit OpenAI endpoint, pinned local-model hosts, and only the Google Identity/Drive origins required by the optional adapter.
 
 **Remaining.** Trusted Types compatibility, automated dependency/supply-chain auditing, verifiable browser-storage deletion caveats, a per-request confirmation mode, opt-in telemetry controls if telemetry is ever added, and clearer provider retention/account-policy links.
 

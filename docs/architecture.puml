@@ -9,6 +9,7 @@ component "Infrastructure / Local advisor + tutor" as Advisor
 component "Infrastructure / Local horizon analysis" as Horizon
 component "Infrastructure / Cached worker renderer" as Renderer
 component "Infrastructure / Consented semantic masks + tags" as Semantic
+component "Infrastructure / Optional Google Identity + Drive" as CloudStorage
 
 Presentation --> Application
 Application --> Domain
@@ -18,4 +19,5 @@ Advisor ..> Application : implements port
 Horizon ..> Application : implements port
 Renderer ..> Application : implements ports
 Semantic ..> Application : implements port
+CloudStorage ..> Application : implements port
 @enduml
