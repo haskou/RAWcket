@@ -10,12 +10,12 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
 
   const pngBase64 = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
-    canvas.width = 2;
-    canvas.height = 1;
+    canvas.width = 400;
+    canvas.height = 200;
     const context = canvas.getContext('2d');
     if (context === null) throw new Error('Canvas is unavailable in the test.');
     context.fillStyle = '#c9f06b';
-    context.fillRect(0, 0, 2, 1);
+    context.fillRect(0, 0, canvas.width, canvas.height);
     return canvas.toDataURL('image/png').split(',')[1] ?? '';
   });
   const png = Buffer.from(pngBase64, 'base64');
@@ -145,6 +145,21 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.mouse.down();
   await page.mouse.move(cropBounds.x + cropBounds.width * 0.7, cropBounds.y + cropBounds.height * 0.8, { steps: 5 });
   await page.mouse.up();
+  await expect.poll(async () => Number(await page.getByLabel('Width numeric value').inputValue()) / Number(await page.getByLabel('Height numeric value').inputValue())).toBeCloseTo(0.5, 1);
+  await page.getByLabel('Left numeric value').fill('0.2');
+  await page.getByLabel('Top numeric value').fill('0.2');
+  await page.getByLabel('Width numeric value').fill('0.3');
+  await page.getByLabel('Height numeric value').fill('0.6');
+  await expect(page.locator('.crop-selection-frame')).toHaveAttribute('style', /width: 30%/);
+  const widthBeforeCornerResize = Number(await page.getByLabel('Width numeric value').inputValue());
+  const resizeHandleBounds = await page.locator('[data-crop-handle="bottom-right"]').boundingBox();
+  if (resizeHandleBounds === null) throw new Error('The placed crop resize handle is unavailable.');
+  const resizeHandleCenter = { x: resizeHandleBounds.x + resizeHandleBounds.width / 2, y: resizeHandleBounds.y + resizeHandleBounds.height / 2 };
+  await page.mouse.move(resizeHandleCenter.x, resizeHandleCenter.y);
+  await page.mouse.down();
+  await page.mouse.move(resizeHandleCenter.x + 30, resizeHandleCenter.y + 30, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => Number(await page.getByLabel('Width numeric value').inputValue())).toBeGreaterThan(widthBeforeCornerResize);
   await expect.poll(async () => Number(await page.getByLabel('Width numeric value').inputValue()) / Number(await page.getByLabel('Height numeric value').inputValue())).toBeCloseTo(0.5, 1);
   await page.getByLabel('Rotation numeric value').fill('10');
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');

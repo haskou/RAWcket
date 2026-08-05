@@ -864,9 +864,22 @@ export function EditorPage(): ReactElement {
   const beginCrop = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
     if (toolWorkspace !== 'develop' || activePanel !== 'crop') return false;
     const start = pointOnCropFrame(event);
-    if (start === null) return true;
-    cropGesture.current = { pointerId: event.pointerId, start };
-    const draft = { x: start.x, y: start.y, width: 0, height: 0 };
+    const bounds = guideFrame.current?.getBoundingClientRect();
+    if (start === null || bounds === undefined || project === null) return true;
+    const current = project.getViewportTransform().toPrimitives().cropFrame;
+    const horizontalTolerance = 18 / bounds.width;
+    const verticalTolerance = 18 / bounds.height;
+    const corners = [
+      { handle: 'top-left', point: { x: current.x, y: current.y }, opposite: { x: current.x + current.width, y: current.y + current.height } },
+      { handle: 'top-right', point: { x: current.x + current.width, y: current.y }, opposite: { x: current.x, y: current.y + current.height } },
+      { handle: 'bottom-left', point: { x: current.x, y: current.y + current.height }, opposite: { x: current.x + current.width, y: current.y } },
+      { handle: 'bottom-right', point: { x: current.x + current.width, y: current.y + current.height }, opposite: { x: current.x, y: current.y } }
+    ];
+    const requestedHandle = event.target instanceof HTMLElement ? event.target.dataset.cropHandle : undefined;
+    const resizeCorner = corners.find((corner) => corner.handle === requestedHandle)
+      ?? corners.find((corner) => Math.abs(start.x - corner.point.x) <= horizontalTolerance && Math.abs(start.y - corner.point.y) <= verticalTolerance);
+    cropGesture.current = { pointerId: event.pointerId, start: resizeCorner?.opposite ?? start };
+    const draft = resizeCorner === undefined ? { x: start.x, y: start.y, width: 0, height: 0 } : current;
     cropDraftValue.current = draft;
     setCropDraft(draft);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1269,9 +1282,9 @@ function CompositionGuideOverlay({ guide }: { guide: CompositionGuide }): ReactE
 }
 
 function CropSelectionOverlay({ crop }: { crop: ViewportTransformPrimitives['cropFrame'] }): ReactElement {
-  return <div className="crop-selection-overlay" aria-label="Crop selection">
+  return <div className="crop-selection-overlay" role="img" aria-label={`Crop selection: left ${crop.x.toFixed(3)}, top ${crop.y.toFixed(3)}, width ${crop.width.toFixed(3)}, height ${crop.height.toFixed(3)}. Drag a corner to resize or drag elsewhere to draw a new crop.`}>
     <div className="crop-selection-frame" style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }}>
-      <span className="top-left" /><span className="top-right" /><span className="bottom-left" /><span className="bottom-right" />
+      <span className="top-left" data-crop-handle="top-left" /><span className="top-right" data-crop-handle="top-right" /><span className="bottom-left" data-crop-handle="bottom-left" /><span className="bottom-right" data-crop-handle="bottom-right" />
     </div>
   </div>;
 }
