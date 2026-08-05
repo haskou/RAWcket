@@ -25,7 +25,7 @@ describe('LibraryPage', () => {
     );
 
     expect(await screen.findByText('Start with a photograph')).toBeInTheDocument();
-    const input = screen.getByLabelText('Select a JPEG, PNG, or Sony ARW image');
+    const input = screen.getByLabelText('Select one or more JPEG, PNG, or Sony ARW images');
     await user.upload(input, new File(['png'], 'test.png', { type: 'image/png' }));
     expect(await screen.findByText('Editor open')).toBeInTheDocument();
   });

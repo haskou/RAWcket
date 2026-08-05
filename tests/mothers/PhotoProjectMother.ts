@@ -1,5 +1,6 @@
 import { StringValueObject, Timestamp } from '@haskou/value-objects';
 import { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
+import { CaptureMetadata } from '@/contexts/projects/domain/CaptureMetadata';
 import { ProjectMetadata } from '@/contexts/projects/domain/ProjectMetadata';
 import { SourceImageReference } from '@/contexts/projects/domain/SourceImageReference';
 import { ProjectId } from '@/contexts/projects/domain/value-objects/ProjectId';
@@ -18,6 +19,7 @@ export class PhotoProjectMother {
         new StringValueObject(`${id.valueOf()}.source`)
       ),
       new ProjectMetadata(now, now, 1200, 800),
+      CaptureMetadata.empty(),
       10
     );
   }

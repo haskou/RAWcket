@@ -16,7 +16,8 @@ export class CreateProject {
         message.getProjectId(),
         message.getProjectName(),
         message.createSourceReference(stored.getStorageKey()),
-        message.createMetadata()
+        message.createMetadata(),
+        message.createCaptureMetadata()
       );
       await this.projects.save(project);
       return project;

@@ -1,5 +1,6 @@
 import type { InspectSourceImageMessage } from '../../application/inspect-source-image/messages/InspectSourceImageMessage';
 import type { SourceImageInspection, SourceImageInspector } from '../../application/ports/SourceImageInspector';
+import { emptyCaptureMetadata } from '../../domain/CaptureMetadata';
 import { ArwEmbeddedPreviewExtractor } from './ArwEmbeddedPreviewExtractor';
 
 export class BrowserSourceImageInspector implements SourceImageInspector {
@@ -15,8 +16,22 @@ export class BrowserSourceImageInspector implements SourceImageInspector {
         height: extracted.height,
         mimeType: 'image/x-sony-arw',
         embeddedPreview: extracted.preview,
-        cameraMake: extracted.cameraMake,
-        cameraModel: extracted.cameraModel
+        captureMetadata: {
+          cameraMake: extracted.cameraMake,
+          cameraModel: extracted.cameraModel,
+          lensModel: extracted.lensModel,
+          capturedAt: extracted.capturedAt,
+          exposureTimeSeconds: extracted.exposureTimeSeconds,
+          apertureFNumber: extracted.apertureFNumber,
+          iso: extracted.iso,
+          focalLengthMm: extracted.focalLengthMm,
+          orientation: extracted.orientation,
+          whiteBalance: extracted.whiteBalance,
+          colorSpace: extracted.colorSpace,
+          blackLevel: extracted.blackLevel,
+          whiteLevel: extracted.whiteLevel,
+          cfaPattern: extracted.cfaPattern
+        }
       };
     }
     const mimeType = file.type === 'image/png' || extension === 'png' ? 'image/png' : file.type === 'image/jpeg' || extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : null;
@@ -27,8 +42,7 @@ export class BrowserSourceImageInspector implements SourceImageInspector {
       height: bitmap.height,
       mimeType,
       embeddedPreview: null,
-      cameraMake: null,
-      cameraModel: null
+      captureMetadata: emptyCaptureMetadata
     };
     bitmap.close();
     return inspection;

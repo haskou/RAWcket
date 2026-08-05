@@ -4,6 +4,7 @@ import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastruc
 import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
 import { VersionTwoToThreeProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTwoToThreeProjectMigration';
 import { VersionThreeToFourProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionThreeToFourProjectMigration';
+import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFourToFiveProjectMigration';
 import { InMemoryProjectRepository } from '@/contexts/projects/infrastructure/repositories/InMemoryProjectRepository';
 import { InMemorySourceFileRepository } from '@/contexts/projects/infrastructure/repositories/InMemorySourceFileRepository';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
@@ -18,8 +19,9 @@ describe('RawcketProjectBundle', () => {
       new ProjectMigrator([
         new VersionZeroToOneProjectMigration(),
         new VersionOneToTwoProjectMigration(),
-    new VersionTwoToThreeProjectMigration(),
-    new VersionThreeToFourProjectMigration()
+        new VersionTwoToThreeProjectMigration(),
+        new VersionThreeToFourProjectMigration(),
+        new VersionFourToFiveProjectMigration()
       ])
     );
     const project = PhotoProjectMother.create();

@@ -2,7 +2,7 @@ import type { AdjustmentKeyPrimitive } from './value-objects/AdjustmentKey';
 import type { CurveChannelPrimitive, ToneCurvePrimitives } from './ToneCurve';
 import type { MaskDefinitionPrimitives } from './MaskDefinition';
 import type { ViewportTransformPrimitives } from './ViewportTransform';
-import type { DevelopmentSettingsPrimitives } from './DevelopmentRecipe';
+import type { DevelopmentRecipePrimitives, DevelopmentSettingsPrimitives } from './DevelopmentRecipe';
 
 export const EDIT_OPERATION = {
   SET_GLOBAL_ADJUSTMENT: 'set-global-adjustment',
@@ -13,6 +13,7 @@ export const EDIT_OPERATION = {
   REMOVE_MASK: 'remove-mask',
   SET_VIEWPORT_TRANSFORM: 'set-viewport-transform',
   REPLACE_DEVELOPMENT_SETTINGS: 'replace-development-settings',
+  REPLACE_RECIPE: 'replace-recipe',
   RENAME_PROJECT: 'rename-project',
   SET_PROJECT_RATING: 'set-project-rating',
   SET_PROJECT_TAGS: 'set-project-tags'
@@ -59,6 +60,10 @@ export type ReplaceDevelopmentSettingsOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS;
   settings: DevelopmentSettingsPrimitives;
 };
+export type ReplaceRecipeOperation = OperationMetadata & {
+  kind: typeof EDIT_OPERATION.REPLACE_RECIPE;
+  recipe: DevelopmentRecipePrimitives;
+};
 export type SetProjectRatingOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.SET_PROJECT_RATING;
   rating: number;
@@ -77,6 +82,7 @@ export type EditOperation =
   | RemoveMaskOperation
   | SetViewportTransformOperation
   | ReplaceDevelopmentSettingsOperation
+  | ReplaceRecipeOperation
   | RenameProjectOperation
   | SetProjectRatingOperation
   | SetProjectTagsOperation;

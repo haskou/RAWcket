@@ -70,7 +70,7 @@ export class WorkerPhotoExporter implements PhotoExporter {
         }
         cleanup();
         if (response.data.kind === 'failed') reject(new Error(response.data.message));
-        else resolve(response.data.image);
+        else resolve(new Blob([response.data.image], { type: response.data.mimeType }));
       };
       worker.postMessage(workerRequest);
     });

@@ -20,11 +20,13 @@ Implemented:
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
-- Versioned schema migrations through version 4.
+- Versioned schema migrations through version 5.
+- Safe TIFF/EXIF inspection for Sony ARW camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern, with an honest in-editor source-information view.
 - AI-first workspace with local, reviewable recipe proposals, a measurement-backed development tutor, deterministic positive/negative-point smart masks, and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Optional cloud AI remains disabled by default.
 - Optional AES-GCM/PBKDF2 API-key vault whose master password is never stored.
 - Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
-- Interactive curves, before/after, workspace-relative Fit, composition/level guides, exact geometry, explained brush/radial/linear/luminance masks, portable development settings, and built-in reversible presets.
+- Interactive curves, before/after, workspace-relative Fit, a dense fixed composition grid, drag-to-crop with an outside veil and locked ratios, explained masks, portable development settings, and reversible presets.
+- A clearly separated AI Companion and Manual workspace, deterministic no-AI Auto Enhance, companion-authored editable briefs, one-click recipe clearing, and local multi-photo import review with photographer override.
 - Local library search across names and tags, validated comma-separated tags, and reversible zero-to-five-star ratings.
 - Optional PWA installation, an offline app shell after first load, and user-controlled update activation.
 - Unit, integration, and Chromium E2E coverage; CI for lint, typecheck, tests, build, and E2E.
@@ -35,7 +37,7 @@ Not implemented yet:
 - WebGPU/WebGL2 passes for masks and spatial filters, device-loss recovery, and a complete GPU/CPU golden-image parity corpus.
 - A consented optional cloud provider and larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
-- 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.
+- Full LibRaw mosaic demosaicing, 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.
 - Collections, sidecars, filesystem links, complete orphan cleanup, and a full WCAG/browser-device audit.
 
 The detailed, actively maintained plan is in [TODO.md](TODO.md).

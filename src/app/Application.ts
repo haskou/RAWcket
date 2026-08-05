@@ -16,6 +16,7 @@ import { SaveProject } from '@/contexts/projects/application/save-project/SavePr
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
 import { ReviewDevelopment } from '@/contexts/projects/application/review-development/ReviewDevelopment';
+import { ReviewImportCandidates } from '@/contexts/projects/application/review-import-candidates/ReviewImportCandidates';
 import { PasteDevelopmentSettings } from '@/contexts/projects/application/paste-development-settings/PasteDevelopmentSettings';
 import type { ProjectExporter } from '@/contexts/projects/application/ports/ProjectExporter';
 import type { ProjectImporter } from '@/contexts/projects/application/ports/ProjectImporter';
@@ -27,6 +28,7 @@ import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastruc
 import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
 import { VersionTwoToThreeProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTwoToThreeProjectMigration';
 import { VersionThreeToFourProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionThreeToFourProjectMigration';
+import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFourToFiveProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
@@ -34,6 +36,7 @@ import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/rende
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
 import { LocalRecipeAdvisor } from '@/contexts/projects/infrastructure/advisors/LocalRecipeAdvisor';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
+import { BrowserImportCandidateReviewer } from '@/contexts/projects/infrastructure/advisors/BrowserImportCandidateReviewer';
 import { BrowserSemanticSegmentationModel } from '@/contexts/projects/infrastructure/ai/BrowserSemanticSegmentationModel';
 import { BrowserDevelopmentSettingsClipboard } from '@/contexts/projects/infrastructure/clipboard/BrowserDevelopmentSettingsClipboard';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
@@ -65,6 +68,7 @@ export type Application = {
   renderProjectPreview: RenderProjectPreview;
   requestEditingAdvice: RequestEditingAdvice;
   reviewDevelopment: ReviewDevelopment;
+  reviewImportCandidates: ReviewImportCandidates;
   exportProjectPhoto: ExportProjectPhoto;
   inspectSourceImage: InspectSourceImage;
 };
@@ -75,7 +79,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
     new VersionZeroToOneProjectMigration(),
     new VersionOneToTwoProjectMigration(),
     new VersionTwoToThreeProjectMigration(),
-    new VersionThreeToFourProjectMigration()
+    new VersionThreeToFourProjectMigration(),
+    new VersionFourToFiveProjectMigration()
   ]);
   const projects = new IndexedDbProjectRepository(database, migrator);
   const sourceFiles = new BrowserSourceFileRepository(database);
@@ -84,6 +89,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const previewRenderer = new CachingPreviewRenderer(new WorkerPreviewRenderer(sourceFiles));
   const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
   const semanticSegmentationModel = new BrowserSemanticSegmentationModel();
+  const sourceImageInspector = new BrowserSourceImageInspector();
   return {
     createProject: new CreateProject(projects, sourceFiles),
     createSemanticMask: new CreateSemanticMask(semanticSegmentationModel),
@@ -107,7 +113,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     requestEditingAdvice: new RequestEditingAdvice(new LocalRecipeAdvisor()),
     reviewDevelopment: new ReviewDevelopment(new LocalDevelopmentTutor()),
+    reviewImportCandidates: new ReviewImportCandidates(sourceImageInspector, new BrowserImportCandidateReviewer()),
     exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles)),
-    inspectSourceImage: new InspectSourceImage(new BrowserSourceImageInspector())
+    inspectSourceImage: new InspectSourceImage(sourceImageInspector)
   };
 }

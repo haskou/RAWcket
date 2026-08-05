@@ -115,6 +115,25 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
     groupId: z.string().nullable()
   }),
   z.object({
+    kind: z.literal('replace-recipe'),
+    recipe: z.object({
+      globalAdjustments: adjustmentSchema,
+      curves: curveSetSchema,
+      viewport: z.object({
+        cropFrame: rectangleSchema,
+        translation: pointSchema,
+        scale: z.number().min(0.1).max(32),
+        rotationDegrees: z.number().min(-180).max(180),
+        flipHorizontal: z.boolean(),
+        flipVertical: z.boolean(),
+        aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
+      }),
+      masks: z.array(maskSchema),
+      disabledGlobalAdjustments: z.array(adjustmentKeySchema)
+    }),
+    groupId: z.string().nullable()
+  }),
+  z.object({
     kind: z.literal('set-viewport-transform'),
     viewport: z.object({
       cropFrame: rectangleSchema,
@@ -147,6 +166,22 @@ export const photoProjectSchema = z.object({
     updatedAt: z.number().finite(),
     width: z.int().positive(),
     height: z.int().positive()
+  }),
+  captureMetadata: z.object({
+    cameraMake: z.string().min(1).max(160).nullable(),
+    cameraModel: z.string().min(1).max(160).nullable(),
+    lensModel: z.string().min(1).max(160).nullable(),
+    capturedAt: z.string().min(1).max(160).nullable(),
+    exposureTimeSeconds: z.number().positive().nullable(),
+    apertureFNumber: z.number().positive().nullable(),
+    iso: z.number().positive().nullable(),
+    focalLengthMm: z.number().positive().nullable(),
+    orientation: z.int().min(1).max(8).nullable(),
+    whiteBalance: z.enum(['auto', 'manual']).nullable(),
+    colorSpace: z.enum(['srgb', 'adobe-rgb', 'uncalibrated']).nullable(),
+    blackLevel: z.number().nonnegative().nullable(),
+    whiteLevel: z.number().nonnegative().nullable(),
+    cfaPattern: z.string().min(1).max(160).nullable()
   }),
   organization: z.object({
     rating: z.int().min(0).max(5),

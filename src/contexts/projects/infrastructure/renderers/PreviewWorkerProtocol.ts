@@ -40,7 +40,13 @@ export const previewWorkerResponseSchema = z.discriminatedUnion('kind', [
     stage: z.enum(['queued', 'decoding', 'developing', 'analyzing', 'encoding']),
     completed: z.number().min(0).max(1)
   }),
-  z.object({ kind: z.literal('completed'), id: z.uuid(), image: z.instanceof(Blob), analysis: histogramSchema }),
+  z.object({
+    kind: z.literal('completed'),
+    id: z.uuid(),
+    image: z.instanceof(ArrayBuffer),
+    mimeType: z.enum(['image/webp', 'image/jpeg', 'image/png', 'image/tiff']),
+    analysis: histogramSchema
+  }),
   z.object({ kind: z.literal('failed'), id: z.uuid(), message: z.string().min(1) })
 ]);
 

@@ -1,5 +1,6 @@
 import { Timestamp } from '@haskou/value-objects';
 import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
+import { DevelopmentRecipe } from '@/contexts/projects/domain/DevelopmentRecipe';
 import { AdjustmentKey } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
 
@@ -42,5 +43,16 @@ describe('Active recipe state', () => {
 
     expect(project.hasCurveAdjustments()).toBe(true);
     expect(project.hasGeometryAdjustments()).toBe(true);
+  });
+
+  it('clears and restores the complete recipe as one undoable operation', () => {
+    const project = PhotoProjectMother.create();
+    project.apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'exposure', value: 1, groupId: null }, Timestamp.new(1_750_000_000_001));
+
+    project.apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: DevelopmentRecipe.neutral().toPrimitives(), groupId: null }, Timestamp.new(1_750_000_000_002));
+    expect(project.isGlobalAdjustmentModified(AdjustmentKey.EXPOSURE)).toBe(false);
+
+    expect(project.undo(Timestamp.new(1_750_000_000_003))).toBe(true);
+    expect(project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).valueOf()).toBe(1);
   });
 });

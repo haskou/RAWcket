@@ -11,17 +11,17 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-export function GeometryControls({ project, onChange, guide, showLevelAxes, onGuideChange, onLevelAxesChange }: {
+export function GeometryControls({ project, onChange, guide, onGuideChange }: {
   project: PhotoProject;
   onChange: (viewport: ViewportTransformPrimitives, groupId: string | null) => void;
   guide: CompositionGuide;
-  showLevelAxes: boolean;
   onGuideChange: (guide: CompositionGuide) => void;
-  onLevelAxesChange: (visible: boolean) => void;
 }): ReactElement {
   const groups = useRef(new Map<string, string>());
   const viewport = project.getViewportTransform().toPrimitives();
   const defaults = ViewportTransform.reset().toPrimitives();
+  const source = project.toPrimitives().metadata;
+  const originalRatio = { width: source.width, height: source.height };
 
   const changeNumeric = (field: NumericViewportField, value: number, groupId: string | null): void => {
     if (!Number.isFinite(value)) return;
@@ -53,11 +53,11 @@ export function GeometryControls({ project, onChange, guide, showLevelAxes, onGu
     <div className="geometry-controls">
       <details className="context-help" open>
         <summary>Framing and straightening guides</summary>
-        <p>Guides are visual references only: they never alter the photograph or export. Use <strong>Level axes</strong> with Rotation to check horizons and vertical architecture.</p>
+        <p>Guides stay fixed while the photograph moves underneath them, so the dense grid can check both horizons and vertical architecture. They never appear in export.</p>
       </details>
       <div className="composition-guide-controls">
-        <label>Composition overlay<select aria-label="Geometry composition guide" value={guide} onChange={(event) => onGuideChange(event.target.value as CompositionGuide)}><option value="none">None</option><option value="thirds">Rule of thirds</option><option value="grid">Quarter grid</option><option value="diagonals">Diagonals</option><option value="golden-ratio">Golden ratio</option></select></label>
-        <label><input type="checkbox" checked={showLevelAxes} onChange={(event) => onLevelAxesChange(event.target.checked)} /> Level axes</label>
+        <label>Composition overlay<select aria-label="Geometry composition guide" value={guide} onChange={(event) => onGuideChange(event.target.value as CompositionGuide)}><option value="none">None</option><option value="thirds">Rule of thirds</option><option value="grid">Dense fixed grid</option><option value="diagonals">Diagonals</option><option value="golden-ratio">Golden ratio</option></select></label>
+        <label>Crop aspect ratio<select aria-label="Crop aspect ratio" value={aspectRatioValue(viewport.aspectRatio, originalRatio)} onChange={(event) => onChange({ ...viewport, aspectRatio: ratioFromValue(event.target.value, originalRatio) }, null)}><option value="free">Free</option><option value="original">Original · locked</option><option value="1:1">1:1 · Square</option><option value="3:2">3:2</option><option value="4:3">4:3</option><option value="5:4">5:4</option><option value="16:9">16:9</option></select></label>
       </div>
       <GeometryNumberControl label="Rotation" unit="°" value={viewport.rotationDegrees} modified={viewport.rotationDegrees !== defaults.rotationDegrees} minimum={-180} maximum={180} step={0.1} groupKey="rotation" groups={groups.current} onChange={(value, groupId) => changeNumeric('rotationDegrees', value, groupId)} />
       <GeometryNumberControl label="Development scale" unit="×" value={viewport.scale} modified={viewport.scale !== defaults.scale} minimum={0.1} maximum={4} step={0.01} groupKey="scale" groups={groups.current} onChange={(value, groupId) => changeNumeric('scale', value, groupId)} />
@@ -76,6 +76,19 @@ export function GeometryControls({ project, onChange, guide, showLevelAxes, onGu
       </div>
     </div>
   );
+}
+
+function aspectRatioValue(current: { width: number; height: number } | null, original: { width: number; height: number }): string {
+  if (current === null) return 'free';
+  if (Math.abs(current.width / current.height - original.width / original.height) < 0.0001) return 'original';
+  return `${current.width}:${current.height}`;
+}
+
+function ratioFromValue(value: string, original: { width: number; height: number }): { width: number; height: number } | null {
+  if (value === 'free') return null;
+  if (value === 'original') return original;
+  const [width = 1, height = 1] = value.split(':').map(Number);
+  return { width, height };
 }
 
 function GeometryNumberControl({ label, unit, value, modified, minimum, maximum, step, groupKey, groups, onChange }: {

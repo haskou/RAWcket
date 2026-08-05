@@ -6,6 +6,7 @@ import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastruc
 import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
 import { VersionTwoToThreeProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTwoToThreeProjectMigration';
 import { VersionThreeToFourProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionThreeToFourProjectMigration';
+import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFourToFiveProjectMigration';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
@@ -16,7 +17,7 @@ describe('IndexedDbProjectRepository', () => {
     const connection = RawcketDatabase.open(databaseName);
     const repository = new IndexedDbProjectRepository(
       connection,
-      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration(), new VersionThreeToFourProjectMigration()])
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration(), new VersionThreeToFourProjectMigration(), new VersionFourToFiveProjectMigration()])
     );
     const project = PhotoProjectMother.create();
 
@@ -36,7 +37,7 @@ describe('IndexedDbProjectRepository', () => {
     const connection = RawcketDatabase.open(databaseName);
     const repository = new IndexedDbProjectRepository(
       connection,
-      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration(), new VersionThreeToFourProjectMigration()])
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration(), new VersionThreeToFourProjectMigration(), new VersionFourToFiveProjectMigration()])
     );
     const project = PhotoProjectMother.create();
 
@@ -63,7 +64,7 @@ describe('IndexedDbProjectRepository', () => {
     const connection = RawcketDatabase.open(databaseName);
     const repository = new IndexedDbProjectRepository(
       connection,
-      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration(), new VersionThreeToFourProjectMigration()])
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration(), new VersionTwoToThreeProjectMigration(), new VersionThreeToFourProjectMigration(), new VersionFourToFiveProjectMigration()])
     );
     const project = PhotoProjectMother.create();
 

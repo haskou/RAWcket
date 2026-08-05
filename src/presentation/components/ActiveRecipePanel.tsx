@@ -13,6 +13,7 @@ export function ActiveRecipePanel({
   onCopy,
   onPaste,
   onApplyPreset,
+  onClear,
   transferMessage,
   collapsed,
   onToggleCollapsed
@@ -24,6 +25,7 @@ export function ActiveRecipePanel({
   onCopy?: () => void;
   onPaste?: () => void;
   onApplyPreset?: (name: 'Natural' | 'Cinematic' | 'Monochrome') => void;
+  onClear: () => void;
   transferMessage?: string;
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -33,6 +35,7 @@ export function ActiveRecipePanel({
   if (project.hasCurveAdjustments()) recipeBlocks.push(['curves', 'Tone Curve']);
   if (project.hasGeometryAdjustments()) recipeBlocks.push(['crop', 'Crop & Geometry']);
   if (project.hasMasks()) recipeBlocks.push(['masks', 'Local Masks']);
+  const hasActiveRecipe = modifiedAdjustments.length > 0 || recipeBlocks.length > 0;
 
   if (collapsed) {
     return <aside className="recipe-panel collapsed" aria-label="Active Recipe collapsed">
@@ -50,6 +53,7 @@ export function ActiveRecipePanel({
         <div className="recipe-transfer-actions">
           <button type="button" onClick={onCopy}>Copy</button>
           <button type="button" onClick={onPaste}>Paste</button>
+          <button type="button" disabled={!hasActiveRecipe} onClick={onClear}>Clear recipe</button>
         </div>
         <div className="recipe-preset-actions" aria-label="Built-in development presets">
           {(['Natural', 'Cinematic', 'Monochrome'] as const).map((name) => (

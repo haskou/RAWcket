@@ -90,7 +90,7 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
         if (response.data.kind === 'failed') reject(new Error(response.data.message));
         else {
           control.onAnalysis?.(response.data.analysis);
-          resolve(response.data.image);
+          resolve(new Blob([response.data.image], { type: response.data.mimeType }));
         }
       };
       worker.postMessage(workerRequest);

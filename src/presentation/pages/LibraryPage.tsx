@@ -10,12 +10,16 @@ import { DuplicateProjectMessage } from '@/contexts/projects/application/duplica
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { ListProjectsMessage } from '@/contexts/projects/application/list-projects/messages/ListProjectsMessage';
+import { ReviewImportCandidatesMessage } from '@/contexts/projects/application/review-import-candidates/messages/ReviewImportCandidatesMessage';
+import type { ReviewedImportCandidate } from '@/contexts/projects/application/review-import-candidates/ReviewImportCandidates';
+import type { SourceImageInspection } from '@/contexts/projects/application/ports/SourceImageInspector';
 import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import type { PhotoProjectSummary } from '@/contexts/projects/domain/PhotoProjectSummary';
 import { useApplication } from '../ApplicationContext';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { ProjectThumbnail } from '../components/ProjectThumbnail';
 import { ProjectOrganizationControls } from '../components/ProjectOrganizationControls';
+import { ImportSelectionDialog } from '../components/ImportSelectionDialog';
 import { createDemoImageBlob, downloadBlob } from '../lib/browserImages';
 
 export function LibraryPage(): ReactElement {
@@ -31,6 +35,8 @@ export function LibraryPage(): ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState<ImportCapacityAssessment | null>(null);
+  const [importCandidates, setImportCandidates] = useState<ReviewedImportCandidate[] | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState(0);
   const projectFilter = useMemo(() => new ListProjectsMessage(searchQuery, minimumRating), [minimumRating, searchQuery]);
   const filteredProjects = useMemo(() => projects.filter((project) => project.matches(
     projectFilter.getQuery(),
@@ -46,24 +52,27 @@ export function LibraryPage(): ReactElement {
     void application.assessImportCapacity.assess(new AssessImportCapacityMessage(1)).then(setStorageCapacity);
   }, [application, refresh]);
 
-  const createFromFile = async (file: File): Promise<void> => {
-    setBusy(true);
-    setError(null);
-    try {
+  const persistImportedFile = async (file: File, inspection: SourceImageInspection): Promise<void> => {
       const capacity = await application.assessImportCapacity.assess(new AssessImportCapacityMessage(file.size));
       setStorageCapacity(capacity);
       if (!capacity.canImport) {
         throw new Error(`This original needs ${formatBytes(file.size)}, but RAWcket is preserving ${formatBytes(capacity.safetyReserveBytes)} as a safety reserve. Free browser storage or export and remove older projects first.`);
       }
-      const inspection = await application.inspectSourceImage.inspect(new InspectSourceImageMessage(file, file.name));
       const normalizedFile = new File([file], file.name, { type: inspection.mimeType });
       const name = file.name.replace(/\.(jpe?g|png|arw)$/i, '') || 'Untitled project';
       const project = await application.createProject.create(
-        new CreateProjectMessage(name, normalizedFile, file.name, inspection.width, inspection.height)
+        new CreateProjectMessage(name, normalizedFile, file.name, inspection.width, inspection.height, inspection.captureMetadata)
       );
       void application.persistentStorage.request();
       await refresh();
       void navigate(`/editor/${project.getId().valueOf()}`);
+  };
+
+  const createFromFile = async (file: File, inspection?: SourceImageInspection): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      await persistImportedFile(file, inspection ?? await application.inspectSourceImage.inspect(new InspectSourceImageMessage(file, file.name)));
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'The image could not be imported.');
     } finally {
@@ -72,9 +81,31 @@ export function LibraryPage(): ReactElement {
   };
 
   const onImage = (event: ChangeEvent<HTMLInputElement>): void => {
-    const file = event.target.files?.[0];
-    if (file !== undefined) void createFromFile(file);
+    const files = [...event.target.files ?? []];
+    if (files.length === 1 && files[0] !== undefined) void createFromFile(files[0]);
+    if (files.length > 1) void reviewImportCandidates(files);
     event.target.value = '';
+  };
+
+  const reviewImportCandidates = async (files: File[]): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const reviewed = await application.reviewImportCandidates.review(new ReviewImportCandidatesMessage(files));
+      setImportCandidates(reviewed);
+      setSelectedCandidate(0);
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'The selected photographs could not be compared.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const continueWithCandidate = (): void => {
+    const candidate = importCandidates?.[selectedCandidate];
+    if (candidate === undefined) return;
+    setImportCandidates(null);
+    void createFromFile(candidate.file, candidate.inspection);
   };
 
   const createDemo = async (): Promise<void> => {
@@ -170,12 +201,12 @@ export function LibraryPage(): ReactElement {
       <header className="library-header">
         <a className="brand" href="/" aria-label="RAWcket library"><span className="brand-mark">R</span><span>RAWcket</span></a>
         <div className="header-actions">
-          <button className="button ai-header-button" type="button" onClick={() => setSettingsOpen(true)}>✦ AI Studio</button>
+          <button className="button ai-header-button" type="button" onClick={() => setSettingsOpen(true)}>✦ AI Companion</button>
           <button className="button ghost" type="button" onClick={() => bundleInput.current?.click()}>Import .rawcket</button>
           <button className="button primary" type="button" onClick={() => imageInput.current?.click()} disabled={busy}>{busy ? 'Importing…' : 'Import image'}</button>
         </div>
       </header>
-      <input ref={imageInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,.arw,image/x-sony-arw" onChange={onImage} aria-label="Select a JPEG, PNG, or Sony ARW image" />
+      <input ref={imageInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,.arw,image/x-sony-arw" onChange={onImage} aria-label="Select one or more JPEG, PNG, or Sony ARW images" />
       <input ref={bundleInput} className="visually-hidden" type="file" accept=".rawcket,application/zip" onChange={(event) => void importBundle(event)} aria-label="Select a RAWcket project" />
       <section className="library-intro">
         <div>
@@ -246,6 +277,7 @@ export function LibraryPage(): ReactElement {
         )}
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {importCandidates !== null && <ImportSelectionDialog candidates={importCandidates} selected={selectedCandidate} onSelect={setSelectedCandidate} onCancel={() => setImportCandidates(null)} onContinue={continueWithCandidate} />}
     </main>
   );
 }

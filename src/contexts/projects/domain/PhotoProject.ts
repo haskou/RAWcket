@@ -1,4 +1,5 @@
 import { StringValueObject, Timestamp } from '@haskou/value-objects';
+import { CaptureMetadata, type CaptureMetadataPrimitives } from './CaptureMetadata';
 import { CurveChannel, ToneCurve } from './ToneCurve';
 import { DevelopmentRecipe, type DevelopmentRecipePrimitives, type DevelopmentSettingsPrimitives } from './DevelopmentRecipe';
 import { EDIT_OPERATION, type EditOperation } from './EditOperation';
@@ -26,6 +27,7 @@ export type PhotoProjectPrimitives = {
   name: string;
   source: { fileName: string; mimeType: SourceImageMimeType; size: number; storageKey: string };
   metadata: { createdAt: number; updatedAt: number; width: number; height: number };
+  captureMetadata: CaptureMetadataPrimitives;
   organization: { rating: number; tags: string[] };
   recipe: DevelopmentRecipePrimitives;
   history: EditHistoryPrimitives;
@@ -41,6 +43,7 @@ export class PhotoProject {
     private name: ProjectName,
     private readonly source: SourceImageReference,
     private metadata: ProjectMetadata,
+    private readonly captureMetadata: CaptureMetadata,
     private readonly recipe: DevelopmentRecipe,
     private readonly history: EditHistory,
     private readonly uiState: ProjectUiState,
@@ -52,6 +55,7 @@ export class PhotoProject {
     name: ProjectName,
     source: SourceImageReference,
     metadata: ProjectMetadata,
+    captureMetadata: CaptureMetadata,
     historyLimit = 100
   ): PhotoProject {
     const project = new PhotoProject(
@@ -60,6 +64,7 @@ export class PhotoProject {
       name,
       source,
       metadata,
+      captureMetadata,
       DevelopmentRecipe.neutral(),
       new EditHistory(historyLimit),
       new ProjectUiState(InterfaceMode.SIMPLE),
@@ -86,6 +91,7 @@ export class PhotoProject {
         input.metadata.width,
         input.metadata.height
       ),
+      CaptureMetadata.fromPrimitives(input.captureMetadata),
       DevelopmentRecipe.fromPrimitives(input.recipe),
       EditHistory.fromPrimitives(input.history),
       new ProjectUiState(InterfaceMode.fromPrimitives(input.uiState.mode)),
@@ -103,6 +109,7 @@ export class PhotoProject {
       this.name.copy(),
       source,
       metadata,
+      CaptureMetadata.fromPrimitives(this.captureMetadata.toPrimitives()),
       DevelopmentRecipe.fromPrimitives(this.recipe.toPrimitives()),
       new EditHistory(100),
       new ProjectUiState(this.uiState.getMode()),
@@ -155,6 +162,10 @@ export class PhotoProject {
 
   public getSource(): SourceImageReference {
     return this.source;
+  }
+
+  public getCaptureMetadata(): CaptureMetadata {
+    return CaptureMetadata.fromPrimitives(this.captureMetadata.toPrimitives());
   }
 
   public getRating(): ProjectRating {
@@ -252,6 +263,7 @@ export class PhotoProject {
         width: this.metadata.getWidth(),
         height: this.metadata.getHeight()
       },
+      captureMetadata: this.captureMetadata.toPrimitives(),
       organization: {
         rating: this.organization.getRating().valueOf(),
         tags: this.organization.getTags().toPrimitives()
@@ -305,6 +317,11 @@ export class PhotoProject {
       const previous = this.recipe.getDevelopmentSettings();
       this.recipe.replaceDevelopmentSettings(operation.settings);
       return { ...operation, settings: previous };
+    }
+    if (operation.kind === EDIT_OPERATION.REPLACE_RECIPE) {
+      const previous = this.recipe.toPrimitives();
+      this.recipe.replaceRecipe(operation.recipe);
+      return { ...operation, recipe: previous };
     }
     if (operation.kind === EDIT_OPERATION.SET_PROJECT_RATING) {
       const previous = this.organization.getRating();

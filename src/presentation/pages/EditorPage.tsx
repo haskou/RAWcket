@@ -28,7 +28,7 @@ import type { PreviewAnalysis } from '@/contexts/projects/application/ports/Prev
 import type { SemanticModelStatus } from '@/contexts/projects/application/ports/SemanticSegmentationModel';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
 import { GlobalAdjustments } from '@/contexts/projects/domain/GlobalAdjustments';
-import type { DevelopmentSettingsPrimitives } from '@/contexts/projects/domain/DevelopmentRecipe';
+import { DevelopmentRecipe, type DevelopmentSettingsPrimitives } from '@/contexts/projects/domain/DevelopmentRecipe';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
@@ -43,6 +43,7 @@ import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { GeometryControls } from '../components/GeometryControls';
 import { ExportPhotoDialog, type PhotoExportSettings } from '../components/ExportPhotoDialog';
 import { MaskControls } from '../components/MaskControls';
+import { PhotoInformationDialog } from '../components/PhotoInformationDialog';
 import { SemanticMaskControls, type SemanticModelTask } from '../components/SemanticMaskControls';
 import { ToneCurveEditor } from '../components/ToneCurveEditor';
 import { HistogramPanel } from '../components/HistogramPanel';
@@ -60,6 +61,7 @@ type ToolWorkspace = 'ai' | 'develop';
 type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
 type BrushGesture = { pointerId: number; maskId: string; groupId: string };
+type CropGesture = { pointerId: number; start: { x: number; y: number } };
 type AiPointPolarity = 'positive' | 'negative';
 type ImageDimensions = { width: number; height: number };
 
@@ -124,8 +126,12 @@ export function EditorPage(): ReactElement {
   const brushGesture = useRef<BrushGesture | null>(null);
   const previewSurface = useRef<HTMLDivElement>(null);
   const photoStage = useRef<HTMLDivElement>(null);
+  const guideFrame = useRef<HTMLDivElement>(null);
+  const cropGesture = useRef<CropGesture | null>(null);
+  const cropDraftValue = useRef<ViewportTransformPrimitives['cropFrame'] | null>(null);
   const exportAbort = useRef<AbortController | null>(null);
   const semanticAbort = useRef<AbortController | null>(null);
+  const renderSequence = useRef(0);
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [beforeSource, setBeforeSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
@@ -139,9 +145,9 @@ export function EditorPage(): ReactElement {
   const [imageDimensions, setImageDimensions] = useState<ImageDimensions | null>(null);
   const [fitDimensions, setFitDimensions] = useState<ImageDimensions | null>(null);
   const [panning, setPanning] = useState(false);
+  const [cropDraft, setCropDraft] = useState<ViewportTransformPrimitives['cropFrame'] | null>(null);
   const [recipeCollapsed, setRecipeCollapsed] = useState(false);
   const [compositionGuide, setCompositionGuide] = useState<CompositionGuide>('none');
-  const [levelAxesVisible, setLevelAxesVisible] = useState(false);
   const [maskOverlayVisible, setMaskOverlayVisible] = useState(true);
   const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
   const [brushActive, setBrushActive] = useState(false);
@@ -156,6 +162,7 @@ export function EditorPage(): ReactElement {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportMessage, setExportMessage] = useState('Choose a photographic format and output size.');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [photoInformationOpen, setPhotoInformationOpen] = useState(false);
   const [recipeTransferMessage, setRecipeTransferMessage] = useState<string | undefined>();
   const [aiPrompt, setAiPrompt] = useState('Give this photograph a refined cinematic look while preserving natural skin tones.');
   const [aiMessage, setAiMessage] = useState('Local Smart Edit is ready. No photograph or metadata will leave this browser.');
@@ -212,6 +219,8 @@ export function EditorPage(): ReactElement {
 
   useEffect(() => {
     if (project === null) return;
+    const sequence = renderSequence.current + 1;
+    renderSequence.current = sequence;
     const controller = new AbortController();
     setRenderProgress('Rendering');
     void application.renderProjectPreview.render(
@@ -219,16 +228,20 @@ export function EditorPage(): ReactElement {
       new RenderProjectPreviewMessage(projectId, 2560),
       {
         signal: controller.signal,
-        onProgress: (progress) => setRenderProgress(`${progress.stage} ${Math.round(progress.completed * 100)}%`),
-        onAnalysis: setPreviewAnalysis
+        onProgress: (progress) => {
+          if (sequence === renderSequence.current) setRenderProgress(`${progress.stage} ${Math.round(progress.completed * 100)}%`);
+        },
+        onAnalysis: (analysis) => {
+          if (sequence === renderSequence.current) setPreviewAnalysis(analysis);
+        }
       }
     ).then((result) => {
-      if (result instanceof Blob) {
+      if (result instanceof Blob && sequence === renderSequence.current) {
         setPreview(result);
         setRenderProgress('Preview up to date');
       }
     }).catch((error: unknown) => {
-      if (!(error instanceof DOMException) || error.name !== 'AbortError') {
+      if (sequence === renderSequence.current && (!(error instanceof DOMException) || error.name !== 'AbortError')) {
         const message = error instanceof Error ? error.message : 'Unknown rendering error.';
         setRenderProgress(`Preview unavailable; showing original. ${message}`);
       }
@@ -324,6 +337,7 @@ export function EditorPage(): ReactElement {
       else if (event.key.toLowerCase() === 'g') setCompositionGuide((current) => compositionGuideSequence[(compositionGuideSequence.indexOf(current) + 1) % compositionGuideSequence.length] ?? 'none');
       else if (event.key.toLowerCase() === 'm') openPanel('masks');
       else if (event.key.toLowerCase() === 'r') setRecipeCollapsed((value) => !value);
+      else if (event.key.toLowerCase() === 'i') setPhotoInformationOpen(true);
       else if (event.key === 'Escape') { setBrushActive(false); setAiPointActive(false); }
       else if (event.key === '?') setShortcutsOpen((value) => !value);
       else return;
@@ -672,6 +686,23 @@ export function EditorPage(): ReactElement {
     }
   };
 
+  const applyClassicAutoEnhance = (): void => {
+    applyBuiltInPreset('Natural');
+    setAiMessage('Classic Auto Enhance applied a deterministic tonal preset without AI. Every change remains in Active Recipe.');
+  };
+
+  const askCompanionOpinion = (): void => {
+    const intent = previewAnalysis === null
+      ? 'Create a natural, balanced edit with gentle contrast and realistic color.'
+      : previewAnalysis.highlightClipping > 0.01
+        ? 'Recover bright highlights while keeping the midtones lively and the result natural.'
+        : previewAnalysis.shadowClipping > 0.01
+          ? 'Open the deep shadows carefully, control noise, and preserve convincing contrast.'
+          : 'Refine this balanced frame with natural color, subtle subject separation, and restrained detail.';
+    setAiPrompt(intent);
+    setAiMessage('AI Companion reviewed the rendered histogram locally and filled the brief. You can edit it before generating a proposal.');
+  };
+
   const applyAiProposal = (): void => {
     if (aiProposal === null) return;
     aiProposal.operations.forEach((operation, index) => {
@@ -761,8 +792,52 @@ export function EditorPage(): ReactElement {
     return true;
   };
 
+  const pointOnCropFrame = (event: ReactPointerEvent<HTMLDivElement>): { x: number; y: number } | null => {
+    const bounds = guideFrame.current?.getBoundingClientRect();
+    if (bounds === undefined || bounds.width === 0 || bounds.height === 0) return null;
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height))
+    };
+  };
+
+  const beginCrop = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
+    if (toolWorkspace !== 'develop' || activePanel !== 'crop') return false;
+    const start = pointOnCropFrame(event);
+    if (start === null) return true;
+    cropGesture.current = { pointerId: event.pointerId, start };
+    const draft = { x: start.x, y: start.y, width: 0, height: 0 };
+    cropDraftValue.current = draft;
+    setCropDraft(draft);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    return true;
+  };
+
+  const continueCrop = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
+    const gesture = cropGesture.current;
+    if (gesture?.pointerId !== event.pointerId) return false;
+    const end = pointOnCropFrame(event);
+    if (end === null || project === null) return true;
+    let width = Math.abs(end.x - gesture.start.x);
+    let height = Math.abs(end.y - gesture.start.y);
+    const aspectRatio = project.getViewportTransform().toPrimitives().aspectRatio;
+    if (aspectRatio !== null && width > 0 && height > 0) {
+      const metadata = project.toPrimitives().metadata;
+      const normalizedRatio = (aspectRatio.width / aspectRatio.height) / (metadata.width / metadata.height);
+      if (width / height > normalizedRatio) width = height * normalizedRatio;
+      else height = width / normalizedRatio;
+    }
+    const x = end.x >= gesture.start.x ? gesture.start.x : gesture.start.x - width;
+    const y = end.y >= gesture.start.y ? gesture.start.y : gesture.start.y - height;
+    const draft = { x: Math.max(0, x), y: Math.max(0, y), width: Math.min(width, 1 - Math.max(0, x)), height: Math.min(height, 1 - Math.max(0, y)) };
+    cropDraftValue.current = draft;
+    setCropDraft(draft);
+    return true;
+  };
+
   const startPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button !== 0) return;
+    if (beginCrop(event)) return;
     if (addAiPoint(event)) return;
     if (beginBrushStroke(event)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -771,6 +846,7 @@ export function EditorPage(): ReactElement {
   };
 
   const movePan = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (continueCrop(event)) return;
     if (continueBrushStroke(event)) return;
     const gesture = panGesture.current;
     if (gesture?.pointerId !== event.pointerId) return;
@@ -781,6 +857,18 @@ export function EditorPage(): ReactElement {
   };
 
   const endPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (cropGesture.current?.pointerId === event.pointerId) {
+      const nextCrop = cropDraftValue.current;
+      cropGesture.current = null;
+      cropDraftValue.current = null;
+      setCropDraft(null);
+      if (nextCrop !== null && nextCrop.width >= 0.02 && nextCrop.height >= 0.02 && project !== null) {
+        const viewport = project.getViewportTransform().toPrimitives();
+        changeViewport({ ...viewport, cropFrame: nextCrop }, null);
+      }
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      return;
+    }
     if (brushGesture.current?.pointerId === event.pointerId) {
       brushGesture.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -834,8 +922,8 @@ export function EditorPage(): ReactElement {
           <button className="icon-button" type="button" disabled={!project.canUndo()} onClick={() => changeHistory('undo')} aria-label="Undo">↶</button>
           <button className="icon-button" type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')} aria-label="Redo">↷</button>
           <button className="icon-button shortcut-button" type="button" onClick={() => setShortcutsOpen(true)} aria-label="Keyboard shortcuts">⌨</button>
+          <button className="icon-button" type="button" onClick={() => setPhotoInformationOpen(true)} aria-label="Photo information">ⓘ</button>
         </div>
-        <button className="button ai-header-button" type="button" onClick={() => openPanel('ai')}><span aria-hidden="true">✦</span> AI Edit</button>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
@@ -848,6 +936,7 @@ export function EditorPage(): ReactElement {
           onCopy={() => void copyDevelopmentSettings()}
           onPaste={() => void pasteDevelopmentSettings()}
           onApplyPreset={applyBuiltInPreset}
+          onClear={() => apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: DevelopmentRecipe.neutral().toPrimitives(), groupId: null })}
           transferMessage={recipeTransferMessage}
           collapsed={recipeCollapsed}
           onToggleCollapsed={() => setRecipeCollapsed((value) => !value)}
@@ -862,13 +951,12 @@ export function EditorPage(): ReactElement {
             <select aria-label="Composition guide" value={compositionGuide} onChange={(event) => setCompositionGuide(event.target.value as CompositionGuide)} title="Composition overlay">
               <option value="none">No guide</option><option value="thirds">Thirds</option><option value="grid">Grid</option><option value="diagonals">Diagonals</option><option value="golden-ratio">Golden ratio</option>
             </select>
-            <button className={levelAxesVisible ? 'active' : ''} aria-pressed={levelAxesVisible} type="button" onClick={() => setLevelAxesVisible((value) => !value)} title="Show horizontal and vertical level references">Level</button>
             {project.hasMasks() && <button className={maskOverlayVisible ? 'active' : ''} aria-pressed={maskOverlayVisible} type="button" onClick={() => setMaskOverlayVisible((value) => !value)} title="Show or hide the editable mask overlay">Mask</button>}
             <button className={showOriginal ? 'active' : ''} type="button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
           </div>
           <div
             ref={photoStage}
-            className={`photo-stage ${panning ? 'panning' : ''} ${brushActive || aiPointActive ? 'painting' : ''}`}
+            className={`photo-stage ${panning ? 'panning' : ''} ${brushActive || aiPointActive || (toolWorkspace === 'develop' && activePanel === 'crop') ? 'painting' : ''}`}
             onPointerDown={startPan}
             onPointerMove={movePan}
             onPointerUp={endPan}
@@ -880,9 +968,12 @@ export function EditorPage(): ReactElement {
               <div ref={previewSurface} className="preview-surface" style={{ transform, width: fitDimensions?.width, height: fitDimensions?.height, maxWidth: fitDimensions === null ? undefined : 'none', maxHeight: fitDimensions === null ? undefined : 'none' }}>
                 <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => previewLoaded(event.currentTarget)} />
                 {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={project.getMasks().map((mask) => mask.toPrimitives())} />}
-                <CompositionGuideOverlay guide={compositionGuide} showLevelAxes={levelAxesVisible} />
               </div>
             )}
+            {sourceUrl !== null && fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame" style={{ width: fitDimensions.width, height: fitDimensions.height }}>
+              <CompositionGuideOverlay guide={compositionGuide} />
+              {toolWorkspace === 'develop' && activePanel === 'crop' && <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} />}
+            </div>}
             <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{previewAnalysis?.backend === 'webgpu' || previewAnalysis?.backend === 'webgl2' ? 'GPU global development · CPU geometry' : 'Reference renderer for masks and spatial stages'} · {renderProgress}</small></span></div>
             {showOriginal && <div className="comparison-badge">Original · Before</div>}
             <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
@@ -890,15 +981,14 @@ export function EditorPage(): ReactElement {
         </div>
         <aside className="tools-panel" aria-label="Editing tools">
           <div className="tool-workspace-switch" role="tablist" aria-label="Editing workspace">
-            <button role="tab" aria-selected={toolWorkspace === 'ai'} className={toolWorkspace === 'ai' ? 'active ai' : ''} type="button" onClick={() => openPanel('ai')}>✦ AI</button>
-            <button role="tab" aria-selected={toolWorkspace === 'develop'} className={toolWorkspace === 'develop' ? 'active' : ''} type="button" onClick={() => { setToolWorkspace('develop'); if (activePanel === 'ai') setActivePanel('light'); }}>Develop</button>
+            <button role="tab" aria-selected={toolWorkspace === 'ai'} className={toolWorkspace === 'ai' ? 'active ai' : ''} type="button" onClick={() => openPanel('ai')}>✦ AI Companion</button>
+            <button role="tab" aria-selected={toolWorkspace === 'develop'} className={toolWorkspace === 'develop' ? 'active' : ''} type="button" onClick={() => { setToolWorkspace('develop'); if (activePanel === 'ai') setActivePanel('light'); }}>Manual</button>
           </div>
           {toolWorkspace === 'ai' ? <>
           <section className="ai-hero">
-            <div><span className="ai-orb" aria-hidden="true">✦</span><span><strong>RAWcket AI</strong><small>Your editing copilot</small></span></div>
-            <p>Describe the result you want. Every suggestion remains explicit, reviewable, and reversible.</p>
+            <div><span className="ai-orb" aria-hidden="true">✦</span><span><strong>RAWcket AI Companion</strong><small>Local, measured, and reviewable</small></span></div>
           </section>
-          <ToolSection id="ai" title="AI Studio" active onToggle={openPanel} badge="Core workflow">
+          <ToolSection id="ai" title="AI Companion" active onToggle={openPanel} badge="Core workflow">
             <div className="development-tutor" aria-label="Local development tutor">
               <div className="development-tutor-heading"><span aria-hidden="true">◇</span><div><strong>Local Development Tutor</strong><small>Measured, explainable, never auto-applied</small></div></div>
               {developmentGuidance.length === 0 ? <p>Waiting for the rendered frame analysis…</p> : developmentGuidance.map((item) => (
@@ -912,6 +1002,10 @@ export function EditorPage(): ReactElement {
             </div>
             <label className="field-label" htmlFor="ai-edit-prompt">What should RAWcket create?</label>
             <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} />
+            <div className="ai-companion-actions">
+              <button type="button" onClick={askCompanionOpinion}>Ask Companion for an opinion</button>
+              <button type="button" onClick={applyClassicAutoEnhance}>Auto Enhance · no AI</button>
+            </div>
             <div className="ai-quick-prompts" aria-label="AI prompt ideas">
               {['Natural portrait', 'Cinematic night', 'Recover highlights'].map((prompt) => <button key={prompt} type="button" onClick={() => setAiPrompt(prompt)}>{prompt}</button>)}
             </div>
@@ -978,8 +1072,8 @@ export function EditorPage(): ReactElement {
             </div>
           </ToolSection>
           <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel} badge="Rendered">
-            <p>Crop, image position, scale, rotation, and flips are persisted, undoable, and rendered by the reference pipeline.</p>
-            <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} showLevelAxes={levelAxesVisible} onGuideChange={setCompositionGuide} onLevelAxesChange={setLevelAxesVisible} />
+            <p>Drag from one corner to the opposite corner on the photograph. The translucent area is excluded; use a locked ratio or choose Free.</p>
+            <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} onGuideChange={setCompositionGuide} />
           </ToolSection>
           <ToolSection id="masks" title="Masks" active={activePanel === 'masks'} onToggle={setActivePanel} badge="AI ready">
             <p>Local masks remain editable recipe data. Brush and radial coverage now render through the reference pipeline.</p>
@@ -1011,6 +1105,7 @@ export function EditorPage(): ReactElement {
         </aside>
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <PhotoInformationDialog project={project} open={photoInformationOpen} onClose={() => setPhotoInformationOpen(false)} />
       <ExportPhotoDialog
         open={exportOpen}
         busy={exportBusy}
@@ -1052,10 +1147,11 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
     ['Pan preview', 'Drag · Arrow keys'],
     ['Light / Color / Detail', '1 · 2 · 3'],
     ['Tone Curve', '4'],
-    ['AI Studio', 'A'],
+    ['AI Companion', 'A'],
     ['Before / after', 'B'],
     ['Cycle composition guides', 'G'],
     ['Collapse / expand recipe', 'R'],
+    ['Photo information', 'I'],
     ['Masks', 'M'],
     ['Shortcut guide', '?']
   ];
@@ -1095,18 +1191,23 @@ function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactEle
   );
 }
 
-function CompositionGuideOverlay({ guide, showLevelAxes }: {
-  guide: CompositionGuide;
-  showLevelAxes: boolean;
-}): ReactElement | null {
-  if (guide === 'none' && !showLevelAxes) return null;
-  return <svg className="composition-guide-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Composition and level guides">
+function CompositionGuideOverlay({ guide }: { guide: CompositionGuide }): ReactElement | null {
+  if (guide === 'none') return null;
+  const denseGridLines = Array.from({ length: 19 }, (_, index) => (index + 1) / 20);
+  return <svg className="composition-guide-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Fixed composition grid">
     {guide === 'thirds' && <path d="M.333 0V1 M.667 0V1 M0 .333H1 M0 .667H1" />}
-    {guide === 'grid' && <path d="M.25 0V1 M.5 0V1 M.75 0V1 M0 .25H1 M0 .5H1 M0 .75H1" />}
+    {guide === 'grid' && <>{denseGridLines.map((position, index) => <path className={(index + 1) % 5 === 0 ? 'grid-major' : 'grid-minor'} key={`grid-${position}`} d={`M${position} 0V1 M0 ${position}H1`} />)}</>}
     {guide === 'diagonals' && <path d="M0 0L1 1 M1 0L0 1" />}
     {guide === 'golden-ratio' && <path d="M.382 0V1 M.618 0V1 M0 .382H1 M0 .618H1" />}
-    {showLevelAxes && <g className="level-axes"><path d="M0 .5H1 M.5 0V1" /><path className="level-ticks" d="M.48 .25H.52 M.48 .75H.52 M.25 .48V.52 M.75 .48V.52" /><circle cx=".5" cy=".5" r=".012" /></g>}
   </svg>;
+}
+
+function CropSelectionOverlay({ crop }: { crop: ViewportTransformPrimitives['cropFrame'] }): ReactElement {
+  return <div className="crop-selection-overlay" aria-label="Crop selection">
+    <div className="crop-selection-frame" style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }}>
+      <span className="top-left" /><span className="top-right" /><span className="bottom-left" /><span className="bottom-right" />
+    </div>
+  </div>;
 }
 
 function describeOperation(operation: EditOperation): string {

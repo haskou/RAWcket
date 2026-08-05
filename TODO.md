@@ -9,7 +9,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Reference CPU pipeline for every current global adjustment and RGB/luminance tone curves.
 - [x] Sliders, exact numeric entry, reset, grouped history, and per-adjustment enable/disable state.
 - [x] Navigable Active Recipe sidebar, preview pan/zoom, and keyboard shortcuts.
-- [x] Workspace-relative Fit, collapsible recipe column, composition/level guides, contextual mask help, and modified-control indicators.
+- [x] Workspace-relative Fit, collapsible recipe column, fixed dense composition guides, contextual mask help, and modified-control indicators.
 - [x] English UI and user-facing errors.
 - [x] Interactive RGB/R/G/B/luminance curve graph with draggable and exact points.
 - [x] Rendered non-destructive crop/geometry, before/after, masks, histogram, and clipping.
@@ -17,6 +17,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Consented, pinned, integrity-verified ONNX semantic model with removable local storage and WebGPU/WASM execution.
 - [x] JPEG/PNG/TIFF worker export with resize, progress, and cancellation.
 - [x] ARW embedded-preview extraction while preserving the original RAW.
+- [x] Bounded TIFF/EXIF extraction and a persisted photo-information view for camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern.
 - [x] Versioned LRU previews, quota preflight, SHA-256 snapshots, and corruption recovery.
 - [x] Safe, postponable PWA updates and a production CSP without `unsafe-eval`.
 - [ ] Full LibRaw/WASM A6600 demosaicing and high-depth linear development.
@@ -38,6 +39,10 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 **Goal.** Convert camera originals into a reproducible, high-depth linear image prepared for the development pipeline, starting with Sony A6600 ARW.
 
 **Scope.** Evaluate existing LibRaw wrappers against a first-party build; compile LibRaw to WebAssembly; open A6600 ARW files; extract embedded previews and EXIF; read camera white balance, black/white levels, and Bayer pattern; implement reference demosaicing and high-depth linear output. Keep the codec boundary extensible for other RAW formats and additional JPEG/PNG/TIFF inputs. Run decoding in a worker with progress, cancellation, explicit limits, and careful WASM memory management.
+
+**Implemented foundation.** A bounded TIFF reader already extracts the embedded JPEG and validated capture facts without blocking on mosaic development. Schema version 5 persists camera/lens identity, exposure, aperture, ISO, focal length, EXIF orientation, white-balance mode, color-space tag, black/white levels, and CFA pattern. The editor exposes those facts and explicitly labels embedded-preview development.
+
+**Remaining.** LibRaw/WASM mosaic decoding, camera matrices and as-shot neutral values, verified A6600 fixtures against a trusted reference decoder, high-depth linear buffers, and memory/cancellation profiling for the WASM path.
 
 **Dependencies.** The existing `PreviewRenderer` boundary; Emscripten; redistributable RAW fixtures; worker protocol; memory/cache policy; LibRaw and wrapper license review.
 
@@ -95,9 +100,11 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Fixed crop frame, free image translation, development scale, rotation/straightening, aspect ratios, flips, persistence, undo/redo, and identical preview/export rasterization.
 
-**Implemented.** Rule-of-thirds, quarter-grid, diagonal, golden-ratio, and central horizontal/vertical level overlays are available from both the canvas and geometry panel. They are editing-only and excluded from export. Fit recalculates against the live canvas after either sidebar changes size.
+**Implemented.** Rule-of-thirds, dense twenty-division grid, diagonal, and golden-ratio overlays are available from both the canvas and geometry panel. The overlay stays fixed while the photograph moves below it, replacing a redundant separate level toggle. Guides are editing-only and excluded from export. Fit recalculates against the live canvas after either sidebar changes size.
 
-**Remaining.** Perspective/vertical/horizontal pixel correction, automatic horizon estimation, direct-manipulation crop handles, and touch gesture polish.
+**Implemented.** Direct corner-to-corner crop selection, translucent excluded area, free/original/common locked aspect ratios, persistence, and one-step undo.
+
+**Remaining.** Perspective/vertical/horizontal pixel correction, automatic horizon estimation, resizable crop handles after placement, and touch gesture polish.
 
 **Dependencies.** Existing `ViewportTransform`; renderer integration; pointer/touch/trackpad gestures; homography math; EXIF orientation.
 
@@ -159,7 +166,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Propose explainable, bounded edits without giving AI direct authority over a project.
 
-**Implemented locally.** The prominent AI Studio translates intent into bounded, validated operations locally; every operation is individually reviewable and unapplied proposals change nothing. No pixels or metadata leave the browser.
+**Implemented locally.** The prominent AI Companion translates intent into bounded, validated operations locally; every operation is individually reviewable and unapplied proposals change nothing. It can derive an editable brief from rendered histogram facts, while a separately labelled classic Auto Enhance applies a deterministic non-AI treatment. No pixels or metadata leave the browser.
 
 **Remaining optional cloud scope.** OpenAI as the first replaceable adapter and a future local VLM. With explicit consent, send only a reduced preview plus selected EXIF, histograms, clipping, percentiles, estimated noise, current values, and user intent. Structured output produces validated operations. Add weaker variants, cost display, cancellation, and provider-specific explanations. Never send full RAW or log images.
 
@@ -197,7 +204,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Five per-project SHA-256 snapshots, newest-valid corruption recovery without overwriting damaged data, portable checksummed bundles, OPFS/IndexedDB original storage, persistent-storage request, quota visibility, and import safety reserve.
 
-**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query.
+**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes.
 
 **Remaining.** Write-ahead journaling across IndexedDB/OPFS, `.rawcket.json` sidecars, optional File System Access links, orphan cleanup, and future collections.
 
@@ -249,7 +256,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Simple/Advanced modes, collapsible tools and recipe column, exact labels, reduced-motion support, keyboard shortcuts, pan/zoom gestures, workspace-relative Fit, visible save/render states, English UI, and a navigable Active Recipe that lists every non-default instruction while automatically removing reset values.
 
-**Implemented.** Before/after comparison, histogram/clipping display, composition and level guides, brush/radial/linear/smart-point overlays, per-mask workflow explanations, modified-control marks, and AI tutor explanations now join the keyboard, pan/zoom, responsive, and Active Recipe work. Luminance masks explicitly disclose that their per-pixel colored overlay is still pending even though their effect renders.
+**Implemented.** Before/after comparison, histogram/clipping display, fixed dense composition guides, drag-to-crop with an outside veil, brush/radial/linear/smart-point overlays, per-mask workflow explanations, modified-control marks, and AI tutor explanations now join the keyboard, pan/zoom, responsive, and Active Recipe work. Active Recipe can be cleared as one undoable operation. Luminance masks explicitly disclose that their per-pixel colored overlay is still pending even though their effect renders.
+
+**Implemented.** Multi-file import opens a local AI Companion contact sheet ranked by measurable clipping, tonal balance, detail, and resolution. Reasons are visible and the photographer can override the recommendation before any project is created.
 
 **Remaining.** Visual history, favorites, onboarding, complete touch/trackpad polish, accessible non-visual alternatives for every canvas interaction, full responsive review, and WCAG audit.
 

@@ -127,11 +127,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .photo-stage.painting { cursor: crosshair; }
 .preview-surface { position: relative; display: grid; width: max-content; max-width: 86%; max-height: calc(100% - 105px); transform-origin: center; will-change: transform; box-shadow: 0 22px 70px rgba(0,0,0,.48); pointer-events: none; }
 .source-preview { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.fixed-guide-frame { position: absolute; z-index: 4; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; overflow: hidden; }
 .composition-guide-overlay { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .composition-guide-overlay > path { fill: none; stroke: rgba(255,255,255,.78); stroke-width: 1; vector-effect: non-scaling-stroke; filter: drop-shadow(0 1px 1px #000); }
-.composition-guide-overlay .level-axes path { fill: none; stroke: #f5ce69; stroke-width: 1.5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 1px 1px #000); }
-.composition-guide-overlay .level-axes .level-ticks { stroke-width: 2.5; }
-.composition-guide-overlay .level-axes circle { fill: #f5ce69; stroke: #111; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.composition-guide-overlay .grid-minor { stroke: rgba(255,255,255,.28); stroke-width: .65; }
+.composition-guide-overlay .grid-major { stroke: rgba(255,255,255,.72); stroke-width: 1.1; }
+.crop-selection-overlay { position: absolute; z-index: 3; inset: 0; overflow: hidden; pointer-events: none; }
+.crop-selection-frame { position: absolute; border: 1.5px solid rgba(255,255,255,.92); box-shadow: 0 0 0 9999px rgba(2,3,3,.58), 0 0 0 1px rgba(0,0,0,.7); }
+.crop-selection-frame > span { position: absolute; width: 10px; height: 10px; border-color: #fff; border-style: solid; }
+.crop-selection-frame .top-left { left: -2px; top: -2px; border-width: 2px 0 0 2px; }
+.crop-selection-frame .top-right { right: -2px; top: -2px; border-width: 2px 2px 0 0; }
+.crop-selection-frame .bottom-left { left: -2px; bottom: -2px; border-width: 0 0 2px 2px; }
+.crop-selection-frame .bottom-right { right: -2px; bottom: -2px; border-width: 0 2px 2px 0; }
 .mask-overlay { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; color: rgba(201,240,107,.28); pointer-events: none; }
 .mask-overlay polyline { stroke: rgba(201,240,107,.48); }
 .mask-gradient-axis { stroke: rgba(255,255,255,.75); stroke-width: .004; stroke-dasharray: .015 .012; vector-effect: non-scaling-stroke; }
@@ -155,7 +162,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .recipe-expand strong { writing-mode: vertical-rl; text-transform: uppercase; letter-spacing: .11em; font-size: .58rem; }
 .recipe-panel-heading h2 { margin: 4px 0 6px; font-size: 1.05rem; }
 .recipe-panel-heading p { margin: 0; color: #7e857f; font-size: .67rem; line-height: 1.45; }
-.recipe-transfer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 12px; }
+.recipe-transfer-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 12px; }
 .recipe-transfer-actions button, .recipe-preset-actions button { min-height: 29px; border: 1px solid #343a35; border-radius: 6px; background: #1b1e1c; color: #b8bfb9; cursor: pointer; font-size: .6rem; }
 .recipe-transfer-actions button:hover, .recipe-preset-actions button:hover { border-color: #68724f; color: var(--accent); }
 .recipe-preset-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
@@ -368,10 +375,29 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .smart-point-fallback strong, .smart-point-fallback small { display: block; }
 .smart-point-fallback strong { color: #cdd4ce; font-size: .65rem; }
 .smart-point-fallback small { margin-top: 2px; color: #747e76; font-size: .55rem; }
+.ai-companion-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 10px 0; }
+.ai-companion-actions button { min-height: 38px; border: 1px solid #3b443d; border-radius: 8px; background: #171c18; color: #bdc9bf; font-size: .62rem; }
+.ai-companion-actions button:first-child { border-color: #596b43; color: #d8e7c9; }
 .shortcut-dialog dl { margin: 0; }
 .shortcut-dialog dl > div { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line-soft); }
 .shortcut-dialog dt { color: #cbd0cc; font-size: .8rem; }
 .shortcut-dialog dd { margin: 0; padding: 4px 7px; border: 1px solid #383d39; border-radius: 6px; background: #0e100f; color: var(--accent); font-size: .7rem; }
+.photo-information-dialog dl { margin: 0; }
+.photo-information-dialog dl > div { display: grid; grid-template-columns: minmax(110px, .75fr) 1.25fr; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.photo-information-dialog dt { color: #838c85; font-size: .7rem; }
+.photo-information-dialog dd { margin: 0; color: #d4dad5; font-size: .76rem; overflow-wrap: anywhere; }
+.photo-information-dialog .notice { margin-top: 16px; font-size: .7rem; line-height: 1.5; }
+.import-selection-dialog { width: min(980px, 100%); }
+.import-candidate-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 18px 0; }
+.import-candidate { min-width: 0; padding: 9px; border: 1px solid #333a35; border-radius: 12px; background: #101311; color: #cfd5d0; text-align: left; }
+.import-candidate.selected { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(185,219,117,.2); background: #161c13; }
+.import-candidate > div { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 8px; background: #080909; }
+.import-candidate img { width: 100%; height: 100%; object-fit: cover; }
+.import-candidate > div span { position: absolute; left: 7px; top: 7px; padding: 4px 6px; border-radius: 999px; background: rgba(8,10,8,.82); color: var(--accent); font-size: .52rem; font-weight: 750; }
+.import-candidate strong, .import-candidate > small { display: block; }
+.import-candidate strong { margin-top: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .72rem; }
+.import-candidate > small { margin-top: 2px; color: var(--accent); font-size: .58rem; }
+.import-candidate ul { margin: 8px 0 0; padding-left: 15px; color: #8f9991; font-size: .55rem; line-height: 1.45; }
 
 .dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(4,5,5,.76); backdrop-filter: blur(6px); }
 .dialog { width: min(520px, 100%); max-height: 90vh; overflow: auto; border: 1px solid #3a3f3b; border-radius: 18px; background: #171918; padding: 24px; box-shadow: 0 30px 100px #000; }

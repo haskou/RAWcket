@@ -59,8 +59,9 @@ async function render(input: unknown): Promise<void> {
     const image = request.output.mimeType === 'image/tiff'
       ? tiff.encode(transformed.pixels, transformed.width, transformed.height)
       : await outputCanvas.convertToBlob({ type: request.output.mimeType, quality: request.output.quality });
+    const imageBytes = await image.arrayBuffer();
     progress(request.id, 'encoding', 0.95);
-    post({ kind: 'completed', id: request.id, image, analysis });
+    post({ kind: 'completed', id: request.id, image: imageBytes, mimeType: request.output.mimeType, analysis }, [imageBytes]);
   } catch (error: unknown) {
     post({
       kind: 'failed',
@@ -78,6 +79,6 @@ function progress(
   post({ kind: 'progress', id, stage, completed });
 }
 
-function post(response: PreviewWorkerResponse): void {
-  worker.postMessage(response);
+function post(response: PreviewWorkerResponse, transfer: Transferable[] = []): void {
+  worker.postMessage(response, transfer);
 }

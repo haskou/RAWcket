@@ -1,4 +1,5 @@
 import { StringValueObject, Timestamp } from '@haskou/value-objects';
+import { CaptureMetadata, type CaptureMetadataPrimitives } from '../../../domain/CaptureMetadata';
 import { ProjectMetadata } from '../../../domain/ProjectMetadata';
 import { SourceImageReference } from '../../../domain/SourceImageReference';
 import { ProjectId } from '../../../domain/value-objects/ProjectId';
@@ -17,6 +18,7 @@ export class CreateProjectMessage {
     private readonly fileName: string,
     private readonly width: number,
     private readonly height: number,
+    private readonly captureMetadata: CaptureMetadataPrimitives,
     now = Date.now()
   ) {
     this.projectName = new ProjectName(name);
@@ -45,5 +47,8 @@ export class CreateProjectMessage {
   }
   public createMetadata(): ProjectMetadata {
     return new ProjectMetadata(this.createdAt, this.createdAt, this.width, this.height);
+  }
+  public createCaptureMetadata(): CaptureMetadata {
+    return CaptureMetadata.fromPrimitives(this.captureMetadata);
   }
 }

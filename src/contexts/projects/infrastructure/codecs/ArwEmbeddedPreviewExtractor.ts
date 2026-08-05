@@ -4,6 +4,18 @@ export type ArwPreview = {
   height: number;
   cameraMake: string | null;
   cameraModel: string | null;
+  lensModel: string | null;
+  capturedAt: string | null;
+  exposureTimeSeconds: number | null;
+  apertureFNumber: number | null;
+  iso: number | null;
+  focalLengthMm: number | null;
+  orientation: number | null;
+  whiteBalance: 'auto' | 'manual' | null;
+  colorSpace: 'srgb' | 'adobe-rgb' | 'uncalibrated' | null;
+  blackLevel: number | null;
+  whiteLevel: number | null;
+  cfaPattern: string | null;
 };
 
 type IfdValues = Map<number, number[]>;
@@ -24,6 +36,18 @@ export class ArwEmbeddedPreviewExtractor {
     let rawHeight = 0;
     let cameraMake: string | null = null;
     let cameraModel: string | null = null;
+    let lensModel: string | null = null;
+    let capturedAt: string | null = null;
+    let exposureTimeSeconds: number | null = null;
+    let apertureFNumber: number | null = null;
+    let iso: number | null = null;
+    let focalLengthMm: number | null = null;
+    let orientation: number | null = null;
+    let whiteBalance: 'auto' | 'manual' | null = null;
+    let colorSpace: 'srgb' | 'adobe-rgb' | 'uncalibrated' | null = null;
+    let blackLevel: number | null = null;
+    let whiteLevel: number | null = null;
+    let cfaPattern: string | null = null;
 
     const readIfd = (offset: number): void => {
       if (visited.has(offset) || offset <= 0 || offset + 2 > bytes.byteLength || visited.size >= 64) return;
@@ -38,14 +62,32 @@ export class ArwEmbeddedPreviewExtractor {
         const count = view.getUint32(entryOffset + 4, littleEndian);
         const numeric = this.numericValues(view, bytes.byteLength, entryOffset, type, count, littleEndian);
         if (numeric.length > 0) values.set(tag, numeric);
-        if (tag === 0x010f || tag === 0x0110) {
+        if (tag === 0x010f || tag === 0x0110 || tag === 0x9003 || tag === 0xa434) {
           const text = this.asciiValue(view, bytes, entryOffset, type, count, littleEndian);
           if (tag === 0x010f && text !== null) cameraMake = text;
           if (tag === 0x0110 && text !== null) cameraModel = text;
+          if (tag === 0x9003 && text !== null) capturedAt = text;
+          if (tag === 0xa434 && text !== null) lensModel = text;
         }
       }
       rawWidth = Math.max(rawWidth, values.get(0x0100)?.[0] ?? 0);
       rawHeight = Math.max(rawHeight, values.get(0x0101)?.[0] ?? 0);
+      orientation ??= this.integerInRange(values.get(0x0112)?.[0], 1, 8);
+      exposureTimeSeconds ??= this.positive(values.get(0x829a)?.[0]);
+      apertureFNumber ??= this.positive(values.get(0x829d)?.[0]);
+      iso ??= this.positive(values.get(0x8827)?.[0]);
+      focalLengthMm ??= this.positive(values.get(0x920a)?.[0]);
+      blackLevel ??= this.nonNegativeAverage(values.get(0xc61a));
+      whiteLevel ??= this.nonNegativeAverage(values.get(0xc61d));
+      if (whiteBalance === null) {
+        const rawWhiteBalance = values.get(0xa403)?.[0];
+        whiteBalance = rawWhiteBalance === 0 ? 'auto' : rawWhiteBalance === 1 ? 'manual' : null;
+      }
+      if (colorSpace === null) {
+        const rawColorSpace = values.get(0xa001)?.[0];
+        colorSpace = rawColorSpace === 1 ? 'srgb' : rawColorSpace === 2 ? 'adobe-rgb' : rawColorSpace === 65_535 ? 'uncalibrated' : null;
+      }
+      cfaPattern ??= this.cfaPattern(values.get(0x828e));
       const jpegOffset = values.get(0x0201)?.[0];
       const jpegLength = values.get(0x0202)?.[0];
       if (jpegOffset !== undefined && jpegLength !== undefined && this.isJpegRange(bytes, jpegOffset, jpegLength)) {
@@ -70,7 +112,19 @@ export class ArwEmbeddedPreviewExtractor {
       width: rawWidth || dimensions.width,
       height: rawHeight || dimensions.height,
       cameraMake,
-      cameraModel
+      cameraModel,
+      lensModel,
+      capturedAt,
+      exposureTimeSeconds,
+      apertureFNumber,
+      iso,
+      focalLengthMm,
+      orientation,
+      whiteBalance,
+      colorSpace,
+      blackLevel,
+      whiteLevel,
+      cfaPattern
     };
   }
 
@@ -82,14 +136,40 @@ export class ArwEmbeddedPreviewExtractor {
     count: number,
     littleEndian: boolean
   ): number[] {
-    const bytesPerValue = type === 3 ? 2 : type === 4 ? 4 : 0;
+    const bytesPerValue = type === 1 ? 1 : type === 3 ? 2 : type === 4 ? 4 : type === 5 || type === 10 ? 8 : 0;
     if (bytesPerValue === 0 || count === 0 || count > 1024) return [];
     const total = bytesPerValue * count;
     const valueOffset = total <= 4 ? entryOffset + 8 : view.getUint32(entryOffset + 8, littleEndian);
     if (valueOffset < 0 || valueOffset + total > byteLength) return [];
-    return Array.from({ length: count }, (_, index) => type === 3
-      ? view.getUint16(valueOffset + index * 2, littleEndian)
-      : view.getUint32(valueOffset + index * 4, littleEndian));
+    return Array.from({ length: count }, (_, index) => {
+      const offset = valueOffset + index * bytesPerValue;
+      if (type === 1) return view.getUint8(offset);
+      if (type === 3) return view.getUint16(offset, littleEndian);
+      if (type === 4) return view.getUint32(offset, littleEndian);
+      const numerator = type === 10 ? view.getInt32(offset, littleEndian) : view.getUint32(offset, littleEndian);
+      const denominator = type === 10 ? view.getInt32(offset + 4, littleEndian) : view.getUint32(offset + 4, littleEndian);
+      return denominator === 0 ? Number.NaN : numerator / denominator;
+    }).filter(Number.isFinite);
+  }
+
+  private integerInRange(value: number | undefined, minimum: number, maximum: number): number | null {
+    return value !== undefined && Number.isInteger(value) && value >= minimum && value <= maximum ? value : null;
+  }
+
+  private positive(value: number | undefined): number | null {
+    return value !== undefined && Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  private nonNegativeAverage(values: number[] | undefined): number | null {
+    if (values === undefined || values.length === 0 || values.some((value) => !Number.isFinite(value) || value < 0)) return null;
+    return values.reduce((total, value) => total + value, 0) / values.length;
+  }
+
+  private cfaPattern(values: number[] | undefined): string | null {
+    if (values === undefined || values.length < 4) return null;
+    const colors = ['R', 'G', 'B', 'C', 'M', 'Y', 'W'];
+    const pattern = values.map((value) => colors[value] ?? '?').join('');
+    return pattern.includes('?') ? null : pattern;
   }
 
   private asciiValue(

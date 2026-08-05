@@ -73,6 +73,15 @@ export class DevelopmentRecipe {
     this.disabledGlobalAdjustments = input.disabledGlobalAdjustments.map((key) => AdjustmentKey.fromPrimitives(key));
   }
 
+  public replaceRecipe(input: DevelopmentRecipePrimitives): void {
+    const replacement = DevelopmentRecipe.fromPrimitives(input);
+    this.globalAdjustments = replacement.globalAdjustments;
+    this.curves = replacement.curves;
+    this.viewport = replacement.viewport;
+    this.masks = replacement.masks;
+    this.disabledGlobalAdjustments = replacement.disabledGlobalAdjustments;
+  }
+
   public addMask(mask: MaskDefinition): void {
     if (this.masks.some((existing) => existing.isIdentifiedBy(mask.getId()))) {
       throw new Error('A mask with the same identifier already exists.');
