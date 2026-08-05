@@ -31,9 +31,13 @@ export class CachingRenderSourceDecoder {
     const key = this.keyFor(projectId, mimeType, maximumEdge, allowEmbeddedRawFallback);
     const cached = this.entries.get(key);
     if (cached?.status === 'ready') {
-      this.touch(key, cached);
-      onStatus('ready');
-      return this.clone(cached.source);
+      if (cached.source.kind === 'raw-linear-16-bit' && cached.source.pixels.buffer.byteLength === 0) {
+        this.entries.delete(key);
+      } else {
+        this.touch(key, cached);
+        onStatus('ready');
+        return this.clone(cached.source);
+      }
     }
     if (cached?.status === 'decoding') {
       onStatus('decoding');
@@ -47,9 +51,11 @@ export class CachingRenderSourceDecoder {
     try {
       const decoded = await decoding;
       if (this.entries.get(key) === pending) {
+        const retained = this.clone(decoded);
         this.entries.delete(key);
-        this.entries.set(key, { status: 'ready', source: decoded });
+        this.entries.set(key, { status: 'ready', source: retained });
         this.evictOldestEntries();
+        return this.clone(retained);
       }
       return this.clone(decoded);
     } catch (error: unknown) {

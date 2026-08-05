@@ -103,11 +103,19 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
           control.onProgress?.({ stage: response.data.stage, completed: response.data.completed });
           return;
         }
-        cleanup();
-        if (response.data.kind === 'failed') reject(new Error(response.data.message));
-        else {
+        if (response.data.kind === 'failed') {
+          cleanup();
+          reject(new Error(response.data.message));
+          return;
+        }
+        try {
+          const image = new Blob([response.data.image], { type: response.data.mimeType });
           control.onAnalysis?.(response.data.analysis);
-          resolve(new Blob([response.data.image], { type: response.data.mimeType }));
+          cleanup();
+          resolve(image);
+        } catch (error: unknown) {
+          cleanup();
+          reject(error instanceof Error ? error : new Error('The completed preview could not be read.'));
         }
       };
       const transfer = workerRequest.source.kind === 'raw-linear-16-bit'

@@ -87,9 +87,19 @@ export class WorkerPhotoExporter implements PhotoExporter {
           control.onProgress?.({ stage: response.data.stage, completed: response.data.completed });
           return;
         }
-        cleanup();
-        if (response.data.kind === 'failed') reject(new Error(response.data.message));
-        else resolve(new Blob([response.data.image], { type: response.data.mimeType }));
+        if (response.data.kind === 'failed') {
+          cleanup();
+          reject(new Error(response.data.message));
+          return;
+        }
+        try {
+          const image = new Blob([response.data.image], { type: response.data.mimeType });
+          cleanup();
+          resolve(image);
+        } catch (error: unknown) {
+          cleanup();
+          reject(error instanceof Error ? error : new Error('The completed photo export could not be read.'));
+        }
       };
       const transfer = workerRequest.source.kind === 'raw-linear-16-bit'
         ? [workerRequest.source.pixels.buffer]

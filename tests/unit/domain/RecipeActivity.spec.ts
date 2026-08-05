@@ -14,6 +14,19 @@ describe('Active recipe state', () => {
     expect(recipe.isNeutral()).toBe(false);
   });
 
+  it('recognizes disabled non-zero adjustments as visually neutral', () => {
+    const recipe = DevelopmentRecipe.neutral();
+    recipe.changeGlobalAdjustment(AdjustmentKey.EXPOSURE, GlobalAdjustmentValue.for(AdjustmentKey.EXPOSURE, 1));
+
+    expect(recipe.isNeutral()).toBe(false);
+    expect(recipe.isVisuallyNeutral()).toBe(false);
+
+    recipe.setGlobalAdjustmentEnabled(AdjustmentKey.EXPOSURE, false);
+
+    expect(recipe.isNeutral()).toBe(false);
+    expect(recipe.isVisuallyNeutral()).toBe(true);
+  });
+
   it('treats reset global values as inactive recipe instructions', () => {
     const project = PhotoProjectMother.create();
 

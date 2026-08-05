@@ -28,6 +28,27 @@ describe('CachingRenderSourceDecoder', () => {
     expect(decodedPixels[0]).toBe(1);
   });
 
+  it('retains an owned cache buffer even if the decoder output is later transferred', async () => {
+    const decodedPixels = new Uint16Array([1, 2, 3]);
+    const decode = vi.fn().mockResolvedValue({
+      kind: 'raw-linear-16-bit' as const,
+      width: 1,
+      height: 1,
+      pixels: decodedPixels
+    });
+    const decoder = new CachingRenderSourceDecoder({ decode });
+    const projectId = new ProjectId(crypto.randomUUID());
+    const source = new Blob(['raw'], { type: 'image/x-sony-arw' });
+
+    await decoder.decode(projectId, source, 'image/x-sony-arw', 2560, true, vi.fn());
+    structuredClone(decodedPixels.buffer, { transfer: [decodedPixels.buffer] });
+    const cached = await decoder.decode(projectId, source, 'image/x-sony-arw', 2560, true, vi.fn());
+
+    expect(decode).toHaveBeenCalledTimes(1);
+    if (cached.kind !== 'raw-linear-16-bit') throw new Error('Expected RAW pixels.');
+    expect([...cached.pixels]).toEqual([1, 2, 3]);
+  });
+
   it('coalesces concurrent requests for the same decoded source', async () => {
     let finishDecode: ((value: { kind: 'raw-linear-16-bit'; width: number; height: number; pixels: Uint16Array<ArrayBuffer> }) => void) | undefined;
     const decode = vi.fn().mockReturnValue(new Promise((resolve) => { finishDecode = resolve; }));

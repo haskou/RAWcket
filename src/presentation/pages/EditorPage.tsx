@@ -168,9 +168,12 @@ export function EditorPage(): ReactElement {
   const [preview, setPreview] = useState<Blob | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [renderProgress, setRenderProgress] = useState('Preparing preview');
+  const [renderBusy, setRenderBusy] = useState(true);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
   const [previewAnalysis, setPreviewAnalysis] = useState<PreviewAnalysis | null>(null);
   const [developmentGuidance, setDevelopmentGuidance] = useState<DevelopmentGuidanceItem[]>([]);
   const [revision, setRevision] = useState(0);
+  const [previewRevision, setPreviewRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
   const [imageDimensions, setImageDimensions] = useState<ImageDimensions | null>(null);
@@ -276,6 +279,9 @@ export function EditorPage(): ReactElement {
         setPreview(null);
         setPreviewAnalysis(null);
         setShowOriginal(false);
+        setRenderBusy(true);
+        setRenderProgress('Preparing preview');
+        setBaselineError(null);
         const loaded = await application.findProject.find(new FindProjectMessage(projectId));
         if (loaded === null) {
           setLoadError('This project does not exist or has been deleted.');
@@ -312,6 +318,7 @@ export function EditorPage(): ReactElement {
     const sequence = renderSequence.current + 1;
     renderSequence.current = sequence;
     const controller = new AbortController();
+    setRenderBusy(true);
     setRenderProgress('Waiting for input');
     void previewRenderDebouncer.current?.run(async () => {
       setRenderProgress('Rendering');
@@ -330,20 +337,26 @@ export function EditorPage(): ReactElement {
       );
       if (result instanceof Blob && sequence === renderSequence.current) {
         setPreview(result);
-        if (project.getSource().getSupportedMimeType() === 'image/x-sony-arw' && project.getRecipe().isNeutral()) {
+        if (project.getSource().getSupportedMimeType() === 'image/x-sony-arw' && project.getRecipe().isVisuallyNeutral()) {
           setBeforeSource(result);
+          setBaselineError(null);
         }
         setRenderProgress('Preview up to date');
+        setRenderBusy(false);
       }
     }).catch((error: unknown) => {
-      if (error instanceof FlowCancelledError) return;
+      if (error instanceof FlowCancelledError) {
+        if (sequence === renderSequence.current) setRenderBusy(false);
+        return;
+      }
       if (sequence === renderSequence.current && (!(error instanceof DOMException) || error.name !== 'AbortError')) {
         const message = error instanceof Error ? error.message : 'Unknown rendering error.';
         setRenderProgress(`Preview unavailable; showing original. ${message}`);
+        setRenderBusy(false);
       }
     });
     return () => controller.abort();
-  }, [application, project, projectId, revision]);
+  }, [application, previewRevision, project, projectId]);
 
   useEffect(() => () => previewRenderDebouncer.current?.cancel(), []);
 
@@ -351,21 +364,25 @@ export function EditorPage(): ReactElement {
     if (project === null
       || beforeSource !== null
       || project.getSource().getSupportedMimeType() !== 'image/x-sony-arw'
-      || project.getRecipe().isNeutral()) return;
+      || project.getRecipe().isVisuallyNeutral()) return;
     const controller = new AbortController();
+    setBaselineError(null);
     void application.renderProjectBaseline.render(
       project,
       new RenderProjectBaselineMessage(projectId, 2560),
       { signal: controller.signal }
     ).then((result) => {
-      if (result instanceof Blob) setBeforeSource(result);
+      if (result instanceof Blob) {
+        setBeforeSource(result);
+        setBaselineError(null);
+      }
     }).catch((error: unknown) => {
       if (!(error instanceof DOMException) || error.name !== 'AbortError') {
-        setRenderProgress(error instanceof Error ? `Baseline unavailable. ${error.message}` : 'Baseline unavailable.');
+        setBaselineError(error instanceof Error ? error.message : 'The neutral RAW baseline could not be rendered.');
       }
     });
     return () => controller.abort();
-  }, [application, beforeSource, project, projectId]);
+  }, [application, beforeSource, previewRevision, project, projectId]);
 
   useEffect(() => {
     if (project === null || previewAnalysis === null) {
@@ -382,6 +399,12 @@ export function EditorPage(): ReactElement {
     if (project === null) return;
     application.applyEditOperation.apply(project, new ApplyEditOperationMessage(projectId, operation));
     setRevision((current) => current + 1);
+    if (operation.kind !== EDIT_OPERATION.RENAME_PROJECT
+      && operation.kind !== EDIT_OPERATION.SET_PROJECT_RATING
+      && operation.kind !== EDIT_OPERATION.SET_PROJECT_TAGS
+      && operation.kind !== EDIT_OPERATION.SET_PROJECT_FAVORITE) {
+      setPreviewRevision((current) => current + 1);
+    }
   }, [application, project, projectId]);
 
   const changeHistory = useCallback((direction: 'undo' | 'redo'): void => {
@@ -390,6 +413,7 @@ export function EditorPage(): ReactElement {
     if (direction === 'undo') application.changeHistory.undo(project, message);
     else application.changeHistory.redo(project, message);
     setRevision((current) => current + 1);
+    setPreviewRevision((current) => current + 1);
   }, [application, project, projectId]);
 
   const calculateFitDimensions = useCallback((dimensions: ImageDimensions | null = imageDimensions): void => {
@@ -1168,14 +1192,14 @@ export function EditorPage(): ReactElement {
   const aiDevelopmentHistory = [...project.getAiDevelopmentJournal().advice].reverse();
   const statusLabel = autosave.status === 'saved' ? 'Saved locally' : autosave.status === 'saving' ? 'Saving…' : 'Save failed';
   const transform = `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
-  const guideTransform = `translate(-50%, -50%) translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
   const sourcePrecisionLabel = previewAnalysis?.sourcePrecision === 'raw-linear-16-bit'
     ? '16-bit linear LibRaw source'
     : previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit'
       ? '8-bit embedded-preview fallback'
       : previewAnalysis === null ? 'Source precision pending' : '8-bit browser source';
-  const renderBusy = !renderProgress.startsWith('Preview up to date') && !renderProgress.startsWith('Preview unavailable');
   const rawSource = project.getSource().getSupportedMimeType() === 'image/x-sony-arw';
+  const comparisonHasDifference = !project.getRecipe().isVisuallyNeutral();
+  const comparisonReady = beforeSource !== null && comparisonHasDifference;
 
   return (
     <main className="editor-shell">
@@ -1230,7 +1254,7 @@ export function EditorPage(): ReactElement {
               <option value="none">No guide</option><option value="thirds">Thirds · image</option><option value="grid">Grid · workspace</option><option value="diagonals">Diagonals · workspace</option><option value="golden-ratio">Golden · image</option>
             </select>
             {project.hasMasks() && <button className={maskOverlayVisible ? 'active' : ''} aria-pressed={maskOverlayVisible} type="button" onClick={() => setMaskOverlayVisible((value) => !value)} title="Show or hide the editable mask overlay">Mask</button>}
-            <button className={showOriginal ? 'active' : ''} type="button" disabled={beforeSource === null} title={beforeSource === null ? 'Preparing the neutral developed RAW baseline' : 'Compare this recipe with its neutral developed baseline'} onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
+            <button className={showOriginal ? 'active' : ''} type="button" disabled={!comparisonReady} title={!comparisonHasDifference ? 'Before and After match because the recipe has no enabled edits.' : baselineError !== null ? `Before preview unavailable: ${baselineError}` : beforeSource === null ? 'Preparing the neutral developed RAW baseline' : 'Compare this recipe with its neutral developed baseline'} onClick={() => setShowOriginal((value) => !value)}>{comparisonHasDifference ? showOriginal ? 'Before' : 'After' : 'No edits'} · B</button>
           </div>
           {toolWorkspace === 'develop' && activePanel === 'crop' && <div className="contextual-canvas-tools crop-tools" role="toolbar" aria-label="Contextual crop tools">
             <span><strong>Crop</strong><small>Drag corner-to-corner on the photograph</small></span>
@@ -1253,13 +1277,13 @@ export function EditorPage(): ReactElement {
               <div ref={previewSurface} className="preview-surface" style={{ transform, width: fitDimensions?.width, height: fitDimensions?.height, maxWidth: fitDimensions === null ? undefined : 'none', maxHeight: fitDimensions === null ? undefined : 'none' }}>
                 <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => previewLoaded(event.currentTarget)} />
                 {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />}
+                {fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame">
+                  <ImageCompositionGuideOverlay guide={compositionGuide} />
+                  {toolWorkspace === 'develop' && activePanel === 'crop' && <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} />}
+                </div>}
               </div>
             )}
             <WorkspaceCompositionGuideOverlay guide={compositionGuide} />
-            {sourceUrl !== null && fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame" style={{ width: fitDimensions.width, height: fitDimensions.height, transform: guideTransform }}>
-              <ImageCompositionGuideOverlay guide={compositionGuide} />
-              {toolWorkspace === 'develop' && activePanel === 'crop' && <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} />}
-            </div>}
             {activePanel === 'masks' && <div className={`active-mask-canvas-status${selectedMask === null ? ' empty' : ''}`} role="status" aria-live="polite">
               <span className="mask-status-swatch" aria-hidden="true" />
               {selectedMask === null ? <span><strong>No active mask</strong><small>Select or create a mask before painting or placing points.</small></span> : <span><strong>Editing {maskShapeLabel(selectedMask.shape.kind)} {selectedMaskIndex + 1}</strong><small>{selectedMask.enabled ? 'Enabled' : 'Disabled'} · {selectedMask.shape.kind === 'brush' ? `${brushMode === 'add' ? 'Paint' : 'Erase'} mode` : selectedMask.shape.kind === 'ai-segmentation' ? `${aiPointPolarity === 'positive' ? 'Include' : 'Exclude'} point mode` : 'Use the highlighted controls in the Masks panel'}</small></span>}
@@ -1267,6 +1291,7 @@ export function EditorPage(): ReactElement {
             <div className={`truth-badge ${previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' ? 'source-fallback' : ''}`} title={previewAnalysis?.rawFallbackReason ?? undefined}><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{sourcePrecisionLabel} · {renderProgress}</small></span></div>
             {renderBusy && <div className="render-busy-indicator" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>Updating preview</strong><small>{renderProgress} · previous frame remains visible</small></span></div>}
             {previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' && <div className="raw-fallback-notice" role="status">Embedded RAW preview fallback · open Photo information for the decoder reason</div>}
+            {baselineError !== null && beforeSource === null && <div className="raw-fallback-notice" role="status">Before preview unavailable · {baselineError}</div>}
             {rawSource && preview === null && loadingSource !== null && <div className="comparison-badge">Camera JPEG preview · developing RAW</div>}
             {showOriginal && <div className="comparison-badge">{rawSource ? 'Neutral developed RAW' : 'Original'} · Before</div>}
             <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>

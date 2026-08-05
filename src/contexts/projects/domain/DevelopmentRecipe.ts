@@ -145,6 +145,15 @@ export class DevelopmentRecipe {
       && this.masks.length === 0;
   }
 
+  public isVisuallyNeutral(): boolean {
+    return AdjustmentKey.all().every((key) => (
+      this.globalAdjustments.get(key).isZero() || !this.isGlobalAdjustmentEnabled(key)
+    ))
+      && !this.curves.hasAdjustments()
+      && this.viewport.isReset()
+      && this.masks.length === 0;
+  }
+
   public getDevelopmentSettings(): DevelopmentSettingsPrimitives {
     return {
       globalAdjustments: this.globalAdjustments.toPrimitives(),
