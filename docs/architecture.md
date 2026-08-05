@@ -57,7 +57,7 @@ sequenceDiagram
 
 ## Preview flow
 
-`RenderProjectPreview` accepts a validated application message. `CachingPreviewRenderer` keys disposable results by source, recipe, preview size, and cache-format version. `WorkerPreviewRenderer` owns scheduling, cancellation, timeout, and source lookup. The worker decodes JPEG/PNG or an ARW embedded preview into an `OffscreenCanvas`. `WebGl2PixelDeveloper` runs compatible global development and curve LUTs in a fragment shader; recipes containing masks or spatial texture/sharpen/denoise stages use `CpuPixelDeveloper`. The backend is reported with the histogram so the UI never disguises a fallback. Viewport geometry, RGB/luminance histograms, clipping, and WebP encoding follow development. Final JPEG/PNG/TIFF export reuses the same worker pipeline. Future WebGPU and LibRaw adapters must preserve this port contract.
+`RenderProjectPreview` accepts a validated application message. `CachingPreviewRenderer` keys disposable results by source, recipe, preview size, and cache-format version. `WorkerPreviewRenderer` owns scheduling, cancellation, timeout, and source lookup. The worker decodes JPEG/PNG or an ARW embedded preview into an `OffscreenCanvas`. `WebGpuPixelDeveloper` runs compatible global development and curve LUTs in a compute shader; `WebGl2PixelDeveloper` provides the graphics fallback. Recipes containing masks or spatial texture/sharpen/denoise stages use `CpuPixelDeveloper`. The backend is reported with the histogram so the UI never disguises a fallback. Viewport geometry, RGB/luminance histograms, clipping, and WebP encoding follow development. Final JPEG/PNG/TIFF export reuses the same worker pipeline. Future full GPU-stage and LibRaw adapters must preserve this port contract.
 
 ## Persistence recovery
 

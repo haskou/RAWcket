@@ -18,14 +18,14 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Versioned LRU previews, quota preflight, SHA-256 snapshots, and corruption recovery.
 - [x] Safe, postponable PWA updates and a production CSP without `unsafe-eval`.
 - [ ] Full LibRaw/WASM A6600 demosaicing and high-depth linear development.
-- [x] WebGL2 global-development/curve shader with explicit CPU fallback for masks and spatial stages.
-- [ ] WebGPU pipeline, complete WebGL2 stage coverage, and the remaining capabilities below.
+- [x] WebGPU-first global-development/curve compute pipeline, WebGL2 fallback, and explicit CPU fallback for masks and spatial stages.
+- [ ] Complete GPU mask/spatial-stage coverage and the remaining capabilities below.
 
 ## Recommended implementation order
 
 1. Prototype LibRaw/WASM in a worker with a redistributable Sony A6600 ARW fixture.
 2. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
-3. Add WebGPU and WebGL2 renderers behind the existing preview boundary.
+3. Extend the WebGPU and WebGL2 renderers behind the existing preview boundary to cover masks and spatial stages.
 4. Add consented ONNX model management and semantic segmentation after manual/local deterministic masks.
 5. Add optional cloud assistance only after privacy, cost, and structured-output contracts are complete.
 
@@ -49,9 +49,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Scope.** Use WebGPU first, WebGL2 as the graphics fallback, and CPU/WASM where appropriate. Produce 512 px thumbnails, 2048–3072 px interactive previews, and full resolution only for final export. Add 1024/4096-entry curve LUTs, initial sRGB color management, future Display P3 support, clipping warnings, RGB/luminance histograms, optional scopes, before/after comparison, intelligent caches, and incremental rendering.
 
-**Implemented.** The worker now selects a real WebGL2 shader for compatible global adjustments, RGB/R/G/B/luminance LUTs, and vignette. Recipes with masks, texture, sharpening, or noise reduction deliberately fall back to the reference CPU pipeline and the active backend is visible in the canvas. The same boundary already provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
+**Implemented.** The worker now selects a WebGPU compute shader first for compatible global adjustments, RGB/R/G/B/luminance LUTs, and vignette, then a real WebGL2 fragment shader when WebGPU is unavailable. Recipes with masks, texture, sharpening, or noise reduction deliberately fall back to the reference CPU pipeline and the active backend is visible in the canvas. The same boundary already provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
 
-**Remaining.** WebGPU-first compute/render stages, WebGL2 mask and spatial-filter passes, formal CPU/GPU golden-image tolerances, device-loss recovery, Display P3/ICC work, optional scopes, and incremental tiled rendering.
+**Remaining.** WebGPU/WebGL2 mask and spatial-filter passes, formal CPU/GPU golden-image tolerances, device-loss recovery, Display P3/ICC work, optional scopes, and incremental tiled rendering.
 
 **Dependencies.** Linear RAW engine; capability detection; preview boundary and worker protocol; color fixtures; documented operation order; versioned caches.
 

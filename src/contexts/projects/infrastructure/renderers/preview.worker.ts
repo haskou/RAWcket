@@ -5,6 +5,7 @@ import { ArwEmbeddedPreviewExtractor } from '../codecs/ArwEmbeddedPreviewExtract
 import { PixelHistogramAnalyzer } from './PixelHistogramAnalyzer';
 import { TiffEncoder } from './TiffEncoder';
 import { WebGl2PixelDeveloper } from './WebGl2PixelDeveloper';
+import { WebGpuPixelDeveloper } from './WebGpuPixelDeveloper';
 import {
   previewWorkerRequestSchema,
   type PreviewWorkerResponse
@@ -17,6 +18,7 @@ const arw = new ArwEmbeddedPreviewExtractor();
 const histogram = new PixelHistogramAnalyzer();
 const tiff = new TiffEncoder();
 const webGl2Developer = new WebGl2PixelDeveloper();
+const webGpuDeveloper = new WebGpuPixelDeveloper();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -42,9 +44,10 @@ async function render(input: unknown): Promise<void> {
     context.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
     const imageData = context.getImageData(0, 0, width, height);
-    const acceleratedPixels = webGl2Developer.develop(imageData.data, width, height, request.development);
-    const pixels = acceleratedPixels ?? developer.develop(imageData.data, width, height, request.development);
-    const backend = acceleratedPixels === null ? 'cpu' : 'webgl2';
+    const webGpuPixels = await webGpuDeveloper.develop(imageData.data, width, height, request.development);
+    const webGl2Pixels = webGpuPixels === null ? webGl2Developer.develop(imageData.data, width, height, request.development) : null;
+    const pixels = webGpuPixels ?? webGl2Pixels ?? developer.develop(imageData.data, width, height, request.development);
+    const backend = webGpuPixels !== null ? 'webgpu' : webGl2Pixels !== null ? 'webgl2' : 'cpu';
     const transformed = viewportTransformer.transform(pixels, width, height, request.development.viewport);
     const outputCanvas = new OffscreenCanvas(transformed.width, transformed.height);
     const outputContext = outputCanvas.getContext('2d', { alpha: false });

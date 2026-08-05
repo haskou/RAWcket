@@ -14,7 +14,7 @@ Implemented:
 - Local library with JPEG/PNG/Sony ARW import, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, quota preflight, and portable project bundles.
 - Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
 - Navigable Active Recipe sidebar with a reversible enable switch for every global parameter.
-- Adaptive renderer in a cancellable Web Worker: a real WebGL2 shader accelerates compatible global development and curve LUTs, while the reference CPU backend handles masks and spatial stages. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, and a versioned LRU preview cache share the same boundary.
+- Adaptive renderer in a cancellable Web Worker: WebGPU compute runs compatible global development and curve LUTs first, a real WebGL2 shader provides the graphics fallback, and the reference CPU backend handles masks and spatial stages. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, and a versioned LRU preview cache share the same boundary.
 - Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
@@ -31,7 +31,7 @@ Implemented:
 Not implemented yet:
 
 - Full LibRaw/WASM demosaicing and a high-depth linear RAW pipeline. Sony ARW currently uses its embedded JPEG preview while preserving the original `.arw` in storage and bundles.
-- WebGPU rendering, WebGL2 ports for masks/spatial filters, and a complete GPU/CPU golden-image parity corpus.
+- WebGPU/WebGL2 passes for masks and spatial filters, device-loss recovery, and a complete GPU/CPU golden-image parity corpus.
 - Downloadable ONNX segmentation models, semantic categories, and a consented optional cloud provider.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
 - 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.

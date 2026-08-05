@@ -5,7 +5,7 @@ export type PixelHistogram = {
   luminance: number[];
   shadowClipping: number;
   highlightClipping: number;
-  backend: 'webgl2' | 'cpu';
+  backend: 'webgpu' | 'webgl2' | 'cpu';
 };
 
 export class PixelHistogramAnalyzer {

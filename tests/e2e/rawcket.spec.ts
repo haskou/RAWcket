@@ -23,7 +23,11 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
 
   await expect(page.getByLabel('Project name')).toHaveValue('night');
   await expect(page.getByLabel('Rendered frame histogram')).toBeVisible();
-  await expect(page.getByText('WebGL2 accelerated preview')).toBeVisible();
+  const webGpuAvailable = await page.evaluate(async () => {
+    if (!Reflect.has(navigator, 'gpu')) return false;
+    return (await navigator.gpu.requestAdapter()) !== null;
+  });
+  await expect(page.getByText(webGpuAvailable ? 'WebGPU accelerated preview' : 'WebGL2 accelerated preview')).toBeVisible();
   const acceleratedPixel = await page.getByRole('img', { name: 'Preview of night' }).evaluate(async (element) => {
     if (!(element instanceof HTMLImageElement)) throw new Error('The accelerated preview is not an image.');
     await element.decode();

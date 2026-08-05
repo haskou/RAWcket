@@ -9,7 +9,7 @@ LibRaw/WASM, WebGPU, WebGL2, and CPU rendering have different lifecycles, capabi
 
 ## Decision
 
-`PreviewRenderer` is the application port for previews. A bounded, versioned LRU decorator reuses immutable preview/analysis results. `WorkerPreviewRenderer` coordinates resolution, progress, cancellation, timeout, and concurrency using `@haskou/flow`. A WebGL2 fragment shader applies compatible global adjustments and curve LUTs. The reference CPU pipeline remains authoritative and handles masks and spatial filters until equivalent GPU stages pass parity checks. Both feed the same geometry, analysis, and JPEG/PNG/TIFF export stages. WebGPU and full LibRaw pipelines will be added as replaceable adapters.
+`PreviewRenderer` is the application port for previews. A bounded, versioned LRU decorator reuses immutable preview/analysis results. `WorkerPreviewRenderer` coordinates resolution, progress, cancellation, timeout, and concurrency using `@haskou/flow`. A WebGPU compute shader applies compatible global adjustments and curve LUTs first, with a WebGL2 fragment shader as the graphics fallback. The reference CPU pipeline remains authoritative and handles masks and spatial filters until equivalent GPU stages pass parity checks. All backends feed the same geometry, analysis, and JPEG/PNG/TIFF export stages. Full GPU-stage and LibRaw pipelines remain replaceable adapters.
 
 ## Consequences
 
