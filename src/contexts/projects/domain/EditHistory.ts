@@ -18,7 +18,7 @@ export class EditHistory {
     private redoEntries: EditHistoryEntryPrimitives[] = []
   ) {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
-      throw new Error('El limite de historial debe estar entre 1 y 1000.');
+      throw new Error('The history limit must be between 1 and 1000.');
     }
   }
 

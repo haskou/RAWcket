@@ -21,10 +21,10 @@ export class ViewportTransform {
     private readonly aspectRatio: AspectRatio | null
   ) {
     if (!Number.isFinite(scale) || scale < 0.1 || scale > 32) {
-      throw new Error('El zoom debe estar entre 0.1 y 32.');
+      throw new Error('Zoom must be between 0.1 and 32.');
     }
     if (!Number.isFinite(rotationDegrees) || rotationDegrees < -180 || rotationDegrees > 180) {
-      throw new Error('La rotacion debe estar entre -180 y 180 grados.');
+      throw new Error('Rotation must be between -180 and 180 degrees.');
     }
   }
 

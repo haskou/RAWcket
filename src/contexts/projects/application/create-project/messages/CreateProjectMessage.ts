@@ -22,7 +22,7 @@ export class CreateProjectMessage {
     this.projectName = new ProjectName(name);
     this.createdAt = Timestamp.new(now);
     if (!supportedMimeTypes.has(file.type)) {
-      throw new Error('Solo se pueden importar imagenes JPEG o PNG en esta iteracion.');
+      throw new Error('Only JPEG and PNG images can currently be imported.');
     }
   }
 

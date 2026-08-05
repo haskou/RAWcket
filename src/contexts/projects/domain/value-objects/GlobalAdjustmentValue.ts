@@ -7,7 +7,7 @@ export class GlobalAdjustmentValue extends NumberValueObject {
     const minimum = key.isExposure() ? -5 : key.isUnsigned() ? 0 : -100;
     const maximum = key.isExposure() ? 5 : 100;
     if (this.isLessThan(minimum) || this.isGreaterThan(maximum)) {
-      throw new Error(`El ajuste debe estar entre ${minimum} y ${maximum}.`);
+      throw new Error(`The adjustment must be between ${minimum} and ${maximum}.`);
     }
   }
 

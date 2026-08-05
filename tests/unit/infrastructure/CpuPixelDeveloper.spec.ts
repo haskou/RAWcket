@@ -1,19 +1,53 @@
-import { CpuPixelDeveloper } from '@/contexts/projects/infrastructure/renderers/CpuPixelDeveloper';
+import { CurveSet } from '@/contexts/projects/domain/ToneCurve';
+import { GlobalAdjustments } from '@/contexts/projects/domain/GlobalAdjustments';
+import { CpuPixelDeveloper, type CpuDevelopmentSettings } from '@/contexts/projects/infrastructure/renderers/CpuPixelDeveloper';
+
+function settings(exposure = 0, contrast = 0): CpuDevelopmentSettings {
+  const adjustments = GlobalAdjustments.neutral().toPrimitives();
+  return {
+    adjustments: { ...adjustments, exposure, contrast },
+    curves: CurveSet.identity().toPrimitives(),
+    disabledAdjustments: []
+  };
+}
 
 describe('CpuPixelDeveloper', () => {
-  it('aplica exposicion real a RGB y conserva alpha', () => {
-    const developed = new CpuPixelDeveloper().develop(new Uint8ClampedArray([64, 32, 16, 120]), 1, 0);
+  it('applies real exposure to RGB and preserves alpha', () => {
+    const developed = new CpuPixelDeveloper().develop(
+      new Uint8ClampedArray([64, 32, 16, 120]),
+      1,
+      1,
+      settings(1)
+    );
     expect([...developed]).toEqual([128, 64, 32, 120]);
   });
 
-  it('aplica contraste alrededor del gris medio y limita canales', () => {
+  it('applies contrast around middle gray and clamps channels', () => {
     const developed = new CpuPixelDeveloper().develop(
       new Uint8ClampedArray([0, 128, 255, 255]),
-      0,
-      100
+      1,
+      1,
+      settings(0, 100)
     );
     expect(developed[0]).toBe(0);
     expect(developed[1]).toBeGreaterThanOrEqual(128);
     expect(developed[2]).toBe(255);
+  });
+
+  it('applies RGB tone curves through a LUT', () => {
+    const developed = new CpuPixelDeveloper().develop(
+      new Uint8ClampedArray([64, 64, 64, 255]),
+      1,
+      1,
+      {
+        adjustments: GlobalAdjustments.neutral().toPrimitives(),
+        curves: {
+          ...CurveSet.identity().toPrimitives(),
+          rgb: { points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.5 }, { x: 1, y: 1 }], interpolation: 'linear' }
+        },
+        disabledAdjustments: []
+      }
+    );
+    expect(developed[0]).toBeGreaterThan(100);
   });
 });

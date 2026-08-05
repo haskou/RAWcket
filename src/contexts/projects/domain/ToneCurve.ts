@@ -43,7 +43,7 @@ export class CurveCoordinate extends NumberValueObject {
   public constructor(value: number) {
     super(value);
     if (this.isLessThan(0) || this.isGreaterThan(1)) {
-      throw new Error('Los puntos de curva deben estar entre 0 y 1.');
+      throw new Error('Curve points must be between 0 and 1.');
     }
   }
 }
@@ -74,16 +74,16 @@ export class ToneCurve {
     private readonly interpolation: CurveInterpolation
   ) {
     if (points.length < 2 || points.length > ToneCurve.MAX_POINTS) {
-      throw new Error(`Una curva debe contener entre 2 y ${ToneCurve.MAX_POINTS} puntos.`);
+      throw new Error(`A curve must contain between 2 and ${ToneCurve.MAX_POINTS} points.`);
     }
     if (!points[0]?.getX().isZero() || !points.at(-1)?.getX().isEqual(new CurveCoordinate(1))) {
-      throw new Error('Una curva debe empezar en x=0 y terminar en x=1.');
+      throw new Error('A curve must start at x=0 and end at x=1.');
     }
     for (let index = 1; index < points.length; index += 1) {
       const previous = points[index - 1];
       const current = points[index];
       if (previous === undefined || !current?.getX().isGreaterThan(previous.getX())) {
-        throw new Error('Los puntos de curva deben tener coordenadas x crecientes y unicas.');
+        throw new Error('Curve points must have increasing, unique x coordinates.');
       }
     }
   }
@@ -142,7 +142,7 @@ export class CurveSet {
 
   public replace(channel: CurveChannel, curve: ToneCurve | null): CurveSet {
     if (curve === null && !channel.isLuminance()) {
-      throw new Error('Solo la curva de luminancia puede omitirse.');
+      throw new Error('Only the luminance curve may be omitted.');
     }
     return new CurveSet(
       channel.isRgb() && curve !== null ? curve : this.rgb,

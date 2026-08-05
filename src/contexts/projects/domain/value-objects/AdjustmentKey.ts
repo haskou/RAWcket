@@ -45,7 +45,7 @@ export class AdjustmentKey extends Enum<AdjustmentKeyPrimitive> {
 
   public static fromString(value: string): AdjustmentKey {
     const supported = adjustmentKeys.find((candidate) => candidate === value);
-    if (supported === undefined) throw new Error(`El ajuste ${value} no esta soportado.`);
+    if (supported === undefined) throw new Error(`The ${value} adjustment is not supported.`);
     return new AdjustmentKey(supported);
   }
 

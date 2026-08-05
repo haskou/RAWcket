@@ -10,7 +10,7 @@ export async function createDemoImageBlob(): Promise<Blob> {
   canvas.width = 1600;
   canvas.height = 1000;
   const context = canvas.getContext('2d');
-  if (context === null) throw new Error('El navegador no puede generar la imagen de demostracion.');
+  if (context === null) throw new Error('The browser cannot generate the demo image.');
   const sky = context.createLinearGradient(0, 0, 0, canvas.height);
   sky.addColorStop(0, '#153043');
   sky.addColorStop(0.56, '#d27854');
@@ -35,7 +35,7 @@ export async function createDemoImageBlob(): Promise<Blob> {
   context.fillStyle = 'rgba(238, 203, 142, 0.16)';
   context.fillRect(0, 850, 1600, 150);
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => blob === null ? reject(new Error('No se pudo crear la demo.')) : resolve(blob), 'image/jpeg', 0.9);
+    canvas.toBlob((blob) => blob === null ? reject(new Error('The demo image could not be created.')) : resolve(blob), 'image/jpeg', 0.9);
   });
 }
 

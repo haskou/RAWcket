@@ -4,7 +4,7 @@ export class NormalizedCoordinate extends NumberValueObject {
   public constructor(value: number | NumberValueObject) {
     super(value);
     if (this.isLessThan(0) || this.isGreaterThan(1)) {
-      throw new Error('Una coordenada normalizada debe estar entre 0 y 1.');
+      throw new Error('A normalized coordinate must be between 0 and 1.');
     }
   }
 }
@@ -31,10 +31,10 @@ export class NormalizedRectangle {
     private readonly height: NormalizedCoordinate
   ) {
     if (origin.getX().add(width).isGreaterThan(1) || origin.getY().add(height).isGreaterThan(1)) {
-      throw new Error('El rectangulo normalizado debe quedar dentro del lienzo.');
+      throw new Error('A normalized rectangle must remain inside the canvas.');
     }
     if (width.isZero() || height.isZero()) {
-      throw new Error('El rectangulo de recorte debe tener area.');
+      throw new Error('A crop rectangle must have a positive area.');
     }
   }
 
@@ -57,7 +57,7 @@ export class AspectRatio {
     private readonly height: number
   ) {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-      throw new Error('La proporcion debe contener dimensiones positivas.');
+      throw new Error('An aspect ratio must contain positive dimensions.');
     }
   }
 

@@ -6,7 +6,7 @@ import { ApplicationProvider } from '@/presentation/ApplicationContext';
 import { LibraryPage } from '@/presentation/pages/LibraryPage';
 
 describe('LibraryPage', () => {
-  it('muestra el empty state e importa una imagen local hacia el editor', async () => {
+  it('shows the empty state and imports a local image into the editor', async () => {
     Object.defineProperty(globalThis, 'createImageBitmap', {
       value: vi.fn(() => Promise.resolve({ width: 2, height: 1, close: vi.fn() })),
       configurable: true
@@ -18,15 +18,15 @@ describe('LibraryPage', () => {
         <MemoryRouter initialEntries={['/']}>
           <Routes>
             <Route path="/" element={<LibraryPage />} />
-            <Route path="/editor/:projectId" element={<p>Editor abierto</p>} />
+            <Route path="/editor/:projectId" element={<p>Editor open</p>} />
           </Routes>
         </MemoryRouter>
       </ApplicationProvider>
     );
 
-    expect(await screen.findByText('Empieza por una imagen')).toBeInTheDocument();
-    const input = screen.getByLabelText('Seleccionar imagen JPEG o PNG');
-    await user.upload(input, new File(['png'], 'prueba.png', { type: 'image/png' }));
-    expect(await screen.findByText('Editor abierto')).toBeInTheDocument();
+    expect(await screen.findByText('Start with a photograph')).toBeInTheDocument();
+    const input = screen.getByLabelText('Select a JPEG or PNG image');
+    await user.upload(input, new File(['png'], 'test.png', { type: 'image/png' }));
+    expect(await screen.findByText('Editor open')).toBeInTheDocument();
   });
 });

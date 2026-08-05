@@ -6,7 +6,7 @@ import { GlobalAdjustmentValue } from '@/contexts/projects/domain/value-objects/
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
 
 describe('PhotoProject edit history', () => {
-  it('agrupa cambios continuos en una accion de undo y conserva redo al restaurar', () => {
+  it('groups continuous edits into one undo action and keeps redo after hydration', () => {
     const project = PhotoProjectMother.create();
     project.apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'exposure', value: 1, groupId: 'drag-1' }, Timestamp.now());
     project.apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'exposure', value: 2, groupId: 'drag-1' }, Timestamp.now());
@@ -20,6 +20,23 @@ describe('PhotoProject edit history', () => {
     expect(restored.redo(Timestamp.now())).toBe(true);
     expect(restored.getGlobalAdjustment(AdjustmentKey.EXPOSURE).isEqual(
       GlobalAdjustmentValue.for(AdjustmentKey.EXPOSURE, 2)
+    )).toBe(true);
+  });
+
+  it('disables an adjustment without losing its value and restores enabled state through undo', () => {
+    const project = PhotoProjectMother.create();
+    project.apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'exposure', value: 1.25, groupId: null }, Timestamp.now());
+    project.apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED, key: 'exposure', enabled: false, groupId: null }, Timestamp.now());
+
+    expect(project.isGlobalAdjustmentEnabled(AdjustmentKey.EXPOSURE)).toBe(false);
+    expect(project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).isEqual(
+      GlobalAdjustmentValue.for(AdjustmentKey.EXPOSURE, 1.25)
+    )).toBe(true);
+
+    expect(project.undo(Timestamp.now())).toBe(true);
+    expect(project.isGlobalAdjustmentEnabled(AdjustmentKey.EXPOSURE)).toBe(true);
+    expect(project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).isEqual(
+      GlobalAdjustmentValue.for(AdjustmentKey.EXPOSURE, 1.25)
     )).toBe(true);
   });
 });

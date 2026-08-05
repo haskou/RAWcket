@@ -16,6 +16,6 @@ export class ChangeHistory {
   }
 
   private ensureProject(project: PhotoProject, message: ChangeHistoryMessage): void {
-    if (!project.isIdentifiedBy(message.getProjectId())) throw new Error('El historial pertenece a otro proyecto.');
+    if (!project.isIdentifiedBy(message.getProjectId())) throw new Error('The history request belongs to a different project.');
   }
 }

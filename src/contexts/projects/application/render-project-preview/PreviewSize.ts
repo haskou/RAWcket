@@ -7,7 +7,7 @@ export class PreviewSize extends Integer {
   public constructor(value: number) {
     super(value);
     if (this.isLessThan(64) || this.isGreaterThan(4096)) {
-      throw new Error('El borde de preview debe estar entre 64 y 4096 pixeles.');
+      throw new Error('The preview edge must be between 64 and 4096 pixels.');
     }
   }
 }

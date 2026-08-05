@@ -5,6 +5,7 @@ import type { ViewportTransformPrimitives } from './ViewportTransform';
 
 export const EDIT_OPERATION = {
   SET_GLOBAL_ADJUSTMENT: 'set-global-adjustment',
+  SET_GLOBAL_ADJUSTMENT_ENABLED: 'set-global-adjustment-enabled',
   SET_CURVE: 'set-curve',
   ADD_MASK: 'add-mask',
   UPDATE_MASK: 'update-mask',
@@ -19,6 +20,11 @@ export type SetGlobalAdjustmentOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT;
   key: AdjustmentKeyPrimitive;
   value: number;
+};
+export type SetGlobalAdjustmentEnabledOperation = OperationMetadata & {
+  kind: typeof EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED;
+  key: AdjustmentKeyPrimitive;
+  enabled: boolean;
 };
 export type SetCurveOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.SET_CURVE;
@@ -48,6 +54,7 @@ export type RenameProjectOperation = OperationMetadata & {
 
 export type EditOperation =
   | SetGlobalAdjustmentOperation
+  | SetGlobalAdjustmentEnabledOperation
   | SetCurveOperation
   | AddMaskOperation
   | UpdateMaskOperation

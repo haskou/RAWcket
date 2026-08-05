@@ -6,7 +6,7 @@ import type {
 
 export class EditingAdvisorDisabledError extends Error {
   public constructor() {
-    super('La IA no esta configurada. RAWcket funciona completamente sin ella.');
+    super('AI is not configured. RAWcket remains fully usable without it.');
     this.name = 'EditingAdvisorDisabledError';
   }
 }

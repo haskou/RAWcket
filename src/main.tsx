@@ -9,7 +9,7 @@ import './presentation/styles.css';
 registerSW({ immediate: true });
 
 const root = document.getElementById('root');
-if (root === null) throw new Error('No se encontro el contenedor principal de RAWcket.');
+if (root === null) throw new Error('The RAWcket root container was not found.');
 
 createRoot(root).render(
   <StrictMode>

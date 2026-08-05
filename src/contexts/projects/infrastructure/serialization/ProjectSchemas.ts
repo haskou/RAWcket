@@ -77,6 +77,12 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
     groupId: z.string().nullable()
   }),
   z.object({
+    kind: z.literal('set-global-adjustment-enabled'),
+    key: adjustmentKeySchema,
+    enabled: z.boolean(),
+    groupId: z.string().nullable()
+  }),
+  z.object({
     kind: z.literal('set-curve'),
     channel: z.enum(['rgb', 'red', 'green', 'blue', 'luminance']),
     curve: toneCurveSchema.nullable(),
@@ -137,7 +143,8 @@ export const photoProjectSchema = z.object({
       flipVertical: z.boolean(),
       aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
     }),
-    masks: z.array(maskSchema)
+    masks: z.array(maskSchema),
+    disabledGlobalAdjustments: z.array(adjustmentKeySchema)
   }),
   history: z.object({
     limit: z.int().min(1).max(1000),

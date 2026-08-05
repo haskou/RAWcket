@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useState, type KeyboardEvent, type ReactElement } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+  type ReactNode,
+  type WheelEvent
+} from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
@@ -8,32 +18,69 @@ import { RenderProjectPreviewMessage } from '@/contexts/projects/application/ren
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
-import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
+import type { ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
+import type { AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { useApplication } from '../ApplicationContext';
+import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
+import { AdjustmentControls } from '../components/AdjustmentControls';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
+import {
+  adjustmentDefinitions,
+  type AdjustmentSection
+} from '../editor/adjustmentDefinitions';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useProjectAutosave } from '../hooks/useProjectAutosave';
 import { downloadBlob } from '../lib/browserImages';
 
-const adjustmentLabels: Array<{ key: AdjustmentKeyPrimitive; label: string; step: number }> = [
-  { key: 'exposure', label: 'Exposicion', step: 0.25 },
-  { key: 'contrast', label: 'Contraste', step: 5 },
-  { key: 'highlights', label: 'Luces', step: 5 },
-  { key: 'shadows', label: 'Sombras', step: 5 }
-];
+type EditorPanel = AdjustmentSection | 'curves' | 'crop' | 'masks' | 'ai';
+type Pan = { x: number; y: number };
+type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
+
+const minimumZoom = 0.1;
+const maximumZoom = 8;
+const curvePresets: Record<'Identity' | 'S curve' | 'Fade', ToneCurvePrimitives> = {
+  Identity: {
+    points: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+    interpolation: 'monotonic-cubic'
+  },
+  'S curve': {
+    points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.18 }, { x: 0.75, y: 0.82 }, { x: 1, y: 1 }],
+    interpolation: 'monotonic-cubic'
+  },
+  Fade: {
+    points: [{ x: 0, y: 0.08 }, { x: 0.4, y: 0.43 }, { x: 1, y: 0.95 }],
+    interpolation: 'monotonic-cubic'
+  }
+};
+
+function clampZoom(value: number): number {
+  return Math.min(maximumZoom, Math.max(minimumZoom, value));
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || (target instanceof HTMLElement && target.isContentEditable);
+}
 
 export function EditorPage(): ReactElement {
   const { projectId = '' } = useParams();
   const application = useApplication();
   const navigate = useNavigate();
+  const panGesture = useRef<PanGesture | null>(null);
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [source, setSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
-  const [renderProgress, setRenderProgress] = useState<string>('Preparando preview');
+  const [renderProgress, setRenderProgress] = useState('Preparing preview');
   const [revision, setRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [activePanel, setActivePanel] = useState('light');
+  const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
+  const [panning, setPanning] = useState(false);
+  const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('Give this photograph a refined cinematic look while preserving natural skin tones.');
+  const [aiMessage, setAiMessage] = useState('AI is private and opt-in. Connect a provider to generate editable proposals.');
   const [loadError, setLoadError] = useState<string | null>(null);
   const sourceUrl = useObjectUrl(preview ?? source);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
@@ -44,13 +91,13 @@ export function EditorPage(): ReactElement {
       try {
         const loaded = await application.findProject.find(new FindProjectMessage(projectId));
         if (loaded === null) {
-          setLoadError('Este proyecto no existe o fue eliminado.');
+          setLoadError('This project does not exist or has been deleted.');
           return;
         }
         setProject(loaded);
         setSource(await application.sourceFiles.find(loaded.getId()));
       } catch (error: unknown) {
-        setLoadError(error instanceof Error ? error.message : 'No se pudo abrir el proyecto.');
+        setLoadError(error instanceof Error ? error.message : 'The project could not be opened.');
       }
     };
     void load();
@@ -59,7 +106,7 @@ export function EditorPage(): ReactElement {
   useEffect(() => {
     if (project === null) return;
     const controller = new AbortController();
-    setRenderProgress('Renderizando');
+    setRenderProgress('Rendering');
     void application.renderProjectPreview.render(
       project,
       new RenderProjectPreviewMessage(projectId, 2560),
@@ -70,44 +117,72 @@ export function EditorPage(): ReactElement {
     ).then((result) => {
       if (result instanceof Blob) {
         setPreview(result);
-        setRenderProgress('Preview actualizada');
+        setRenderProgress('Preview up to date');
       }
     }).catch((error: unknown) => {
       if (!(error instanceof DOMException) || error.name !== 'AbortError') {
-        setRenderProgress('Preview no disponible; mostrando original');
+        setRenderProgress('Preview unavailable; showing original');
       }
     });
     return () => controller.abort();
   }, [application, project, projectId, revision]);
 
-  const apply = (operation: EditOperation): void => {
+  const apply = useCallback((operation: EditOperation): void => {
     if (project === null) return;
     application.applyEditOperation.apply(project, new ApplyEditOperationMessage(projectId, operation));
     setRevision((current) => current + 1);
-  };
+  }, [application, project, projectId]);
 
-  const adjust = (key: AdjustmentKeyPrimitive, delta: number): void => {
-    if (project === null) return;
-    const adjustmentKey = AdjustmentKey.fromPrimitives(key);
-    const current = project.getGlobalAdjustment(adjustmentKey).valueOf();
-    apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key, value: current + delta, groupId: null });
-  };
-
-  const resetAdjustment = (key: AdjustmentKeyPrimitive): void => {
-    apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key, value: 0, groupId: null });
-  };
-
-  const changeMode = (mode: InterfaceModePrimitive): void => {
-    if (project === null) return;
-    application.chooseInterfaceMode.choose(project, new ChooseInterfaceModeMessage(mode));
-    setRevision((current) => current + 1);
-  };
-
-  const changeHistory = (direction: 'undo' | 'redo'): void => {
+  const changeHistory = useCallback((direction: 'undo' | 'redo'): void => {
     if (project === null) return;
     const message = new ChangeHistoryMessage(projectId);
     if (direction === 'undo') application.changeHistory.undo(project, message);
     else application.changeHistory.redo(project, message);
+    setRevision((current) => current + 1);
+  }, [application, project, projectId]);
+
+  const fitPreview = useCallback((): void => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  useEffect(() => {
+    const handleShortcut = (event: globalThis.KeyboardEvent): void => {
+      if (isTextEntryTarget(event.target) || settingsOpen) return;
+      const modifier = event.metaKey || event.ctrlKey;
+      if (modifier && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        changeHistory(event.shiftKey ? 'redo' : 'undo');
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        changeHistory('redo');
+        return;
+      }
+      if (event.key === '+' || event.key === '=') setZoom((value) => clampZoom(value + 0.1));
+      else if (event.key === '-' || event.key === '_') setZoom((value) => clampZoom(value - 0.1));
+      else if (event.key === '0') fitPreview();
+      else if (event.key === 'ArrowLeft') setPan((value) => ({ ...value, x: value.x - 24 }));
+      else if (event.key === 'ArrowRight') setPan((value) => ({ ...value, x: value.x + 24 }));
+      else if (event.key === 'ArrowUp') setPan((value) => ({ ...value, y: value.y - 24 }));
+      else if (event.key === 'ArrowDown') setPan((value) => ({ ...value, y: value.y + 24 }));
+      else if (event.key === '1') setActivePanel('light');
+      else if (event.key === '2') setActivePanel('color');
+      else if (event.key === '3') setActivePanel('detail');
+      else if (event.key === '4') setActivePanel('curves');
+      else if (event.key.toLowerCase() === 'a') setActivePanel('ai');
+      else if (event.key === '?') setShortcutsOpen((value) => !value);
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [changeHistory, fitPreview, settingsOpen]);
+
+  const changeMode = (mode: InterfaceModePrimitive): void => {
+    if (project === null) return;
+    application.chooseInterfaceMode.choose(project, new ChooseInterfaceModeMessage(mode));
     setRevision((current) => current + 1);
   };
 
@@ -132,107 +207,196 @@ export function EditorPage(): ReactElement {
     if (event.key === 'Enter') event.currentTarget.blur();
   };
 
-  if (loadError !== null) return <main className="centered-state"><h1>No se pudo abrir</h1><p>{loadError}</p><button className="button primary" onClick={() => void navigate('/')}>Volver a biblioteca</button></main>;
-  if (project === null) return <main className="centered-state"><div className="loader" /><p>Abriendo proyecto local…</p></main>;
+  const changeAdjustment = (key: AdjustmentKeyPrimitive, value: number, groupId: string | null): void => {
+    if (!Number.isFinite(value)) return;
+    apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key, value, groupId });
+  };
+
+  const toggleAdjustment = (key: AdjustmentKeyPrimitive, enabled: boolean): void => {
+    apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED, key, enabled, groupId: null });
+  };
+
+  const showAdjustment = (section: AdjustmentSection): void => {
+    setActivePanel(section);
+    window.requestAnimationFrame(() => document.getElementById(`tool-${section}`)?.scrollIntoView({ block: 'start' }));
+  };
+
+  const chooseCurvePreset = (name: keyof typeof curvePresets): void => {
+    apply({
+      kind: EDIT_OPERATION.SET_CURVE,
+      channel: 'rgb',
+      curve: curvePresets[name],
+      groupId: null
+    });
+  };
+
+  const startPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panGesture.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, ...pan };
+    setPanning(true);
+  };
+
+  const movePan = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const gesture = panGesture.current;
+    if (gesture?.pointerId !== event.pointerId) return;
+    setPan({
+      x: gesture.x + event.clientX - gesture.startX,
+      y: gesture.y + event.clientY - gesture.startY
+    });
+  };
+
+  const endPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (panGesture.current?.pointerId !== event.pointerId) return;
+    panGesture.current = null;
+    setPanning(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const changeZoom = (value: number): void => {
+    if (Number.isFinite(value)) setZoom(clampZoom(value));
+  };
+
+  const zoomWithWheel = (event: WheelEvent<HTMLDivElement>): void => {
+    event.preventDefault();
+    changeZoom(zoom * (event.deltaY < 0 ? 1.1 : 0.9));
+  };
+
+  if (loadError !== null) {
+    return <main className="centered-state"><h1>Unable to open</h1><p>{loadError}</p><button className="button primary" onClick={() => void navigate('/')}>Back to library</button></main>;
+  }
+  if (project === null) return <main className="centered-state"><div className="loader" /><p>Opening local project…</p></main>;
 
   const mode = project.getInterfaceMode().valueOf();
-  const statusLabel = autosave.status === 'saved' ? 'Guardado localmente' : autosave.status === 'saving' ? 'Guardando…' : 'Error al guardar';
+  const statusLabel = autosave.status === 'saved' ? 'Saved locally' : autosave.status === 'saving' ? 'Saving…' : 'Save failed';
+  const transform = `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
 
   return (
     <main className="editor-shell">
       <header className="editor-header">
-        <button className="icon-button back-button" type="button" onClick={() => void close()} aria-label="Cerrar proyecto y volver">←</button>
+        <button className="icon-button back-button" type="button" onClick={() => void close()} aria-label="Close project and return">←</button>
         <a className="brand compact" href="/" onClick={(event) => { event.preventDefault(); void close(); }}><span className="brand-mark">R</span><span>RAWcket</span></a>
         <div className="project-title-block">
-          <input className="project-title-input" aria-label="Nombre del proyecto" defaultValue={project.getName().valueOf()} onBlur={(event) => rename(event.target.value)} onKeyDown={handleNameKey} />
+          <input className="project-title-input" aria-label="Project name" defaultValue={project.getName().valueOf()} onBlur={(event) => rename(event.target.value)} onKeyDown={handleNameKey} />
           <span className={`save-status ${autosave.status}`} aria-live="polite"><span aria-hidden="true">●</span> {statusLabel}</span>
         </div>
         <div className="history-actions">
-          <button className="icon-button" type="button" disabled={!project.canUndo()} onClick={() => changeHistory('undo')} aria-label="Deshacer">↶</button>
-          <button className="icon-button" type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')} aria-label="Rehacer">↷</button>
+          <button className="icon-button" type="button" disabled={!project.canUndo()} onClick={() => changeHistory('undo')} aria-label="Undo">↶</button>
+          <button className="icon-button" type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')} aria-label="Redo">↷</button>
+          <button className="icon-button shortcut-button" type="button" onClick={() => setShortcutsOpen(true)} aria-label="Keyboard shortcuts">⌨</button>
         </div>
-        <button className="button ghost" type="button" disabled title="El motor de revelado aun no esta implementado">Antes / despues · pendiente</button>
-        <button className="button primary" type="button" onClick={() => void exportBundle()}>Exportar proyecto</button>
+        <button className="button ai-header-button" type="button" onClick={() => setActivePanel('ai')}><span aria-hidden="true">✦</span> AI Edit</button>
+        <button className="button primary" type="button" onClick={() => void exportBundle()}>Export project</button>
       </header>
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
       <section className="editor-workspace">
+        <ActiveRecipePanel project={project} onNavigate={showAdjustment} onToggle={toggleAdjustment} />
         <div className="canvas-area">
-          <div className="canvas-toolbar" aria-label="Controles de vista">
-            <button type="button" onClick={() => setZoom((value) => Math.max(0.25, value - 0.25))} aria-label="Alejar vista">−</button>
-            <span>{Math.round(zoom * 100)}%</span>
-            <button type="button" onClick={() => setZoom((value) => Math.min(3, value + 0.25))} aria-label="Acercar vista">+</button>
-            <button type="button" onClick={() => setZoom(1)}>Ajustar</button>
+          <div className="canvas-toolbar" aria-label="Preview controls">
+            <button type="button" onClick={() => changeZoom(zoom - 0.1)} aria-label="Zoom out">−</button>
+            <input aria-label="Preview zoom" type="range" min={minimumZoom} max={maximumZoom} step="0.05" value={zoom} onChange={(event) => changeZoom(event.currentTarget.valueAsNumber)} />
+            <label><span className="visually-hidden">Zoom percentage</span><input type="number" min={10} max={800} step={1} value={Math.round(zoom * 100)} onChange={(event) => changeZoom(event.currentTarget.valueAsNumber / 100)} />%</label>
+            <button type="button" onClick={() => changeZoom(zoom + 0.1)} aria-label="Zoom in">+</button>
+            <button type="button" onClick={fitPreview}>Fit</button>
           </div>
-          <div className="photo-stage">
-            {sourceUrl !== null && <img className="source-preview" src={sourceUrl} alt={`Original de ${project.getName().valueOf()}`} style={{ transform: `scale(${zoom})` }} />}
-            <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>Preview CPU de referencia</strong><small>Exposicion y contraste reales · {renderProgress}</small></span></div>
-          </div>
-          <div className="recipe-strip">
-            <span>Receta activa</span>
-            <strong>Exposicion {project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).valueOf().toFixed(2)}</strong>
-            <strong>Contraste {project.getGlobalAdjustment(AdjustmentKey.CONTRAST).valueOf()}</strong>
+          <div
+            className={`photo-stage ${panning ? 'panning' : ''}`}
+            onPointerDown={startPan}
+            onPointerMove={movePan}
+            onPointerUp={endPan}
+            onPointerCancel={endPan}
+            onWheel={zoomWithWheel}
+            aria-label="Photo preview. Drag to pan and use the mouse wheel to zoom."
+          >
+            {sourceUrl !== null && <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} style={{ transform }} />}
+            <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>Reference CPU preview</strong><small>Full global recipe and curves · {renderProgress}</small></span></div>
+            <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
           </div>
         </div>
-        <aside className="tools-panel" aria-label="Herramientas de edicion">
-          <div className="mode-switch" aria-label="Nivel de interfaz">
+        <aside className="tools-panel" aria-label="Editing tools">
+          <section className="ai-hero">
+            <div><span className="ai-orb" aria-hidden="true">✦</span><span><strong>RAWcket AI</strong><small>Your editing copilot</small></span></div>
+            <p>Describe the result you want. AI proposals will always be explicit, reversible recipe changes.</p>
+            <button className="button ai-primary full" type="button" onClick={() => setActivePanel('ai')}>Create with AI</button>
+          </section>
+          <div className="mode-switch" aria-label="Interface level">
             <button className={mode === 'simple' ? 'active' : ''} type="button" onClick={() => changeMode('simple')}>Simple</button>
             <button className={mode === 'advanced' ? 'active' : ''} type="button" onClick={() => changeMode('advanced')}>Advanced</button>
           </div>
-          <p className="panel-intro">Los controles modifican y persisten la receta. No alteran los pixeles todavia.</p>
-          <ToolSection id="light" title="Luz" active={activePanel === 'light'} onToggle={setActivePanel}>
-            <div className="adjustment-list">
-              {adjustmentLabels.map(({ key, label, step }) => {
-                const value = project.getGlobalAdjustment(AdjustmentKey.fromPrimitives(key)).valueOf();
-                return (
-                  <div className="adjustment-row" key={key}>
-                    <div><span>{label}</span><output aria-label={`${label}: ${value}`}>{value > 0 ? '+' : ''}{value}</output></div>
-                    <div className="stepper">
-                      <button type="button" onClick={() => adjust(key, -step)} aria-label={`Reducir ${label}`}>−</button>
-                      <button type="button" onClick={() => resetAdjustment(key)} aria-label={`Restablecer ${label}`}>Reset</button>
-                      <button type="button" onClick={() => adjust(key, step)} aria-label={`Aumentar ${label}`}>+</button>
-                    </div>
-                  </div>
-                );
-              })}
+          <ToolSection id="ai" title="AI Studio" active={activePanel === 'ai'} onToggle={setActivePanel} badge="Core workflow">
+            <label className="field-label" htmlFor="ai-edit-prompt">What should RAWcket create?</label>
+            <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} />
+            <div className="ai-quick-prompts" aria-label="AI prompt ideas">
+              {['Natural portrait', 'Cinematic night', 'Recover highlights'].map((prompt) => <button key={prompt} type="button" onClick={() => setAiPrompt(prompt)}>{prompt}</button>)}
+            </div>
+            <button className="button ai-primary full" type="button" onClick={() => setAiMessage('Connect an AI provider first. RAWcket will never upload pixels without your explicit consent.')}>Generate editable proposal</button>
+            <p className="ai-status" aria-live="polite">{aiMessage}</p>
+            <button className="button ghost full" type="button" onClick={() => setSettingsOpen(true)}>AI privacy and provider settings</button>
+          </ToolSection>
+          <ToolSection id="light" title="Light" active={activePanel === 'light'} onToggle={setActivePanel} badge="Shortcut 1">
+            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} />
+          </ToolSection>
+          <ToolSection id="color" title="Color" active={activePanel === 'color'} onToggle={setActivePanel} badge="Shortcut 2">
+            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeAdjustment} />
+          </ToolSection>
+          <ToolSection id="detail" title="Detail" active={activePanel === 'detail'} onToggle={setActivePanel} badge="Shortcut 3">
+            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} />
+          </ToolSection>
+          <ToolSection id="curves" title="Tone Curve" active={activePanel === 'curves'} onToggle={setActivePanel} badge="Shortcut 4">
+            <p>Choose a real-time RGB curve preset. Every change is non-destructive and undoable.</p>
+            <div className="curve-presets">
+              {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
             </div>
           </ToolSection>
-          <ToolSection id="color" title="Color" active={activePanel === 'color'} onToggle={setActivePanel} badge="Modelo listo">
-            <p>Temperatura, tint, saturacion y vibrance ya tienen rangos validados. El procesamiento visual se implementara con el pipeline.</p>
-          </ToolSection>
-          <ToolSection id="curves" title="Curvas" active={activePanel === 'curves'} onToggle={setActivePanel} badge="Alta prioridad">
-            <p>RGB, R, G, B y luminancia estan modeladas con puntos normalizados e interpolacion validada. El editor grafico no esta disponible aun.</p>
-          </ToolSection>
-          {mode === 'advanced' && <ToolSection id="crop" title="Recorte y geometria" active={activePanel === 'crop'} onToggle={setActivePanel} badge="Pendiente">
-            <p>La transformacion no destructiva admite marco, traslacion, zoom, rotacion, flip y proporcion. Falta conectarla al lienzo.</p>
+          {mode === 'advanced' && <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel} badge="Coming next">
+            <p>The non-destructive model supports crop frame, translation, zoom, rotation, flip, and aspect ratio. Canvas editing is next.</p>
           </ToolSection>}
-          <ToolSection id="masks" title="Mascaras" active={activePanel === 'masks'} onToggle={setActivePanel} badge="Pendiente">
-            <p>El JSON admite pincel, gradientes, rangos, IA y composicion add/subtract/intersect. El render y la interaccion llegaran despues.</p>
-          </ToolSection>
-          <ToolSection id="ai" title="IA opcional" active={activePanel === 'ai'} onToggle={setActivePanel} badge="Desactivada">
-            <p>Ninguna imagen ni metadata sale del navegador. No hay proveedor conectado.</p>
-            <button className="button ghost full" type="button" onClick={() => setSettingsOpen(true)}>Configurar almacenamiento de key</button>
+          <ToolSection id="masks" title="Masks" active={activePanel === 'masks'} onToggle={setActivePanel} badge="AI ready">
+            <p>Brushes, gradients, range masks, AI segmentation, and add/subtract/intersect composition are represented in the recipe.</p>
           </ToolSection>
         </aside>
       </section>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {shortcutsOpen && <ShortcutsDialog onClose={() => setShortcutsOpen(false)} />}
     </main>
   );
 }
 
 function ToolSection({ id, title, active, onToggle, badge, children }: {
-  id: string;
+  id: EditorPanel;
   title: string;
   active: boolean;
-  onToggle: (id: string) => void;
+  onToggle: (id: EditorPanel) => void;
   badge?: string;
-  children: ReactElement | ReactElement[] | string;
+  children: ReactNode;
 }): ReactElement {
   return (
-    <section className={`tool-section ${active ? 'open' : ''}`}>
-      <button type="button" className="tool-heading" onClick={() => onToggle(active ? '' : id)} aria-expanded={active}>
+    <section id={`tool-${id}`} className={`tool-section ${active ? 'open' : ''}`}>
+      <button type="button" className="tool-heading" onClick={() => onToggle(id)} aria-expanded={active}>
         <span>{title}</span><span>{badge !== undefined && <small>{badge}</small>}<b aria-hidden="true">⌄</b></span>
       </button>
       {active && <div className="tool-content">{children}</div>}
     </section>
+  );
+}
+
+function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
+  const shortcuts = [
+    ['Undo / redo', '⌘/Ctrl Z · ⇧⌘/Ctrl Z'],
+    ['Zoom in / out', '+ · −'],
+    ['Fit preview', '0'],
+    ['Pan preview', 'Drag · Arrow keys'],
+    ['Light / Color / Detail', '1 · 2 · 3'],
+    ['Tone Curve', '4'],
+    ['AI Studio', 'A'],
+    ['Shortcut guide', '?']
+  ];
+  return (
+    <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="dialog shortcut-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="dialog-heading"><div><span className="eyebrow">Work faster</span><h2 id="shortcuts-title">Keyboard shortcuts</h2></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close shortcuts">×</button></div>
+        <dl>{shortcuts.map(([label, keys]) => <div key={label}><dt>{label}</dt><dd>{keys}</dd></div>)}</dl>
+      </section>
+    </div>
   );
 }

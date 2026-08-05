@@ -1,17 +1,18 @@
 import { deleteDB } from 'idb';
 import { ProjectMigrator } from '@/contexts/projects/infrastructure/migrations/ProjectMigrator';
 import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionZeroToOneProjectMigration';
+import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
 
 describe('IndexedDbProjectRepository', () => {
-  it('persiste, lista, hidrata y elimina agregados', async () => {
+  it('persists, lists, hydrates, and deletes aggregates', async () => {
     const databaseName = `rawcket-projects-${crypto.randomUUID()}`;
     const connection = RawcketDatabase.open(databaseName);
     const repository = new IndexedDbProjectRepository(
       connection,
-      new ProjectMigrator([new VersionZeroToOneProjectMigration()])
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration()])
     );
     const project = PhotoProjectMother.create();
 

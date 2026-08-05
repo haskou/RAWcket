@@ -4,7 +4,7 @@ import type { ApplyEditOperationMessage } from './messages/ApplyEditOperationMes
 
 export class ApplyEditOperation {
   public apply(project: PhotoProject, message: ApplyEditOperationMessage): PhotoProject {
-    if (!project.isIdentifiedBy(message.getProjectId())) throw new Error('La operacion pertenece a otro proyecto.');
+    if (!project.isIdentifiedBy(message.getProjectId())) throw new Error('The operation belongs to a different project.');
     project.apply(message.getOperation(), Timestamp.new(message.getOccurredAt()));
     return project;
   }

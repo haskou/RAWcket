@@ -15,7 +15,7 @@ export class RenderProjectPreview {
     control?: PreviewRenderControl
   ): Promise<ImageBitmap | Blob> {
     if (!project.isIdentifiedBy(message.getProjectId())) {
-      throw new Error('La solicitud de preview pertenece a otro proyecto.');
+      throw new Error('The preview request belongs to a different project.');
     }
     return this.renderer.render(
       new PreviewRenderRequest(message.getProjectId(), message.getSize(), project),

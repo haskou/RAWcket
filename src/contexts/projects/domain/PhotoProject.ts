@@ -141,6 +141,10 @@ export class PhotoProject {
     return this.recipe.getGlobalAdjustment(key);
   }
 
+  public isGlobalAdjustmentEnabled(key: AdjustmentKey): boolean {
+    return this.recipe.isGlobalAdjustmentEnabled(key);
+  }
+
   public getInterfaceMode(): InterfaceMode {
     return this.uiState.getMode();
   }
@@ -188,6 +192,12 @@ export class PhotoProject {
       const previous = this.recipe.getGlobalAdjustment(key);
       this.recipe.changeGlobalAdjustment(key, GlobalAdjustmentValue.for(key, operation.value));
       return { ...operation, value: previous.valueOf() };
+    }
+    if (operation.kind === EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED) {
+      const key = AdjustmentKey.fromPrimitives(operation.key);
+      const previous = this.recipe.isGlobalAdjustmentEnabled(key);
+      this.recipe.setGlobalAdjustmentEnabled(key, operation.enabled);
+      return { ...operation, enabled: previous };
     }
     if (operation.kind === EDIT_OPERATION.SET_CURVE) {
       const channel = CurveChannel.fromPrimitives(operation.channel);

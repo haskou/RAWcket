@@ -1,18 +1,19 @@
 import { RawcketProjectBundle } from '@/contexts/projects/infrastructure/bundles/RawcketProjectBundle';
 import { ProjectMigrator } from '@/contexts/projects/infrastructure/migrations/ProjectMigrator';
 import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionZeroToOneProjectMigration';
+import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
 import { InMemoryProjectRepository } from '@/contexts/projects/infrastructure/repositories/InMemoryProjectRepository';
 import { InMemorySourceFileRepository } from '@/contexts/projects/infrastructure/repositories/InMemorySourceFileRepository';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
 
 describe('RawcketProjectBundle', () => {
-  it('exporta e importa project.json, manifest e imagen con integridad SHA-256', async () => {
+  it('exports and imports project.json, manifest, and image with SHA-256 integrity', async () => {
     const projects = new InMemoryProjectRepository();
     const sources = new InMemorySourceFileRepository();
     const bundle = new RawcketProjectBundle(
       projects,
       sources,
-      new ProjectMigrator([new VersionZeroToOneProjectMigration()])
+      new ProjectMigrator([new VersionZeroToOneProjectMigration(), new VersionOneToTwoProjectMigration()])
     );
     const project = PhotoProjectMother.create();
     await projects.save(project);
@@ -26,10 +27,10 @@ describe('RawcketProjectBundle', () => {
     expect(await sources.find(importedId)).not.toBeNull();
   });
 
-  it('rechaza bytes que no forman un bundle', async () => {
+  it('rejects bytes that do not form a bundle', async () => {
     const projects = new InMemoryProjectRepository();
     const sources = new InMemorySourceFileRepository();
     const bundle = new RawcketProjectBundle(projects, sources, new ProjectMigrator([]));
-    await expect(bundle.importProject(new Blob(['no-es-zip']))).rejects.toThrow(/no es un bundle/);
+    await expect(bundle.importProject(new Blob(['not-a-zip']))).rejects.toThrow(/not a valid .rawcket bundle/);
   });
 });

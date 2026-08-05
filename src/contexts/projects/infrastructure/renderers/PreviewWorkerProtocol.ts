@@ -1,12 +1,16 @@
 import { z } from 'zod';
+import { photoProjectSchema } from '../serialization/ProjectSchemas';
+
+const recipeSchema = photoProjectSchema.shape.recipe;
 
 export const previewWorkerRequestSchema = z.object({
   id: z.uuid(),
   source: z.instanceof(Blob),
   maximumEdge: z.int().min(64).max(4096),
-  adjustments: z.object({
-    exposure: z.number().min(-5).max(5),
-    contrast: z.number().min(-100).max(100)
+  development: z.object({
+    adjustments: recipeSchema.shape.globalAdjustments,
+    curves: recipeSchema.shape.curves,
+    disabledAdjustments: recipeSchema.shape.disabledGlobalAdjustments
   })
 });
 

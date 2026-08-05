@@ -17,7 +17,7 @@ class RecordingPreviewRenderer implements PreviewRenderer {
 }
 
 describe('RenderProjectPreview', () => {
-  it('convierte primitivas del mensaje antes de invocar el renderer', async () => {
+  it('converts message primitives before invoking the renderer', async () => {
     const renderer = new RecordingPreviewRenderer();
     const useCase = new RenderProjectPreview(renderer);
     const project = PhotoProjectMother.create();
@@ -29,7 +29,7 @@ describe('RenderProjectPreview', () => {
     expect(renderer.requestedSize).toBe(2048);
   });
 
-  it('rechaza resoluciones fuera del contrato', () => {
-    expect(() => new RenderProjectPreviewMessage(crypto.randomUUID(), 8192)).toThrow(/entre 64 y 4096/);
+  it('rejects resolutions outside the contract', () => {
+    expect(() => new RenderProjectPreviewMessage(crypto.randomUUID(), 8192)).toThrow(/between 64 and 4096/);
   });
 });

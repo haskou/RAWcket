@@ -25,14 +25,15 @@ async function render(input: unknown): Promise<void> {
     const height = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = new OffscreenCanvas(width, height);
     const context = canvas.getContext('2d', { alpha: false });
-    if (context === null) throw new Error('No se pudo crear el contexto de preview.');
+    if (context === null) throw new Error('The preview context could not be created.');
     context.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
     const image = context.getImageData(0, 0, width, height);
     const pixels = developer.develop(
       image.data,
-      request.adjustments.exposure,
-      request.adjustments.contrast
+      width,
+      height,
+      request.development
     );
     context.putImageData(new ImageData(pixels, width, height), 0, 0);
     progress(request.id, 'developing', 0.8);
@@ -43,7 +44,7 @@ async function render(input: unknown): Promise<void> {
     post({
       kind: 'failed',
       id: request.id,
-      message: error instanceof Error ? error.message : 'No se pudo renderizar la preview.'
+      message: error instanceof Error ? error.message : 'The preview could not be rendered.'
     });
   }
 }

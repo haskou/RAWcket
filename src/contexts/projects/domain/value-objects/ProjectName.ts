@@ -7,7 +7,7 @@ export class ProjectName extends StringValueObject {
     const normalized = typeof value === 'string' ? value.trim() : value;
     super(normalized, ProjectName.MAX_LENGTH);
     if (this.isEmpty()) {
-      throw new Error('El nombre del proyecto no puede estar vacio.');
+      throw new Error('The project name cannot be empty.');
     }
   }
 

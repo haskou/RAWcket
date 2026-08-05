@@ -4,7 +4,7 @@ import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiK
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
 
 describe('BrowserApiKeyVault', () => {
-  it('cifra con contrasena, desbloquea y borra sin persistir la contrasena', async () => {
+  it('encrypts with a password, unlocks, and deletes without persisting the password', async () => {
     const databaseName = `rawcket-vault-${crypto.randomUUID()}`;
     const connection = RawcketDatabase.open(databaseName);
     const vault = new BrowserApiKeyVault(new RawcketSettingsRepository(connection));

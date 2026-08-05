@@ -10,7 +10,7 @@ export class PhotoProjectMother {
     const now = Timestamp.new(1_750_000_000_000);
     return PhotoProject.create(
       id,
-      new ProjectName('Proyecto de prueba'),
+      new ProjectName('Test project'),
       new SourceImageReference(
         new StringValueObject('source.jpg'),
         new StringValueObject('image/jpeg'),

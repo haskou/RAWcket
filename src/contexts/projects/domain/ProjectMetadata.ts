@@ -8,7 +8,7 @@ export class ProjectMetadata {
     private readonly height: number
   ) {
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) {
-      throw new Error('Las dimensiones de la imagen deben ser enteros positivos.');
+      throw new Error('Image dimensions must be positive integers.');
     }
   }
 

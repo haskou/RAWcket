@@ -3,7 +3,7 @@ import { CurveSet, type CurveSetPrimitives } from './ToneCurve';
 import { GlobalAdjustments, type GlobalAdjustmentsPrimitives } from './GlobalAdjustments';
 import { MaskDefinition, type MaskDefinitionPrimitives } from './MaskDefinition';
 import { ViewportTransform, type ViewportTransformPrimitives } from './ViewportTransform';
-import type { AdjustmentKey } from './value-objects/AdjustmentKey';
+import { AdjustmentKey, type AdjustmentKeyPrimitive } from './value-objects/AdjustmentKey';
 import type { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
 import type { MaskId } from './value-objects/MaskId';
 
@@ -12,6 +12,7 @@ export type DevelopmentRecipePrimitives = {
   curves: CurveSetPrimitives;
   viewport: ViewportTransformPrimitives;
   masks: MaskDefinitionPrimitives[];
+  disabledGlobalAdjustments: AdjustmentKeyPrimitive[];
 };
 
 export class DevelopmentRecipe {
@@ -19,11 +20,12 @@ export class DevelopmentRecipe {
     private globalAdjustments: GlobalAdjustments,
     private curves: CurveSet,
     private viewport: ViewportTransform,
-    private masks: MaskDefinition[]
+    private masks: MaskDefinition[],
+    private disabledGlobalAdjustments: AdjustmentKey[]
   ) {}
 
   public static neutral(): DevelopmentRecipe {
-    return new DevelopmentRecipe(GlobalAdjustments.neutral(), CurveSet.identity(), ViewportTransform.reset(), []);
+    return new DevelopmentRecipe(GlobalAdjustments.neutral(), CurveSet.identity(), ViewportTransform.reset(), [], []);
   }
 
   public static fromPrimitives(input: DevelopmentRecipePrimitives): DevelopmentRecipe {
@@ -31,12 +33,25 @@ export class DevelopmentRecipe {
       GlobalAdjustments.fromPrimitives(input.globalAdjustments),
       CurveSet.fromPrimitives(input.curves),
       ViewportTransform.fromPrimitives(input.viewport),
-      input.masks.map((mask) => MaskDefinition.fromPrimitives(mask))
+      input.masks.map((mask) => MaskDefinition.fromPrimitives(mask)),
+      input.disabledGlobalAdjustments.map((key) => AdjustmentKey.fromPrimitives(key))
     );
   }
 
   public changeGlobalAdjustment(key: AdjustmentKey, value: GlobalAdjustmentValue): void {
     this.globalAdjustments = this.globalAdjustments.change(key, value);
+  }
+
+  public setGlobalAdjustmentEnabled(key: AdjustmentKey, enabled: boolean): void {
+    if (enabled) {
+      this.disabledGlobalAdjustments = this.disabledGlobalAdjustments.filter((candidate) => candidate.isNotEqual(key));
+    } else if (!this.disabledGlobalAdjustments.some((candidate) => candidate.isEqual(key))) {
+      this.disabledGlobalAdjustments = [...this.disabledGlobalAdjustments, key];
+    }
+  }
+
+  public isGlobalAdjustmentEnabled(key: AdjustmentKey): boolean {
+    return !this.disabledGlobalAdjustments.some((candidate) => candidate.isEqual(key));
   }
 
   public replaceCurve(channel: CurveChannel, curve: ToneCurve | null): void {
@@ -49,7 +64,7 @@ export class DevelopmentRecipe {
 
   public addMask(mask: MaskDefinition): void {
     if (this.masks.some((existing) => existing.isIdentifiedBy(mask.getId()))) {
-      throw new Error('Ya existe una mascara con el mismo identificador.');
+      throw new Error('A mask with the same identifier already exists.');
     }
     this.masks = [...this.masks, mask];
   }
@@ -57,14 +72,14 @@ export class DevelopmentRecipe {
   public replaceMask(mask: MaskDefinition): void {
     const maskId = mask.getId();
     if (!this.masks.some((existing) => existing.isIdentifiedBy(maskId))) {
-      throw new Error('No se puede actualizar una mascara inexistente.');
+      throw new Error('A missing mask cannot be updated.');
     }
     this.masks = this.masks.map((existing) => (existing.isIdentifiedBy(maskId) ? mask : existing));
   }
 
   public removeMask(id: MaskId): MaskDefinition {
     const mask = this.masks.find((candidate) => candidate.isIdentifiedBy(id));
-    if (mask === undefined) throw new Error('No se puede eliminar una mascara inexistente.');
+    if (mask === undefined) throw new Error('A missing mask cannot be removed.');
     this.masks = this.masks.filter((candidate) => !candidate.isIdentifiedBy(id));
     return mask;
   }
@@ -83,7 +98,7 @@ export class DevelopmentRecipe {
 
   public findMask(id: MaskId): MaskDefinition {
     const mask = this.masks.find((candidate) => candidate.isIdentifiedBy(id));
-    if (mask === undefined) throw new Error('La mascara solicitada no existe.');
+    if (mask === undefined) throw new Error('The requested mask does not exist.');
     return mask;
   }
 
@@ -92,7 +107,8 @@ export class DevelopmentRecipe {
       globalAdjustments: this.globalAdjustments.toPrimitives(),
       curves: this.curves.toPrimitives(),
       viewport: this.viewport.toPrimitives(),
-      masks: this.masks.map((mask) => mask.toPrimitives())
+      masks: this.masks.map((mask) => mask.toPrimitives()),
+      disabledGlobalAdjustments: this.disabledGlobalAdjustments.map((key) => key.valueOf())
     };
   }
 }

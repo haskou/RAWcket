@@ -26,7 +26,7 @@ export function useProjectAutosave(
       setError(null);
     } catch (caught: unknown) {
       setStatus('error');
-      setError(caught instanceof Error ? caught.message : 'No se pudo guardar el proyecto.');
+      setError(caught instanceof Error ? caught.message : 'The project could not be saved.');
     }
   }, [save]);
 

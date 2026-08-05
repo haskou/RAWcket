@@ -35,7 +35,7 @@ export function LibraryPage(): ReactElement {
     setError(null);
     try {
       const dimensions = await readImageDimensions(file);
-      const name = file.name.replace(/\.(jpe?g|png)$/i, '') || 'Proyecto sin titulo';
+      const name = file.name.replace(/\.(jpe?g|png)$/i, '') || 'Untitled project';
       const project = await application.createProject.create(
         new CreateProjectMessage(name, file, file.name, dimensions.width, dimensions.height)
       );
@@ -43,7 +43,7 @@ export function LibraryPage(): ReactElement {
       await refresh();
       void navigate(`/editor/${project.getId().valueOf()}`);
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo importar la imagen.');
+      setError(caught instanceof Error ? caught.message : 'The image could not be imported.');
     } finally {
       setBusy(false);
     }
@@ -61,7 +61,7 @@ export function LibraryPage(): ReactElement {
   };
 
   const rename = async (summary: PhotoProjectSummary): Promise<void> => {
-    const name = window.prompt('Nuevo nombre del proyecto', summary.getName().valueOf());
+    const name = window.prompt('New project name', summary.getName().valueOf());
     if (name === null) return;
     const project = await application.findProject.find(new FindProjectMessage(summary.getId().valueOf()));
     if (project === null) return;
@@ -80,7 +80,7 @@ export function LibraryPage(): ReactElement {
   };
 
   const remove = async (summary: PhotoProjectSummary): Promise<void> => {
-    if (!window.confirm(`Eliminar “${summary.getName().valueOf()}” y su original local?`)) return;
+    if (!window.confirm(`Delete “${summary.getName().valueOf()}” and its local original?`)) return;
     await application.deleteProject.delete(new DeleteProjectMessage(summary.getId().valueOf()));
     await refresh();
   };
@@ -88,7 +88,7 @@ export function LibraryPage(): ReactElement {
   const exportProject = async (summary: PhotoProjectSummary): Promise<void> => {
     const bundle = await application.projectExporter.exportProject(summary.getId());
     const safeName = summary.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '');
-    downloadBlob(bundle, `${safeName || 'proyecto'}.rawcket`);
+    downloadBlob(bundle, `${safeName || 'project'}.rawcket`);
   };
 
   const importBundle = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -100,7 +100,7 @@ export function LibraryPage(): ReactElement {
       await refresh();
       void navigate(`/editor/${id.valueOf()}`);
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo importar el bundle.');
+      setError(caught instanceof Error ? caught.message : 'The project bundle could not be imported.');
     } finally {
       setBusy(false);
       event.target.value = '';
@@ -110,37 +110,37 @@ export function LibraryPage(): ReactElement {
   return (
     <main className="library-shell">
       <header className="library-header">
-        <a className="brand" href="/" aria-label="RAWcket, biblioteca"><span className="brand-mark">R</span><span>RAWcket</span></a>
+        <a className="brand" href="/" aria-label="RAWcket library"><span className="brand-mark">R</span><span>RAWcket</span></a>
         <div className="header-actions">
-          <button className="button ghost" type="button" onClick={() => setSettingsOpen(true)}>IA y privacidad</button>
-          <button className="button ghost" type="button" onClick={() => bundleInput.current?.click()}>Importar .rawcket</button>
-          <button className="button primary" type="button" onClick={() => imageInput.current?.click()} disabled={busy}>{busy ? 'Importando…' : 'Importar imagen'}</button>
+          <button className="button ai-header-button" type="button" onClick={() => setSettingsOpen(true)}>✦ AI Studio</button>
+          <button className="button ghost" type="button" onClick={() => bundleInput.current?.click()}>Import .rawcket</button>
+          <button className="button primary" type="button" onClick={() => imageInput.current?.click()} disabled={busy}>{busy ? 'Importing…' : 'Import image'}</button>
         </div>
       </header>
-      <input ref={imageInput} className="visually-hidden" type="file" accept="image/jpeg,image/png" onChange={onImage} aria-label="Seleccionar imagen JPEG o PNG" />
-      <input ref={bundleInput} className="visually-hidden" type="file" accept=".rawcket,application/zip" onChange={(event) => void importBundle(event)} aria-label="Seleccionar proyecto RAWcket" />
+      <input ref={imageInput} className="visually-hidden" type="file" accept="image/jpeg,image/png" onChange={onImage} aria-label="Select a JPEG or PNG image" />
+      <input ref={bundleInput} className="visually-hidden" type="file" accept=".rawcket,application/zip" onChange={(event) => void importBundle(event)} aria-label="Select a RAWcket project" />
       <section className="library-intro">
         <div>
-          <span className="eyebrow">Biblioteca local</span>
-          <h1>Tus imagenes. En tu navegador.</h1>
-          <p>RAWcket conserva el original y guarda cada decision como una receta reversible. En esta version la imagen no se procesa: el modelo de edicion ya esta listo, con total honestidad.</p>
+          <span className="eyebrow">Local photo library</span>
+          <h1>Your photographs. Your browser.</h1>
+          <p>RAWcket keeps every original untouched and turns each decision into a reversible recipe. Its AI-first workflow helps you create while you remain in control of every parameter.</p>
         </div>
         <button className="demo-card" type="button" onClick={() => void createDemo()}>
           <span className="demo-orbit" aria-hidden="true" />
-          <span><strong>Explorar con una demo</strong><small>Generada en tu dispositivo · sin descargas</small></span>
+          <span><strong>Explore with a demo</strong><small>Generated on your device · no download</small></span>
           <span aria-hidden="true">→</span>
         </button>
       </section>
-      <p className="storage-note">Almacenamiento local del navegador · privado por defecto · no sustituye una copia de seguridad</p>
+      <p className="storage-note">Local browser storage · private by default · not a replacement for a backup</p>
       {error !== null && <p className="notice error" role="alert">{error}</p>}
       <section aria-labelledby="projects-title">
-        <div className="section-heading"><h2 id="projects-title">Proyectos recientes</h2><span>{projects.length} {projects.length === 1 ? 'proyecto' : 'proyectos'}</span></div>
+        <div className="section-heading"><h2 id="projects-title">Recent projects</h2><span>{projects.length} {projects.length === 1 ? 'project' : 'projects'}</span></div>
         {projects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon" aria-hidden="true">+</div>
-            <h3>Empieza por una imagen</h3>
-            <p>Importa un JPEG o PNG. El original permanecera intacto y local.</p>
-            <button className="button primary" type="button" onClick={() => imageInput.current?.click()}>Elegir imagen</button>
+            <h3>Start with a photograph</h3>
+            <p>Import a JPEG or PNG. The original remains untouched and local.</p>
+            <button className="button primary" type="button" onClick={() => imageInput.current?.click()}>Choose image</button>
           </div>
         ) : (
           <div className="project-grid">
@@ -149,15 +149,15 @@ export function LibraryPage(): ReactElement {
               const name = project.getName().valueOf();
               return (
                 <article className="project-card" key={id}>
-                  <button className="project-open" type="button" onClick={() => void navigate(`/editor/${id}`)} aria-label={`Abrir ${name}`}>
+                  <button className="project-open" type="button" onClick={() => void navigate(`/editor/${id}`)} aria-label={`Open ${name}`}>
                     <ProjectThumbnail projectId={id} name={name} />
-                    <span className="project-meta"><strong>{name}</strong><small>Editado {project.getUpdatedAt().toDate().toLocaleString()}</small></span>
+                    <span className="project-meta"><strong>{name}</strong><small>Edited {project.getUpdatedAt().toDate().toLocaleString('en')}</small></span>
                   </button>
-                  <div className="project-actions" aria-label={`Acciones de ${name}`}>
-                    <button type="button" onClick={() => void rename(project)}>Renombrar</button>
-                    <button type="button" onClick={() => void duplicate(id)}>Duplicar</button>
-                    <button type="button" onClick={() => void exportProject(project)}>Exportar</button>
-                    <button className="danger-text" type="button" onClick={() => void remove(project)}>Eliminar</button>
+                  <div className="project-actions" aria-label={`Actions for ${name}`}>
+                    <button type="button" onClick={() => void rename(project)}>Rename</button>
+                    <button type="button" onClick={() => void duplicate(id)}>Duplicate</button>
+                    <button type="button" onClick={() => void exportProject(project)}>Export</button>
+                    <button className="danger-text" type="button" onClick={() => void remove(project)}>Delete</button>
                   </div>
                 </article>
               );

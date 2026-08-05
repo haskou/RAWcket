@@ -42,7 +42,7 @@ export class GlobalAdjustments {
   public get(key: AdjustmentKey): GlobalAdjustmentValue {
     const entry = this.values.find((candidate) => candidate.key.isEqual(key));
     if (entry === undefined) {
-      throw new Error('El ajuste solicitado no existe en la receta.');
+      throw new Error('The requested adjustment does not exist in the recipe.');
     }
     return entry.value;
   }

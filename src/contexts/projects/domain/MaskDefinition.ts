@@ -92,7 +92,7 @@ export class MaskDefinition {
 
   private static ensureUnitInterval(value: number, label: string): void {
     if (!Number.isFinite(value) || value < 0 || value > 1) {
-      throw new Error(`La ${label} de mascara debe estar entre 0 y 1.`);
+      throw new Error(`Mask ${label} must be between 0 and 1.`);
     }
   }
 
@@ -114,7 +114,7 @@ export class MaskDefinition {
       points.push(...shape.positivePoints, ...shape.negativePoints);
       boxes.push(...shape.boundingBoxes);
       if (shape.prompt.trim().length === 0 || shape.strategy.trim().length === 0 || shape.version.trim().length === 0) {
-        throw new Error('Una mascara IA debe conservar prompt, estrategia y version.');
+        throw new Error('An AI mask must preserve its prompt, strategy, and version.');
       }
     }
     points.forEach((point) => this.ensurePoint(point));
@@ -123,14 +123,14 @@ export class MaskDefinition {
       MaskDefinition.ensureUnitInterval(box.width, 'anchura');
       MaskDefinition.ensureUnitInterval(box.height, 'altura');
       if (box.x + box.width > 1 || box.y + box.height > 1) {
-        throw new Error('Las cajas de mascara deben quedar dentro de la imagen.');
+        throw new Error('Mask boxes must remain inside the image.');
       }
     });
     if (shape.kind === 'luminance-range' && (shape.minimum < 0 || shape.maximum > 1 || shape.minimum > shape.maximum)) {
-      throw new Error('El rango de luminancia no es valido.');
+      throw new Error('The luminance range is invalid.');
     }
     if (shape.kind === 'composite') {
-      if (shape.children.length < 2) throw new Error('Una mascara compuesta necesita al menos dos mascaras.');
+      if (shape.children.length < 2) throw new Error('A composite mask needs at least two masks.');
       shape.children.forEach((child) => MaskDefinition.fromPrimitives(child));
     }
   }

@@ -8,7 +8,7 @@ export function AiSettingsDialog({ open, onClose }: { open: boolean; onClose: ()
   const [rememberSession, setRememberSession] = useState(true);
   const [saveEncrypted, setSaveEncrypted] = useState(false);
   const [hasEncryptedKey, setHasEncryptedKey] = useState(false);
-  const [message, setMessage] = useState('IA desactivada. No hay ningun proveedor conectado.');
+  const [message, setMessage] = useState('AI is disabled. No provider is connected.');
 
   useEffect(() => {
     void apiKeyVault.hasEncryptedKey().then(setHasEncryptedKey);
@@ -24,9 +24,9 @@ export function AiSettingsDialog({ open, onClose }: { open: boolean; onClose: ()
       setApiKey('');
       setPassword('');
       setHasEncryptedKey(saveEncrypted || hasEncryptedKey);
-      setMessage('Clave guardada segun tus opciones. La IA sigue desactivada hasta configurar un proveedor.');
+      setMessage('The key was stored according to your choices. AI remains disabled until a provider is configured.');
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : 'No se pudo guardar la clave.');
+      setMessage(error instanceof Error ? error.message : 'The key could not be stored.');
     }
   };
 
@@ -35,7 +35,7 @@ export function AiSettingsDialog({ open, onClose }: { open: boolean; onClose: ()
     setApiKey('');
     setPassword('');
     setHasEncryptedKey(false);
-    setMessage('La clave se ha eliminado de la sesion y del dispositivo.');
+    setMessage('The key has been removed from this session and device.');
   };
 
   return (
@@ -43,34 +43,34 @@ export function AiSettingsDialog({ open, onClose }: { open: boolean; onClose: ()
       <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="ai-settings-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="dialog-heading">
           <div>
-            <span className="eyebrow">Privacidad primero</span>
-            <h2 id="ai-settings-title">Configuracion de IA</h2>
+            <span className="eyebrow">Privacy first</span>
+            <h2 id="ai-settings-title">AI settings</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Cerrar configuracion">×</button>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Close settings">×</button>
         </div>
-        <p className="notice warning">Guardar una API key en un navegador compartido implica riesgo. El cifrado real exige una contrasena maestra que RAWcket no almacena.</p>
+        <p className="notice warning">Storing an API key in a shared browser carries risk. Encryption requires a master password that RAWcket never stores.</p>
         <form onSubmit={(event) => void submit(event)}>
           <label className="field-label" htmlFor="api-key">API key</label>
-          <input id="api-key" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" placeholder="No se registra ni se anade al proyecto" />
+          <input id="api-key" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" placeholder="Never logged or added to the project" />
           <label className="check-row">
             <input type="checkbox" checked={rememberSession} onChange={(event) => setRememberSession(event.target.checked)} />
-            Recordar solo durante esta sesion
+            Remember for this session only
           </label>
           <label className="check-row">
             <input type="checkbox" checked={saveEncrypted} onChange={(event) => setSaveEncrypted(event.target.checked)} />
-            Guardar cifrada en este dispositivo
+            Store encrypted on this device
           </label>
           {saveEncrypted && (
             <>
-              <label className="field-label" htmlFor="master-password">Contrasena maestra (minimo 12 caracteres)</label>
+              <label className="field-label" htmlFor="master-password">Master password (12 characters minimum)</label>
               <input id="master-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
             </>
           )}
-          <p className="muted">Cifrado: AES-GCM; derivacion: PBKDF2-SHA-256, 210.000 iteraciones. Clave cifrada presente: {hasEncryptedKey ? 'si' : 'no'}.</p>
+          <p className="muted">Encryption: AES-GCM; derivation: PBKDF2-SHA-256, 210,000 iterations. Encrypted key present: {hasEncryptedKey ? 'yes' : 'no'}.</p>
           <p className="status-copy" aria-live="polite">{message}</p>
           <div className="dialog-actions">
-            <button className="button ghost danger" type="button" onClick={() => void remove()}>Eliminar clave</button>
-            <button className="button primary" type="submit">Guardar opciones</button>
+            <button className="button ghost danger" type="button" onClick={() => void remove()}>Remove key</button>
+            <button className="button primary" type="submit">Save choices</button>
           </div>
         </form>
       </section>

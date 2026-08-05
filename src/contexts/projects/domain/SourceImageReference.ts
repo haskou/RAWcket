@@ -8,7 +8,7 @@ export class SourceImageReference {
     private readonly storageKey: StringValueObject
   ) {
     if (!Number.isSafeInteger(size) || size <= 0) {
-      throw new Error('La imagen original debe tener un tamano valido.');
+      throw new Error('The original image must have a valid size.');
     }
   }
 

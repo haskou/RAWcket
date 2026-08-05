@@ -63,7 +63,7 @@ export class BrowserApiKeyVault {
       this.rememberForSession(apiKey);
       return apiKey;
     } catch {
-      throw new Error('No se pudo desbloquear la clave. Revisa la contrasena maestra.');
+      throw new Error('The key could not be unlocked. Check the master password.');
     }
   }
 
@@ -94,11 +94,11 @@ export class BrowserApiKeyVault {
   }
 
   private ensureKey(apiKey: string): void {
-    if (apiKey.trim().length < 8) throw new Error('La API key parece incompleta.');
+    if (apiKey.trim().length < 8) throw new Error('The API key appears incomplete.');
   }
 
   private ensurePassword(password: string): void {
-    if (password.length < 12) throw new Error('La contrasena maestra debe tener al menos 12 caracteres.');
+    if (password.length < 12) throw new Error('The master password must contain at least 12 characters.');
   }
 
   private toBase64(bytes: Uint8Array): string {

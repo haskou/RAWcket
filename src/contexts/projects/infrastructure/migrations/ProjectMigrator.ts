@@ -11,7 +11,7 @@ export class ProjectMigrator {
     let current: unknown = input;
     let version = versionedSchema.parse(current).schemaVersion;
     if (version > ProjectSchemaVersion.CURRENT) {
-      throw new Error(`El proyecto usa un esquema futuro no compatible (${version}).`);
+      throw new Error(`The project uses an unsupported future schema (${version}).`);
     }
     while (version < ProjectSchemaVersion.CURRENT) {
       const migration = this.migrations.find((candidate) => candidate.from === version);
