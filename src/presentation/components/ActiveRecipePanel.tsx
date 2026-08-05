@@ -14,6 +14,8 @@ export function ActiveRecipePanel({
   onPaste,
   onApplyPreset,
   onClear,
+  onExportSidecar,
+  onImportSidecar,
   transferMessage,
   collapsed,
   onToggleCollapsed
@@ -26,6 +28,8 @@ export function ActiveRecipePanel({
   onPaste?: () => void;
   onApplyPreset?: (name: 'Natural' | 'Cinematic' | 'Monochrome') => void;
   onClear: () => void;
+  onExportSidecar: () => void;
+  onImportSidecar: () => void;
   transferMessage?: string;
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -54,6 +58,8 @@ export function ActiveRecipePanel({
           <button type="button" onClick={onCopy}>Copy</button>
           <button type="button" onClick={onPaste}>Paste</button>
           <button type="button" disabled={!hasActiveRecipe} onClick={onClear}>Clear recipe</button>
+          <button type="button" onClick={onExportSidecar}>Save sidecar</button>
+          <button type="button" onClick={onImportSidecar}>Load sidecar</button>
         </div>
         <div className="recipe-preset-actions" aria-label="Built-in development presets">
           {(['Natural', 'Cinematic', 'Monochrome'] as const).map((name) => (

@@ -206,7 +206,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes.
 
-**Remaining.** Write-ahead journaling across IndexedDB/OPFS, `.rawcket.json` sidecars, optional File System Access links, orphan cleanup, and future collections.
+**Implemented.** Versioned `.rawcket.json` sidecars export only source dimensions and validated recipe data. They exclude the original, project identity, history, ratings, and tags; applying one is a single undoable aggregate operation with a 5 MB input limit.
+
+**Remaining.** Write-ahead journaling across IndexedDB/OPFS, optional File System Access links, orphan cleanup, and future collections.
 
 **Acceptance.** Interrupted saves recover the last consistent snapshot; corruption never overwrites the backup; cleanup never deletes a referenced original; quota errors are explained early; sidecars and bundles migrate by version; revoked file permissions fall back to OPFS.
 

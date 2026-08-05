@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type ChangeEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
@@ -11,12 +12,14 @@ import {
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
+import { ApplyProjectSidecarMessage } from '@/contexts/projects/application/apply-project-sidecar/messages/ApplyProjectSidecarMessage';
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { CopyDevelopmentSettingsMessage } from '@/contexts/projects/application/copy-development-settings/messages/CopyDevelopmentSettingsMessage';
 import { CreateSemanticMaskMessage } from '@/contexts/projects/application/create-semantic-mask/messages/CreateSemanticMaskMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { ExportProjectPhotoMessage } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
+import { ExportProjectSidecarMessage } from '@/contexts/projects/application/export-project-sidecar/messages/ExportProjectSidecarMessage';
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
@@ -130,6 +133,7 @@ export function EditorPage(): ReactElement {
   const cropGesture = useRef<CropGesture | null>(null);
   const cropDraftValue = useRef<ViewportTransformPrimitives['cropFrame'] | null>(null);
   const exportAbort = useRef<AbortController | null>(null);
+  const sidecarInput = useRef<HTMLInputElement>(null);
   const semanticAbort = useRef<AbortController | null>(null);
   const renderSequence = useRef(0);
   const [project, setProject] = useState<PhotoProject | null>(null);
@@ -365,6 +369,28 @@ export function EditorPage(): ReactElement {
     await autosave.flush();
     const bundle = await application.projectExporter.exportProject(project.getId());
     downloadBlob(bundle, `${project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-')}.rawcket`);
+  };
+
+  const exportSidecar = (): void => {
+    if (project === null) return;
+    const sidecar = application.exportProjectSidecar.export(project, new ExportProjectSidecarMessage(projectId));
+    const safeName = project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '');
+    downloadBlob(sidecar, `${safeName || 'recipe'}.rawcket.json`);
+    setRecipeTransferMessage('Versioned recipe sidecar exported without the original image.');
+  };
+
+  const importSidecar = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const sidecar = event.target.files?.[0];
+    event.target.value = '';
+    if (project === null || sidecar === undefined) return;
+    try {
+      const updated = await application.applyProjectSidecar.apply(project, new ApplyProjectSidecarMessage(projectId, sidecar));
+      setProject(updated);
+      setRevision((value) => value + 1);
+      setRecipeTransferMessage('Sidecar applied as one undoable recipe operation.');
+    } catch (error: unknown) {
+      setRecipeTransferMessage(error instanceof Error ? error.message : 'The sidecar could not be applied.');
+    }
   };
 
   const exportPhoto = async (settings: PhotoExportSettings): Promise<void> => {
@@ -926,6 +952,7 @@ export function EditorPage(): ReactElement {
         </div>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
+      <input ref={sidecarInput} className="visually-hidden" type="file" accept=".rawcket.json,application/json" aria-label="Select a RAWcket recipe sidecar" onChange={(event) => void importSidecar(event)} />
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
       <section className={`editor-workspace ${recipeCollapsed ? 'recipe-collapsed' : ''}`}>
         <ActiveRecipePanel
@@ -937,6 +964,8 @@ export function EditorPage(): ReactElement {
           onPaste={() => void pasteDevelopmentSettings()}
           onApplyPreset={applyBuiltInPreset}
           onClear={() => apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: DevelopmentRecipe.neutral().toPrimitives(), groupId: null })}
+          onExportSidecar={exportSidecar}
+          onImportSidecar={() => sidecarInput.current?.click()}
           transferMessage={recipeTransferMessage}
           collapsed={recipeCollapsed}
           onToggleCollapsed={() => setRecipeCollapsed((value) => !value)}

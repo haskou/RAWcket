@@ -96,6 +96,8 @@ original.jpg     or original.png / original.arw
 
 Import validates the manifest, format version, every hash, and the Zod schema before hydrating the domain model. If an ID already exists, RAWcket generates a new one to prevent overwriting.
 
+Recipe-only sidecars use the separate `.rawcket.json` format. They contain a versioned recipe and source dimensions, never the original image, project identity, history, ratings, or tags. Applying one is a single undoable edit.
+
 ## Privacy and security
 
 - There is no backend, account, authentication, analytics, or mandatory SaaS.

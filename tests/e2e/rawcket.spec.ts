@@ -163,9 +163,14 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
   await page.locator('.curve-graph circle').nth(1).click();
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
+  const sidecarDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save sidecar' }).click();
+  const sidecarDownload = await sidecarDownloadPromise;
+  expect(sidecarDownload.suggestedFilename()).toBe('night.rawcket.json');
+  const sidecarPath = await sidecarDownload.path();
   await page.getByRole('button', { name: 'Clear recipe' }).click();
   await expect(page.getByText('No active edits')).toBeVisible();
-  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByLabel('Select a RAWcket recipe sidecar').setInputFiles(sidecarPath);
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByLabel('Format', { exact: true }).selectOption('png');

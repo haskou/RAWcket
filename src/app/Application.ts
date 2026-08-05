@@ -1,4 +1,5 @@
 import { ApplyEditOperation } from '@/contexts/projects/application/apply-edit-operation/ApplyEditOperation';
+import { ApplyProjectSidecar } from '@/contexts/projects/application/apply-project-sidecar/ApplyProjectSidecar';
 import { AssessImportCapacity } from '@/contexts/projects/application/assess-import-capacity/AssessImportCapacity';
 import { ChangeHistory } from '@/contexts/projects/application/change-history/ChangeHistory';
 import { ChooseInterfaceMode } from '@/contexts/projects/application/choose-interface-mode/ChooseInterfaceMode';
@@ -8,6 +9,7 @@ import { CreateSemanticMask } from '@/contexts/projects/application/create-seman
 import { DeleteProject } from '@/contexts/projects/application/delete-project/DeleteProject';
 import { DuplicateProject } from '@/contexts/projects/application/duplicate-project/DuplicateProject';
 import { ExportProjectPhoto } from '@/contexts/projects/application/export-project-photo/ExportProjectPhoto';
+import { ExportProjectSidecar } from '@/contexts/projects/application/export-project-sidecar/ExportProjectSidecar';
 import { FindProject } from '@/contexts/projects/application/find-project/FindProject';
 import { ListProjects } from '@/contexts/projects/application/list-projects/ListProjects';
 import { ManageSemanticSegmentationModel } from '@/contexts/projects/application/manage-semantic-segmentation-model/ManageSemanticSegmentationModel';
@@ -39,6 +41,7 @@ import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/adviso
 import { BrowserImportCandidateReviewer } from '@/contexts/projects/infrastructure/advisors/BrowserImportCandidateReviewer';
 import { BrowserSemanticSegmentationModel } from '@/contexts/projects/infrastructure/ai/BrowserSemanticSegmentationModel';
 import { BrowserDevelopmentSettingsClipboard } from '@/contexts/projects/infrastructure/clipboard/BrowserDevelopmentSettingsClipboard';
+import { JsonProjectSidecarCodec } from '@/contexts/projects/infrastructure/sidecars/JsonProjectSidecarCodec';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
@@ -53,6 +56,7 @@ export type Application = {
   listProjects: ListProjects;
   manageSemanticSegmentationModel: ManageSemanticSegmentationModel;
   applyEditOperation: ApplyEditOperation;
+  applyProjectSidecar: ApplyProjectSidecar;
   changeHistory: ChangeHistory;
   chooseInterfaceMode: ChooseInterfaceMode;
   copyDevelopmentSettings: CopyDevelopmentSettings;
@@ -70,6 +74,7 @@ export type Application = {
   reviewDevelopment: ReviewDevelopment;
   reviewImportCandidates: ReviewImportCandidates;
   exportProjectPhoto: ExportProjectPhoto;
+  exportProjectSidecar: ExportProjectSidecar;
   inspectSourceImage: InspectSourceImage;
 };
 
@@ -90,6 +95,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
   const semanticSegmentationModel = new BrowserSemanticSegmentationModel();
   const sourceImageInspector = new BrowserSourceImageInspector();
+  const projectSidecarCodec = new JsonProjectSidecarCodec();
   return {
     createProject: new CreateProject(projects, sourceFiles),
     createSemanticMask: new CreateSemanticMask(semanticSegmentationModel),
@@ -98,6 +104,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     listProjects: new ListProjects(projects),
     manageSemanticSegmentationModel: new ManageSemanticSegmentationModel(semanticSegmentationModel),
     applyEditOperation: new ApplyEditOperation(),
+    applyProjectSidecar: new ApplyProjectSidecar(projectSidecarCodec),
     changeHistory: new ChangeHistory(),
     chooseInterfaceMode: new ChooseInterfaceMode(),
     copyDevelopmentSettings: new CopyDevelopmentSettings(developmentSettingsClipboard),
@@ -115,6 +122,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     reviewDevelopment: new ReviewDevelopment(new LocalDevelopmentTutor()),
     reviewImportCandidates: new ReviewImportCandidates(sourceImageInspector, new BrowserImportCandidateReviewer()),
     exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles)),
+    exportProjectSidecar: new ExportProjectSidecar(projectSidecarCodec),
     inspectSourceImage: new InspectSourceImage(sourceImageInspector)
   };
 }

@@ -162,7 +162,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .recipe-expand strong { writing-mode: vertical-rl; text-transform: uppercase; letter-spacing: .11em; font-size: .58rem; }
 .recipe-panel-heading h2 { margin: 4px 0 6px; font-size: 1.05rem; }
 .recipe-panel-heading p { margin: 0; color: #7e857f; font-size: .67rem; line-height: 1.45; }
-.recipe-transfer-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 12px; }
+.recipe-transfer-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 12px; }
 .recipe-transfer-actions button, .recipe-preset-actions button { min-height: 29px; border: 1px solid #343a35; border-radius: 6px; background: #1b1e1c; color: #b8bfb9; cursor: pointer; font-size: .6rem; }
 .recipe-transfer-actions button:hover, .recipe-preset-actions button:hover { border-color: #68724f; color: var(--accent); }
 .recipe-preset-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }

@@ -27,6 +27,8 @@ Schema version 4 introduced `ProjectOrganization`: a bounded zero-to-five `Proje
 
 Schema version 5 adds immutable `CaptureMetadata`. The bounded TIFF reader extracts only validated, size-limited EXIF fields from Sony ARW containers; the aggregate persists those facts separately from editable project state. Missing fields remain explicitly null and the UI distinguishes embedded-preview development from future high-depth RAW demosaicing.
 
+`JsonProjectSidecarCodec` is an infrastructure boundary for recipe-only `.rawcket.json` files. Application messages validate project identity and file size; importing delegates to the aggregate’s `replace-recipe` operation so the entire change is validated, serializable, and undoable without copying source bytes or project identity.
+
 `DevelopmentRecipe` contains:
 
 - `GlobalAdjustments`: sixteen adjustments with concept-specific ranges and independent enabled state.
