@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type WheelEvent
 } from 'react';
+import { Debouncer, FlowCancelledError } from '@haskou/flow';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
 import { UploadCloudAssetMessage } from '@/contexts/cloud-storage/application/manage-cloud-storage/messages/UploadCloudAssetMessage';
@@ -159,6 +160,8 @@ export function EditorPage(): ReactElement {
   const semanticAbort = useRef<AbortController | null>(null);
   const semanticInstallAbort = useRef<AbortController | null>(null);
   const renderSequence = useRef(0);
+  const previewRenderDebouncer = useRef<Debouncer<void> | null>(null);
+  previewRenderDebouncer.current ??= new Debouncer(80);
   const [project, setProject] = useState<PhotoProject | null>(null);
   const [loadingSource, setLoadingSource] = useState<Blob | null>(null);
   const [beforeSource, setBeforeSource] = useState<Blob | null>(null);
@@ -309,20 +312,22 @@ export function EditorPage(): ReactElement {
     const sequence = renderSequence.current + 1;
     renderSequence.current = sequence;
     const controller = new AbortController();
-    setRenderProgress('Rendering');
-    void application.renderProjectPreview.render(
-      project,
-      new RenderProjectPreviewMessage(projectId, 2560),
-      {
-        signal: controller.signal,
-        onProgress: (progress) => {
-          if (sequence === renderSequence.current) setRenderProgress(`${progress.stage} ${Math.round(progress.completed * 100)}%`);
-        },
-        onAnalysis: (analysis) => {
-          if (sequence === renderSequence.current) setPreviewAnalysis(analysis);
+    setRenderProgress('Waiting for input');
+    void previewRenderDebouncer.current?.run(async () => {
+      setRenderProgress('Rendering');
+      const result = await application.renderProjectPreview.render(
+        project,
+        new RenderProjectPreviewMessage(projectId, 2560),
+        {
+          signal: controller.signal,
+          onProgress: (progress) => {
+            if (sequence === renderSequence.current) setRenderProgress(`${progress.stage} ${Math.round(progress.completed * 100)}%`);
+          },
+          onAnalysis: (analysis) => {
+            if (sequence === renderSequence.current) setPreviewAnalysis(analysis);
+          }
         }
-      }
-    ).then((result) => {
+      );
       if (result instanceof Blob && sequence === renderSequence.current) {
         setPreview(result);
         if (project.getSource().getSupportedMimeType() === 'image/x-sony-arw' && project.getRecipe().isNeutral()) {
@@ -331,6 +336,7 @@ export function EditorPage(): ReactElement {
         setRenderProgress('Preview up to date');
       }
     }).catch((error: unknown) => {
+      if (error instanceof FlowCancelledError) return;
       if (sequence === renderSequence.current && (!(error instanceof DOMException) || error.name !== 'AbortError')) {
         const message = error instanceof Error ? error.message : 'Unknown rendering error.';
         setRenderProgress(`Preview unavailable; showing original. ${message}`);
@@ -338,6 +344,8 @@ export function EditorPage(): ReactElement {
     });
     return () => controller.abort();
   }, [application, project, projectId, revision]);
+
+  useEffect(() => () => previewRenderDebouncer.current?.cancel(), []);
 
   useEffect(() => {
     if (project === null

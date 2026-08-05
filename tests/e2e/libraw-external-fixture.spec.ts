@@ -24,6 +24,27 @@ test('develops an external camera RAW through the 16-bit LibRaw/WASM path', asyn
   await page.getByRole('button', { name: 'After · B' }).click();
   await expect(page.getByText('Neutral developed RAW · Before')).toBeVisible();
   await expect(preview).toHaveAttribute('src', neutralDevelopedSource ?? '');
+  await page.getByRole('tab', { name: 'Manual' }).click();
+  await page.evaluate(() => {
+    document.documentElement.dataset.rawcketSawRepeatedDecode = 'false';
+    document.documentElement.dataset.rawcketSawPreviewUpdate = 'false';
+    document.documentElement.dataset.rawcketCompletedPreviewUpdate = 'false';
+    new MutationObserver(() => {
+      const status = document.body.innerText;
+      if (status.includes('decoding')) {
+        document.documentElement.dataset.rawcketSawRepeatedDecode = 'true';
+      }
+      if (status.includes('Waiting for input') || status.includes('Rendering') || status.includes('developing')) {
+        document.documentElement.dataset.rawcketSawPreviewUpdate = 'true';
+      }
+      if (document.documentElement.dataset.rawcketSawPreviewUpdate === 'true' && status.includes('Preview up to date')) {
+        document.documentElement.dataset.rawcketCompletedPreviewUpdate = 'true';
+      }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+  await page.getByLabel('Exposure numeric value').fill('0.5');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.rawcketCompletedPreviewUpdate), { timeout: 30_000 }).toBe('true');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.rawcketSawRepeatedDecode)).toBe('false');
   await page.getByRole('button', { name: 'Photo information' }).click();
   const information = page.getByRole('dialog', { name: 'Photo information' });
   await expect(information, browserErrors.join('\n')).toContainText('LibRaw/WASM · linear RGB · 16-bit');

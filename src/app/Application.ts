@@ -67,6 +67,7 @@ import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/render
 import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/CachingPreviewRenderer';
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
 import { RenderSourceDecoder } from '@/contexts/projects/infrastructure/renderers/RenderSourceDecoder';
+import { CachingRenderSourceDecoder } from '@/contexts/projects/infrastructure/renderers/CachingRenderSourceDecoder';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
 import { OpenAiEditingAdvisor } from '@/contexts/projects/infrastructure/advisors/OpenAiEditingAdvisor';
 import { OpenAiEditProposalMapper } from '@/contexts/projects/infrastructure/advisors/OpenAiEditProposalMapper';
@@ -154,7 +155,10 @@ export function createApplication(databaseName = 'rawcket'): Application {
     new LibRawImageDecoder(undefined, undefined, 150_000),
     new ArwEmbeddedPreviewExtractor()
   );
-  const previewRenderer = new CachingPreviewRenderer(new WorkerPreviewRenderer(sourceFiles, previewSourceDecoder));
+  const previewRenderer = new CachingPreviewRenderer(new WorkerPreviewRenderer(
+    sourceFiles,
+    new CachingRenderSourceDecoder(previewSourceDecoder)
+  ));
   const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
   const semanticSegmentationModel = new BrowserSemanticSegmentationModel();
   const sourceImageInspector = new BrowserSourceImageInspector();

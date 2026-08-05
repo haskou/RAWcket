@@ -9,14 +9,16 @@ import {
   previewWorkerResponseSchema,
   type PreviewWorkerRequest
 } from './PreviewWorkerProtocol';
-import type { RenderSourceDecoder } from './RenderSourceDecoder';
+import type { CachingRenderSourceDecoder } from './CachingRenderSourceDecoder';
+
+type PreviewSourceDecoder = Pick<CachingRenderSourceDecoder, 'decode'>;
 
 export class WorkerPreviewRenderer implements PreviewRenderer {
   private readonly capacity = new Semaphore(2);
 
   public constructor(
     private readonly sources: SourceFileRepository,
-    private readonly sourceDecoder: RenderSourceDecoder
+    private readonly sourceDecoder: PreviewSourceDecoder
   ) {}
 
   public async render(
@@ -48,14 +50,19 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
     if (source === null) throw new Error('The project does not have a renderable original.');
     const project = request.getProject().toPrimitives();
     const recipe = request.getRecipe().toPrimitives();
-    control.onProgress?.({ stage: 'decoding', completed: 0.1 });
     const decodedSource = await this.sourceDecoder.decode(
+      request.getProjectId(),
       source,
       project.source.mimeType,
       request.getSize().valueOf(),
-      true
+      true,
+      (status) => control.onProgress?.({
+        stage: status === 'ready' ? 'developing' : 'decoding',
+        completed: status === 'ready' ? 0.3 : 0.1
+      })
     );
-    control.onProgress?.({ stage: 'decoding', completed: 0.3 });
+    if (signal.aborted) throw new DOMException('Rendering was cancelled.', 'AbortError');
+    control.onProgress?.({ stage: 'developing', completed: 0.3 });
     const workerRequest: PreviewWorkerRequest = {
       id: crypto.randomUUID(),
       source: decodedSource,
