@@ -39,4 +39,20 @@ describe('PhotoProject edit history', () => {
       GlobalAdjustmentValue.for(AdjustmentKey.EXPOSURE, 1.25)
     )).toBe(true);
   });
+
+  it('replaces a complete development recipe as one reversible operation', () => {
+    const project = PhotoProjectMother.create();
+    const settings = project.getDevelopmentSettings();
+    project.apply({
+      kind: EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS,
+      settings: { ...settings, globalAdjustments: { ...settings.globalAdjustments, exposure: 2, vignette: -30 } },
+      groupId: null
+    }, Timestamp.now());
+
+    expect(project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).valueOf()).toBe(2);
+    expect(project.getGlobalAdjustment(AdjustmentKey.VIGNETTE).valueOf()).toBe(-30);
+    expect(project.undo(Timestamp.now())).toBe(true);
+    expect(project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).valueOf()).toBe(0);
+    expect(project.getGlobalAdjustment(AdjustmentKey.VIGNETTE).valueOf()).toBe(0);
+  });
 });

@@ -1,6 +1,6 @@
 import { StringValueObject, Timestamp } from '@haskou/value-objects';
 import { CurveChannel, ToneCurve } from './ToneCurve';
-import { DevelopmentRecipe, type DevelopmentRecipePrimitives } from './DevelopmentRecipe';
+import { DevelopmentRecipe, type DevelopmentRecipePrimitives, type DevelopmentSettingsPrimitives } from './DevelopmentRecipe';
 import { EDIT_OPERATION, type EditOperation } from './EditOperation';
 import { EditHistory, type EditHistoryPrimitives } from './EditHistory';
 import { MaskDefinition } from './MaskDefinition';
@@ -153,6 +153,10 @@ export class PhotoProject {
     return this.recipe.getMasks();
   }
 
+  public getDevelopmentSettings(): DevelopmentSettingsPrimitives {
+    return this.recipe.getDevelopmentSettings();
+  }
+
   public getCurve(channel: CurveChannel): ToneCurve | null {
     const curve = this.recipe.getCurve(channel);
     return curve === null ? null : ToneCurve.fromPrimitives(curve.toPrimitives());
@@ -237,6 +241,11 @@ export class PhotoProject {
       const previous = this.recipe.getViewport();
       this.recipe.replaceViewport(ViewportTransform.fromPrimitives(operation.viewport));
       return { ...operation, viewport: previous.toPrimitives() };
+    }
+    if (operation.kind === EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS) {
+      const previous = this.recipe.getDevelopmentSettings();
+      this.recipe.replaceDevelopmentSettings(operation.settings);
+      return { ...operation, settings: previous };
     }
     const previousName = this.name;
     this.name = new ProjectName(operation.name);

@@ -1,6 +1,7 @@
 import { ApplyEditOperation } from '@/contexts/projects/application/apply-edit-operation/ApplyEditOperation';
 import { ChangeHistory } from '@/contexts/projects/application/change-history/ChangeHistory';
 import { ChooseInterfaceMode } from '@/contexts/projects/application/choose-interface-mode/ChooseInterfaceMode';
+import { CopyDevelopmentSettings } from '@/contexts/projects/application/copy-development-settings/CopyDevelopmentSettings';
 import { CreateProject } from '@/contexts/projects/application/create-project/CreateProject';
 import { DeleteProject } from '@/contexts/projects/application/delete-project/DeleteProject';
 import { DuplicateProject } from '@/contexts/projects/application/duplicate-project/DuplicateProject';
@@ -12,6 +13,7 @@ import { SaveProject } from '@/contexts/projects/application/save-project/SavePr
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
 import { ReviewDevelopment } from '@/contexts/projects/application/review-development/ReviewDevelopment';
+import { PasteDevelopmentSettings } from '@/contexts/projects/application/paste-development-settings/PasteDevelopmentSettings';
 import type { ProjectExporter } from '@/contexts/projects/application/ports/ProjectExporter';
 import type { ProjectImporter } from '@/contexts/projects/application/ports/ProjectImporter';
 import type { SourceFileRepository } from '@/contexts/projects/domain/repositories/SourceFileRepository';
@@ -27,6 +29,7 @@ import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/render
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
 import { LocalRecipeAdvisor } from '@/contexts/projects/infrastructure/advisors/LocalRecipeAdvisor';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
+import { BrowserDevelopmentSettingsClipboard } from '@/contexts/projects/infrastructure/clipboard/BrowserDevelopmentSettingsClipboard';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
@@ -39,6 +42,8 @@ export type Application = {
   applyEditOperation: ApplyEditOperation;
   changeHistory: ChangeHistory;
   chooseInterfaceMode: ChooseInterfaceMode;
+  copyDevelopmentSettings: CopyDevelopmentSettings;
+  pasteDevelopmentSettings: PasteDevelopmentSettings;
   saveProject: SaveProject;
   deleteProject: DeleteProject;
   duplicateProject: DuplicateProject;
@@ -66,6 +71,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const bundle = new RawcketProjectBundle(projects, sourceFiles, migrator);
   const settings = new RawcketSettingsRepository(database);
   const previewRenderer = new WorkerPreviewRenderer(sourceFiles);
+  const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
   return {
     createProject: new CreateProject(projects, sourceFiles),
     findProject: new FindProject(projects),
@@ -73,6 +79,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
     applyEditOperation: new ApplyEditOperation(),
     changeHistory: new ChangeHistory(),
     chooseInterfaceMode: new ChooseInterfaceMode(),
+    copyDevelopmentSettings: new CopyDevelopmentSettings(developmentSettingsClipboard),
+    pasteDevelopmentSettings: new PasteDevelopmentSettings(developmentSettingsClipboard),
     saveProject: new SaveProject(projects),
     deleteProject: new DeleteProject(projects, sourceFiles),
     duplicateProject: new DuplicateProject(projects, sourceFiles),

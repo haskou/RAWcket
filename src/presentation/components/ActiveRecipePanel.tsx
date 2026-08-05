@@ -3,11 +3,24 @@ import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { adjustmentDefinitions, type AdjustmentSection } from '../editor/adjustmentDefinitions';
 
-export function ActiveRecipePanel({ project, onNavigate, onToggle, onNavigateTool }: {
+export function ActiveRecipePanel({
+  project,
+  onNavigate,
+  onToggle,
+  onNavigateTool,
+  onCopy,
+  onPaste,
+  onApplyPreset,
+  transferMessage
+}: {
   project: PhotoProject;
   onNavigate: (section: AdjustmentSection) => void;
   onToggle: (key: AdjustmentKeyPrimitive, enabled: boolean) => void;
   onNavigateTool?: (tool: 'curves' | 'crop' | 'masks') => void;
+  onCopy?: () => void;
+  onPaste?: () => void;
+  onApplyPreset?: (name: 'Natural' | 'Cinematic' | 'Monochrome') => void;
+  transferMessage?: string;
 }): ReactElement {
   return (
     <aside className="recipe-panel" aria-label="Active Recipe">
@@ -15,6 +28,16 @@ export function ActiveRecipePanel({ project, onNavigate, onToggle, onNavigateToo
         <span className="eyebrow">Non-destructive</span>
         <h2>Active Recipe</h2>
         <p>Toggle any instruction without losing its value. Select it to edit.</p>
+        <div className="recipe-transfer-actions">
+          <button type="button" onClick={onCopy}>Copy</button>
+          <button type="button" onClick={onPaste}>Paste</button>
+        </div>
+        <div className="recipe-preset-actions" aria-label="Built-in development presets">
+          {(['Natural', 'Cinematic', 'Monochrome'] as const).map((name) => (
+            <button type="button" key={name} onClick={() => onApplyPreset?.(name)}>{name}</button>
+          ))}
+        </div>
+        {transferMessage !== undefined && <output className="recipe-transfer-message" aria-live="polite">{transferMessage}</output>}
       </div>
       <div className="recipe-items">
         {adjustmentDefinitions.map((definition) => {

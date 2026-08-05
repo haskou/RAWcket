@@ -2,6 +2,7 @@ import type { AdjustmentKeyPrimitive } from './value-objects/AdjustmentKey';
 import type { CurveChannelPrimitive, ToneCurvePrimitives } from './ToneCurve';
 import type { MaskDefinitionPrimitives } from './MaskDefinition';
 import type { ViewportTransformPrimitives } from './ViewportTransform';
+import type { DevelopmentSettingsPrimitives } from './DevelopmentRecipe';
 
 export const EDIT_OPERATION = {
   SET_GLOBAL_ADJUSTMENT: 'set-global-adjustment',
@@ -11,6 +12,7 @@ export const EDIT_OPERATION = {
   UPDATE_MASK: 'update-mask',
   REMOVE_MASK: 'remove-mask',
   SET_VIEWPORT_TRANSFORM: 'set-viewport-transform',
+  REPLACE_DEVELOPMENT_SETTINGS: 'replace-development-settings',
   RENAME_PROJECT: 'rename-project'
 } as const;
 
@@ -51,6 +53,10 @@ export type RenameProjectOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.RENAME_PROJECT;
   name: string;
 };
+export type ReplaceDevelopmentSettingsOperation = OperationMetadata & {
+  kind: typeof EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS;
+  settings: DevelopmentSettingsPrimitives;
+};
 
 export type EditOperation =
   | SetGlobalAdjustmentOperation
@@ -60,4 +66,5 @@ export type EditOperation =
   | UpdateMaskOperation
   | RemoveMaskOperation
   | SetViewportTransformOperation
+  | ReplaceDevelopmentSettingsOperation
   | RenameProjectOperation;

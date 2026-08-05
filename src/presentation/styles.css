@@ -122,6 +122,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .recipe-panel-heading { padding: 21px 15px 16px; border-bottom: 1px solid var(--line-soft); }
 .recipe-panel-heading h2 { margin: 4px 0 6px; font-size: 1.05rem; }
 .recipe-panel-heading p { margin: 0; color: #7e857f; font-size: .67rem; line-height: 1.45; }
+.recipe-transfer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 12px; }
+.recipe-transfer-actions button, .recipe-preset-actions button { min-height: 29px; border: 1px solid #343a35; border-radius: 6px; background: #1b1e1c; color: #b8bfb9; cursor: pointer; font-size: .6rem; }
+.recipe-transfer-actions button:hover, .recipe-preset-actions button:hover { border-color: #68724f; color: var(--accent); }
+.recipe-preset-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
+.recipe-preset-actions button:last-child { grid-column: 1 / -1; }
+.recipe-transfer-message { display: block; margin-top: 8px; color: #8e9989; font-size: .57rem; line-height: 1.4; }
 .recipe-items { padding: 7px; }
 .recipe-item { display: grid; grid-template-columns: 30px minmax(0,1fr); align-items: center; border-radius: 8px; }
 .recipe-item:hover { background: #1b1e1c; }

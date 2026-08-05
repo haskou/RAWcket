@@ -13,6 +13,19 @@ const toneCurveSchema = z.object({
   points: z.array(pointSchema).min(2).max(64),
   interpolation: z.enum(['linear', 'monotonic-cubic'])
 });
+const curveSetSchema = z.object({
+  rgb: toneCurveSchema,
+  red: toneCurveSchema,
+  green: toneCurveSchema,
+  blue: toneCurveSchema,
+  luminance: toneCurveSchema.nullable()
+});
+
+export const developmentSettingsSchema = z.object({
+  globalAdjustments: adjustmentSchema,
+  curves: curveSetSchema,
+  disabledGlobalAdjustments: z.array(adjustmentKeySchema)
+});
 
 export const maskSchema: z.ZodType<MaskDefinitionPrimitives> = z.lazy(() =>
   z.object({
@@ -93,6 +106,11 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('update-mask'), mask: maskSchema, groupId: z.string().nullable() }),
   z.object({ kind: z.literal('remove-mask'), maskId: z.uuid(), groupId: z.string().nullable() }),
   z.object({
+    kind: z.literal('replace-development-settings'),
+    settings: developmentSettingsSchema,
+    groupId: z.string().nullable()
+  }),
+  z.object({
     kind: z.literal('set-viewport-transform'),
     viewport: z.object({
       cropFrame: rectangleSchema,
@@ -128,13 +146,7 @@ export const photoProjectSchema = z.object({
   }),
   recipe: z.object({
     globalAdjustments: adjustmentSchema,
-    curves: z.object({
-      rgb: toneCurveSchema,
-      red: toneCurveSchema,
-      green: toneCurveSchema,
-      blue: toneCurveSchema,
-      luminance: toneCurveSchema.nullable()
-    }),
+    curves: curveSetSchema,
     viewport: z.object({
       cropFrame: rectangleSchema,
       translation: pointSchema,

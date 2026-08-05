@@ -13,20 +13,24 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
+import { CopyDevelopmentSettingsMessage } from '@/contexts/projects/application/copy-development-settings/messages/CopyDevelopmentSettingsMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { ExportProjectPhotoMessage } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
 import { ReviewDevelopmentMessage } from '@/contexts/projects/application/review-development/messages/ReviewDevelopmentMessage';
+import { PasteDevelopmentSettingsMessage } from '@/contexts/projects/application/paste-development-settings/messages/PasteDevelopmentSettingsMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
 import type { DevelopmentGuidanceItem } from '@/contexts/projects/application/ports/DevelopmentTutor';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
+import { GlobalAdjustments } from '@/contexts/projects/domain/GlobalAdjustments';
+import type { DevelopmentSettingsPrimitives } from '@/contexts/projects/domain/DevelopmentRecipe';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
-import type { ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
+import { CurveSet, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { useApplication } from '../ApplicationContext';
@@ -67,6 +71,31 @@ const curvePresets: Record<'Identity' | 'S curve' | 'Fade', ToneCurvePrimitives>
     interpolation: 'monotonic-cubic'
   }
 };
+type BuiltInPresetName = 'Natural' | 'Cinematic' | 'Monochrome';
+
+function builtInPreset(name: BuiltInPresetName): DevelopmentSettingsPrimitives {
+  const adjustments = GlobalAdjustments.neutral().toPrimitives();
+  const curves = CurveSet.identity().toPrimitives();
+  if (name === 'Natural') {
+    return {
+      globalAdjustments: { ...adjustments, highlights: -18, shadows: 12, vibrance: 8, clarity: 4, texture: 5, sharpness: 10 },
+      curves,
+      disabledGlobalAdjustments: []
+    };
+  }
+  if (name === 'Cinematic') {
+    return {
+      globalAdjustments: { ...adjustments, contrast: 12, highlights: -28, shadows: 8, temperature: -6, tint: 3, saturation: -8, dehaze: 7, vignette: -18 },
+      curves: { ...curves, rgb: curvePresets['S curve'] },
+      disabledGlobalAdjustments: []
+    };
+  }
+  return {
+    globalAdjustments: { ...adjustments, contrast: 18, highlights: -20, shadows: 14, saturation: -100, clarity: 8, texture: 12 },
+    curves: { ...curves, rgb: curvePresets['S curve'] },
+    disabledGlobalAdjustments: []
+  };
+}
 
 function clampZoom(value: number): number {
   return Math.min(maximumZoom, Math.max(minimumZoom, value));
@@ -108,6 +137,7 @@ export function EditorPage(): ReactElement {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportMessage, setExportMessage] = useState('Choose a photographic format and output size.');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [recipeTransferMessage, setRecipeTransferMessage] = useState<string | undefined>();
   const [aiPrompt, setAiPrompt] = useState('Give this photograph a refined cinematic look while preserving natural skin tones.');
   const [aiMessage, setAiMessage] = useState('Local Smart Edit is ready. No photograph or metadata will leave this browser.');
   const [aiProposal, setAiProposal] = useState<EditProposal | null>(null);
@@ -302,6 +332,36 @@ export function EditorPage(): ReactElement {
   const showAdjustment = (section: AdjustmentSection): void => {
     setActivePanel(section);
     window.requestAnimationFrame(() => document.getElementById(`tool-${section}`)?.scrollIntoView({ block: 'start' }));
+  };
+
+  const copyDevelopmentSettings = async (): Promise<void> => {
+    if (project === null) return;
+    try {
+      await application.copyDevelopmentSettings.copy(project, new CopyDevelopmentSettingsMessage(projectId));
+      setRecipeTransferMessage('Development settings copied. Masks, crop, source, and cache data were excluded.');
+    } catch (error: unknown) {
+      setRecipeTransferMessage(error instanceof Error ? error.message : 'The development settings could not be copied.');
+    }
+  };
+
+  const pasteDevelopmentSettings = async (): Promise<void> => {
+    if (project === null) return;
+    try {
+      await application.pasteDevelopmentSettings.paste(project, new PasteDevelopmentSettingsMessage(projectId));
+      setRevision((current) => current + 1);
+      setRecipeTransferMessage('Development settings pasted as one undoable recipe change.');
+    } catch (error: unknown) {
+      setRecipeTransferMessage(error instanceof Error ? error.message : 'The development settings could not be pasted.');
+    }
+  };
+
+  const applyBuiltInPreset = (name: BuiltInPresetName): void => {
+    apply({
+      kind: EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS,
+      settings: builtInPreset(name),
+      groupId: null
+    });
+    setRecipeTransferMessage(`${name} applied as one reversible recipe operation.`);
   };
 
   const chooseCurvePreset = (name: keyof typeof curvePresets): void => {
@@ -581,7 +641,16 @@ export function EditorPage(): ReactElement {
       </header>
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
       <section className="editor-workspace">
-        <ActiveRecipePanel project={project} onNavigate={showAdjustment} onToggle={toggleAdjustment} onNavigateTool={setActivePanel} />
+        <ActiveRecipePanel
+          project={project}
+          onNavigate={showAdjustment}
+          onToggle={toggleAdjustment}
+          onNavigateTool={setActivePanel}
+          onCopy={() => void copyDevelopmentSettings()}
+          onPaste={() => void pasteDevelopmentSettings()}
+          onApplyPreset={applyBuiltInPreset}
+          transferMessage={recipeTransferMessage}
+        />
         <div className="canvas-area">
           <div className="canvas-toolbar" aria-label="Preview controls">
             <button type="button" onClick={() => changeZoom(zoom - 0.1)} aria-label="Zoom out">−</button>
@@ -785,6 +854,7 @@ function describeOperation(operation: EditOperation): string {
   if (operation.kind === EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED) return `${operation.enabled ? 'Enable' : 'Disable'} ${operation.key}`;
   if (operation.kind === EDIT_OPERATION.SET_CURVE) return `Update ${operation.channel.toUpperCase()} curve`;
   if (operation.kind === EDIT_OPERATION.SET_VIEWPORT_TRANSFORM) return 'Update crop and geometry';
+  if (operation.kind === EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS) return 'Replace development settings';
   if (operation.kind === EDIT_OPERATION.RENAME_PROJECT) return `Rename project to ${operation.name}`;
   if (operation.kind === EDIT_OPERATION.REMOVE_MASK) return 'Remove local mask';
   return operation.kind === EDIT_OPERATION.ADD_MASK ? 'Add local mask' : 'Update local mask';

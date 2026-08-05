@@ -15,6 +15,11 @@ export type DevelopmentRecipePrimitives = {
   disabledGlobalAdjustments: AdjustmentKeyPrimitive[];
 };
 
+export type DevelopmentSettingsPrimitives = Pick<
+  DevelopmentRecipePrimitives,
+  'globalAdjustments' | 'curves' | 'disabledGlobalAdjustments'
+>;
+
 export class DevelopmentRecipe {
   public constructor(
     private globalAdjustments: GlobalAdjustments,
@@ -62,6 +67,12 @@ export class DevelopmentRecipe {
     this.viewport = viewport;
   }
 
+  public replaceDevelopmentSettings(input: DevelopmentSettingsPrimitives): void {
+    this.globalAdjustments = GlobalAdjustments.fromPrimitives(input.globalAdjustments);
+    this.curves = CurveSet.fromPrimitives(input.curves);
+    this.disabledGlobalAdjustments = input.disabledGlobalAdjustments.map((key) => AdjustmentKey.fromPrimitives(key));
+  }
+
   public addMask(mask: MaskDefinition): void {
     if (this.masks.some((existing) => existing.isIdentifiedBy(mask.getId()))) {
       throw new Error('A mask with the same identifier already exists.');
@@ -104,6 +115,14 @@ export class DevelopmentRecipe {
 
   public getMasks(): MaskDefinition[] {
     return this.masks.map((mask) => MaskDefinition.fromPrimitives(mask.toPrimitives()));
+  }
+
+  public getDevelopmentSettings(): DevelopmentSettingsPrimitives {
+    return {
+      globalAdjustments: this.globalAdjustments.toPrimitives(),
+      curves: this.curves.toPrimitives(),
+      disabledGlobalAdjustments: this.disabledGlobalAdjustments.map((key) => key.valueOf())
+    };
   }
 
   public toPrimitives(): DevelopmentRecipePrimitives {
