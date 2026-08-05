@@ -230,6 +230,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .mask-number-control > input[type='range'] { width: 100%; accent-color: var(--accent); }
 .local-ai-note { padding: 10px; border: 1px solid #465636; border-radius: 8px; background: #12170f; color: #9eaa97; }
 .local-ai-note strong { display: block; color: var(--accent); }
+.development-tutor { display: grid; gap: 7px; margin-bottom: 16px; padding-bottom: 15px; border-bottom: 1px solid var(--line-soft); }
+.development-tutor > p { margin: 4px 0 !important; color: #778078; font-size: .67rem; }
+.development-tutor-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; color: var(--accent); }
+.development-tutor-heading > div { min-width: 0; }
+.development-tutor-heading strong, .development-tutor-heading small { display: block; }
+.development-tutor-heading strong { color: #dce3d8; font-size: .72rem; }
+.development-tutor-heading small { color: #7e897b; font-size: .57rem; }
+.guidance-item { width: 100%; padding: 10px; border: 1px solid #343b34; border-radius: 8px; background: #111411; color: #aeb6ac; cursor: pointer; text-align: left; }
+.guidance-item:hover, .guidance-item:focus-visible { border-color: #65734c; background: #151a13; }
+.guidance-item.warning { border-color: #654c33; background: #19140f; }
+.guidance-item > span { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.guidance-item strong { color: #d1d7ce; font-size: .67rem; }
+.guidance-item small { flex: 0 0 auto; color: #7b8579; font-size: .53rem; text-transform: uppercase; letter-spacing: .04em; }
+.guidance-item p { margin: 6px 0 5px !important; color: #979f95; font-size: .62rem; line-height: 1.45; }
+.guidance-item em { display: block; color: #737d71; font-size: .57rem; font-style: normal; }
+.guidance-item b { display: block; margin-top: 6px; color: var(--accent); font-size: .57rem; font-weight: 650; text-transform: capitalize; }
 .ai-prompt { width: 100%; resize: vertical; min-height: 96px; padding: 10px; border: 1px solid #3b413b; border-radius: 9px; background: #0c0e0d; color: var(--text); line-height: 1.5; }
 .ai-quick-prompts { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 12px; }
 .ai-quick-prompts button { min-height: 27px; padding: 0 8px; }

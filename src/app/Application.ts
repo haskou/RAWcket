@@ -11,6 +11,7 @@ import { InspectSourceImage } from '@/contexts/projects/application/inspect-sour
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
+import { ReviewDevelopment } from '@/contexts/projects/application/review-development/ReviewDevelopment';
 import type { ProjectExporter } from '@/contexts/projects/application/ports/ProjectExporter';
 import type { ProjectImporter } from '@/contexts/projects/application/ports/ProjectImporter';
 import type { SourceFileRepository } from '@/contexts/projects/domain/repositories/SourceFileRepository';
@@ -24,6 +25,7 @@ import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/r
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
 import { LocalRecipeAdvisor } from '@/contexts/projects/infrastructure/advisors/LocalRecipeAdvisor';
+import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
 import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
@@ -46,6 +48,7 @@ export type Application = {
   persistentStorage: PersistentStorageRequest;
   renderProjectPreview: RenderProjectPreview;
   requestEditingAdvice: RequestEditingAdvice;
+  reviewDevelopment: ReviewDevelopment;
   exportProjectPhoto: ExportProjectPhoto;
   inspectSourceImage: InspectSourceImage;
 };
@@ -78,6 +81,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     requestEditingAdvice: new RequestEditingAdvice(new LocalRecipeAdvisor()),
+    reviewDevelopment: new ReviewDevelopment(new LocalDevelopmentTutor()),
     exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles)),
     inspectSourceImage: new InspectSourceImage(new BrowserSourceImageInspector())
   };

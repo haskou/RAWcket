@@ -9,6 +9,6 @@ export function ApplicationProvider({ application, children }: PropsWithChildren
 
 export function useApplication(): Application {
   const application = useContext(ApplicationContext);
-  if (application === null) throw new Error('RAWcket no ha inicializado sus servicios.');
+  if (application === null) throw new Error('RAWcket has not initialized its application services.');
   return application;
 }

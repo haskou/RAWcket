@@ -18,7 +18,9 @@ import { ExportProjectPhotoMessage } from '@/contexts/projects/application/expor
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
+import { ReviewDevelopmentMessage } from '@/contexts/projects/application/review-development/messages/ReviewDevelopmentMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
+import type { DevelopmentGuidanceItem } from '@/contexts/projects/application/ports/DevelopmentTutor';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
@@ -90,6 +92,7 @@ export function EditorPage(): ReactElement {
   const [showOriginal, setShowOriginal] = useState(false);
   const [renderProgress, setRenderProgress] = useState('Preparing preview');
   const [previewAnalysis, setPreviewAnalysis] = useState<PreviewAnalysis | null>(null);
+  const [developmentGuidance, setDevelopmentGuidance] = useState<DevelopmentGuidanceItem[]>([]);
   const [revision, setRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
@@ -160,6 +163,17 @@ export function EditorPage(): ReactElement {
     });
     return () => controller.abort();
   }, [application, project, projectId, revision]);
+
+  useEffect(() => {
+    if (project === null || previewAnalysis === null) {
+      setDevelopmentGuidance([]);
+      return;
+    }
+    setDevelopmentGuidance(application.reviewDevelopment.review(
+      project,
+      new ReviewDevelopmentMessage(projectId, previewAnalysis.shadowClipping, previewAnalysis.highlightClipping)
+    ));
+  }, [application, previewAnalysis, project, projectId, revision]);
 
   const apply = useCallback((operation: EditOperation): void => {
     if (project === null) return;
@@ -609,6 +623,17 @@ export function EditorPage(): ReactElement {
             <button className={mode === 'advanced' ? 'active' : ''} type="button" onClick={() => changeMode('advanced')}>Advanced</button>
           </div>
           <ToolSection id="ai" title="AI Studio" active={activePanel === 'ai'} onToggle={setActivePanel} badge="Core workflow">
+            <div className="development-tutor" aria-label="Local development tutor">
+              <div className="development-tutor-heading"><span aria-hidden="true">◇</span><div><strong>Local Development Tutor</strong><small>Measured, explainable, never auto-applied</small></div></div>
+              {developmentGuidance.length === 0 ? <p>Waiting for the rendered frame analysis…</p> : developmentGuidance.map((item) => (
+                <button className={`guidance-item ${item.severity}`} type="button" key={`${item.title}-${item.evidence}`} onClick={() => setActivePanel(item.targetPanel)}>
+                  <span><strong>{item.title}</strong><small>{item.kind === 'measurement' ? 'Measured fact' : 'Review suggestion'}</small></span>
+                  <p>{item.detail}</p>
+                  <em>{item.evidence}</em>
+                  <b>Open {item.targetPanel} →</b>
+                </button>
+              ))}
+            </div>
             <label className="field-label" htmlFor="ai-edit-prompt">What should RAWcket create?</label>
             <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} />
             <div className="ai-quick-prompts" aria-label="AI prompt ideas">
