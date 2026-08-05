@@ -15,4 +15,12 @@ describe('ToneCurveLut', () => {
     expect(samples.every((value) => value >= 0 && value <= 1)).toBe(true);
     expect(samples.every((value, index) => index === 0 || value >= (samples[index - 1] ?? 0))).toBe(true);
   });
+
+  it('provides an immutable copy for GPU texture upload', () => {
+    const lut = ToneCurveLut.create({ points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'linear' });
+    const first = lut.toFloat32Array();
+    first[512] = 0;
+
+    expect(lut.toFloat32Array()[512]).toBeGreaterThan(0.49);
+  });
 });

@@ -23,6 +23,20 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
 
   await expect(page.getByLabel('Project name')).toHaveValue('night');
   await expect(page.getByLabel('Rendered frame histogram')).toBeVisible();
+  await expect(page.getByText('WebGL2 accelerated preview')).toBeVisible();
+  const acceleratedPixel = await page.getByRole('img', { name: 'Preview of night' }).evaluate(async (element) => {
+    if (!(element instanceof HTMLImageElement)) throw new Error('The accelerated preview is not an image.');
+    await element.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d');
+    if (context === null) throw new Error('The accelerated preview cannot be sampled.');
+    context.drawImage(element, 0, 0, 1, 1);
+    return [...context.getImageData(0, 0, 1, 1).data];
+  });
+  expect(acceleratedPixel[0]).toBeGreaterThan(150);
+  expect(acceleratedPixel[1]).toBeGreaterThan(180);
   await page.getByRole('button', { name: 'Generate editable proposal' }).click();
   await expect(page.getByLabel('AI edit proposal')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Contrast: +14' })).toBeChecked();
@@ -47,6 +61,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await page.getByRole('button', { name: /Local Smart Mask/ }).click();
   await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
+  await expect(page.getByText('CPU compatibility preview')).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
   await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
   const curveGraph = page.locator('.curve-graph');

@@ -29,7 +29,8 @@ const histogramSchema = z.object({
   blue: z.array(z.number().min(0).max(1)).length(64),
   luminance: z.array(z.number().min(0).max(1)).length(64),
   shadowClipping: z.number().min(0).max(1),
-  highlightClipping: z.number().min(0).max(1)
+  highlightClipping: z.number().min(0).max(1),
+  backend: z.enum(['webgl2', 'cpu'])
 });
 
 export const previewWorkerResponseSchema = z.discriminatedUnion('kind', [

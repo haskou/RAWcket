@@ -722,7 +722,7 @@ export function EditorPage(): ReactElement {
                 {!showOriginal && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={project.getMasks().map((mask) => mask.toPrimitives())} />}
               </div>
             )}
-            <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>Reference CPU preview</strong><small>Full global recipe and curves · {renderProgress}</small></span></div>
+            <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{previewAnalysis?.backend === 'webgl2' ? 'GPU global development · CPU geometry' : 'Reference renderer for masks and spatial stages'} · {renderProgress}</small></span></div>
             {showOriginal && <div className="comparison-badge">Original · Before</div>}
             <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
           </div>

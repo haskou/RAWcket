@@ -12,6 +12,7 @@ describe('PixelHistogramAnalyzer', () => {
     expect(result.luminance[63]).toBe(1);
     expect(result.shadowClipping).toBe(0.5);
     expect(result.highlightClipping).toBe(0.5);
+    expect(result.backend).toBe('cpu');
   });
 
   it('rejects malformed pixel buffers', () => {

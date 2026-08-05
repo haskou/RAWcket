@@ -5,6 +5,7 @@ export type PixelHistogram = {
   luminance: number[];
   shadowClipping: number;
   highlightClipping: number;
+  backend: 'webgl2' | 'cpu';
 };
 
 export class PixelHistogramAnalyzer {
@@ -14,7 +15,7 @@ export class PixelHistogramAnalyzer {
     }
   }
 
-  public analyze(pixels: Uint8ClampedArray): PixelHistogram {
+  public analyze(pixels: Uint8ClampedArray, backend: PixelHistogram['backend'] = 'cpu'): PixelHistogram {
     if (pixels.length === 0 || pixels.length % 4 !== 0) throw new Error('A histogram requires a non-empty RGBA pixel buffer.');
     const red = Array<number>(this.bucketCount).fill(0);
     const green = Array<number>(this.bucketCount).fill(0);
@@ -41,7 +42,8 @@ export class PixelHistogramAnalyzer {
       blue: this.normalize(blue),
       luminance: this.normalize(luminance),
       shadowClipping: shadows / pixelsCount,
-      highlightClipping: highlights / pixelsCount
+      highlightClipping: highlights / pixelsCount,
+      backend
     };
   }
 

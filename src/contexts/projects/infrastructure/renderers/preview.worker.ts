@@ -4,6 +4,7 @@ import { CpuViewportTransformer } from './CpuViewportTransformer';
 import { ArwEmbeddedPreviewExtractor } from '../codecs/ArwEmbeddedPreviewExtractor';
 import { PixelHistogramAnalyzer } from './PixelHistogramAnalyzer';
 import { TiffEncoder } from './TiffEncoder';
+import { WebGl2PixelDeveloper } from './WebGl2PixelDeveloper';
 import {
   previewWorkerRequestSchema,
   type PreviewWorkerResponse
@@ -15,6 +16,7 @@ const viewportTransformer = new CpuViewportTransformer();
 const arw = new ArwEmbeddedPreviewExtractor();
 const histogram = new PixelHistogramAnalyzer();
 const tiff = new TiffEncoder();
+const webGl2Developer = new WebGl2PixelDeveloper();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -40,19 +42,16 @@ async function render(input: unknown): Promise<void> {
     context.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
     const imageData = context.getImageData(0, 0, width, height);
-    const pixels = developer.develop(
-      imageData.data,
-      width,
-      height,
-      request.development
-    );
+    const acceleratedPixels = webGl2Developer.develop(imageData.data, width, height, request.development);
+    const pixels = acceleratedPixels ?? developer.develop(imageData.data, width, height, request.development);
+    const backend = acceleratedPixels === null ? 'cpu' : 'webgl2';
     const transformed = viewportTransformer.transform(pixels, width, height, request.development.viewport);
     const outputCanvas = new OffscreenCanvas(transformed.width, transformed.height);
     const outputContext = outputCanvas.getContext('2d', { alpha: false });
     if (outputContext === null) throw new Error('The output preview context could not be created.');
     outputContext.putImageData(new ImageData(transformed.pixels, transformed.width, transformed.height), 0, 0);
     progress(request.id, 'developing', 0.8);
-    const analysis = histogram.analyze(transformed.pixels);
+    const analysis = histogram.analyze(transformed.pixels, backend);
     progress(request.id, 'analyzing', 0.88);
     const image = request.output.mimeType === 'image/tiff'
       ? tiff.encode(transformed.pixels, transformed.width, transformed.height)

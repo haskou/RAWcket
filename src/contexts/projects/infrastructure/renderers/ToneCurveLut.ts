@@ -31,6 +31,10 @@ export class ToneCurveLut {
     return start + (end - start) * mix;
   }
 
+  public toFloat32Array(): Float32Array {
+    return new Float32Array(this.values);
+  }
+
   private static segment(points: ToneCurvePrimitives['points'], x: number): number {
     const found = points.findIndex((point) => point.x >= x);
     return Math.max(0, Math.min(points.length - 2, found <= 0 ? 0 : found - 1));

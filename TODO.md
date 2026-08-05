@@ -18,7 +18,8 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Versioned LRU previews, quota preflight, SHA-256 snapshots, and corruption recovery.
 - [x] Safe, postponable PWA updates and a production CSP without `unsafe-eval`.
 - [ ] Full LibRaw/WASM A6600 demosaicing and high-depth linear development.
-- [ ] WebGPU/WebGL2 pipeline and the remaining capabilities below.
+- [x] WebGL2 global-development/curve shader with explicit CPU fallback for masks and spatial stages.
+- [ ] WebGPU pipeline, complete WebGL2 stage coverage, and the remaining capabilities below.
 
 ## Recommended implementation order
 
@@ -47,6 +48,10 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 **Goal.** Apply the recipe interactively without sacrificing quality or blocking the interface.
 
 **Scope.** Use WebGPU first, WebGL2 as the graphics fallback, and CPU/WASM where appropriate. Produce 512 px thumbnails, 2048–3072 px interactive previews, and full resolution only for final export. Add 1024/4096-entry curve LUTs, initial sRGB color management, future Display P3 support, clipping warnings, RGB/luminance histograms, optional scopes, before/after comparison, intelligent caches, and incremental rendering.
+
+**Implemented.** The worker now selects a real WebGL2 shader for compatible global adjustments, RGB/R/G/B/luminance LUTs, and vignette. Recipes with masks, texture, sharpening, or noise reduction deliberately fall back to the reference CPU pipeline and the active backend is visible in the canvas. The same boundary already provides 2560 px interactive previews, full-resolution export, versioned LRU caching, histograms, clipping, and before/after.
+
+**Remaining.** WebGPU-first compute/render stages, WebGL2 mask and spatial-filter passes, formal CPU/GPU golden-image tolerances, device-loss recovery, Display P3/ICC work, optional scopes, and incremental tiled rendering.
 
 **Dependencies.** Linear RAW engine; capability detection; preview boundary and worker protocol; color fixtures; documented operation order; versioned caches.
 
