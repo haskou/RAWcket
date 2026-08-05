@@ -787,7 +787,7 @@ export function EditorPage(): ReactElement {
           </ToolSection>
           <ToolSection id="curves" title="Tone Curve" active={activePanel === 'curves'} onToggle={setActivePanel} badge="Shortcut 4">
             <p>Edit every channel with draggable or exact numeric points. Double click the graph to add a point.</p>
-            <ToneCurveEditor project={project} onChange={changeCurve} />
+            <ToneCurveEditor project={project} analysis={previewAnalysis} onChange={changeCurve} />
             <div className="curve-presets">
               {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
             </div>

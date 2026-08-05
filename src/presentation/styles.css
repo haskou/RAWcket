@@ -200,6 +200,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .curve-channel-tabs button { min-height: 28px; padding: 0 3px; border: 1px solid #303531; border-radius: 5px; background: #191c1a; color: #858c87; cursor: pointer; font-size: .59rem; }
 .curve-channel-tabs button.active { border-color: #697363; color: var(--text); background: #292d2a; }
 .curve-graph { width: 100%; aspect-ratio: 1; border: 1px solid #394039; border-radius: 7px; background: linear-gradient(145deg, #101211, #090a0a); touch-action: none; cursor: crosshair; }
+.curve-histogram-backdrop { pointer-events: none; }
+.curve-histogram-backdrop polygon { opacity: .28; mix-blend-mode: screen; }
+.curve-histogram-backdrop polygon.luminance { fill: #aab0aa; opacity: .22; }
+.curve-histogram-backdrop polygon.red { fill: #d34742; }
+.curve-histogram-backdrop polygon.green { fill: #45a95b; }
+.curve-histogram-backdrop polygon.blue { fill: #416ed0; }
 .curve-grid { fill: none; stroke: #252a26; stroke-width: .003; vector-effect: non-scaling-stroke; }
 .curve-line { fill: none; stroke: #e1e5df; stroke-width: .009; vector-effect: non-scaling-stroke; }
 .curve-graph.channel-red .curve-line { stroke: #ff7b73; }

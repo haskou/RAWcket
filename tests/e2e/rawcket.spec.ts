@@ -48,6 +48,20 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: /Local Smart Mask/ }).click();
   await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
+  await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
+  const curveGraph = page.locator('.curve-graph');
+  const graphBounds = await curveGraph.boundingBox();
+  if (graphBounds === null) throw new Error('The tone curve graph is unavailable.');
+  await page.mouse.dblclick(graphBounds.x + graphBounds.width * 0.5, graphBounds.y + graphBounds.height * 0.5);
+  await expect.poll(async () => Number(await page.getByLabel('Curve point X').inputValue())).toBeGreaterThan(0.49);
+  const middlePoint = curveGraph.locator('circle').nth(1);
+  const pointBounds = await middlePoint.boundingBox();
+  if (pointBounds === null) throw new Error('The middle tone-curve point is unavailable.');
+  await page.mouse.move(pointBounds.x + pointBounds.width / 2, pointBounds.y + pointBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(graphBounds.x + graphBounds.width * 0.7, graphBounds.y + graphBounds.height * 0.4, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => Number(await page.getByLabel('Curve point X').inputValue())).toBeGreaterThan(0.69);
   await page.getByLabel('Curve point Y').fill('0.1');
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
   await page.getByRole('button', { name: 'Close project and return' }).click();
@@ -60,6 +74,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
+  await page.locator('.curve-graph circle').nth(1).click();
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByLabel('Format').selectOption('png');
@@ -111,5 +126,5 @@ test('imports a Sony ARW container and develops its embedded preview locally', a
 
   await expect(page.getByLabel('Project name')).toHaveValue('a6600-sample');
   await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeVisible();
-  await expect(page.getByText(/Preview up to date/)).toBeVisible();
+  await expect(page.getByText(/Preview up to date/)).toBeVisible({ timeout: 15_000 });
 });

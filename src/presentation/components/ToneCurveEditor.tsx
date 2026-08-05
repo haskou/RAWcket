@@ -1,5 +1,6 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
+import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import {
   CurveChannel,
   ToneCurve,
@@ -17,8 +18,9 @@ const channels: Array<{ value: CurveChannelPrimitive; label: string }> = [
   { value: 'luminance', label: 'Luma' }
 ];
 
-export function ToneCurveEditor({ project, onChange }: {
+export function ToneCurveEditor({ project, analysis, onChange }: {
   project: PhotoProject;
+  analysis: PreviewAnalysis | null;
   onChange: (channel: CurveChannelPrimitive, curve: ToneCurvePrimitives | null, groupId: string | null) => void;
 }): ReactElement {
   const graph = useRef<SVGSVGElement>(null);
@@ -29,8 +31,17 @@ export function ToneCurveEditor({ project, onChange }: {
   const selected = curve.points[selectedIndex] ?? curve.points[0];
 
   const graphPoint = (event: { clientX: number; clientY: number }): { x: number; y: number } | null => {
-    const bounds = graph.current?.getBoundingClientRect();
+    const activeGraph = graph.current;
+    const bounds = activeGraph?.getBoundingClientRect();
     if (bounds === undefined || bounds.width === 0 || bounds.height === 0) return null;
+    const matrix = activeGraph?.getScreenCTM();
+    if (matrix !== null && matrix !== undefined && typeof DOMPoint !== 'undefined') {
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+      return {
+        x: Math.min(1, Math.max(0, point.x)),
+        y: Math.min(1, Math.max(0, 1 - point.y))
+      };
+    }
     return {
       x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
       y: Math.min(1, Math.max(0, 1 - (event.clientY - bounds.top) / bounds.height))
@@ -50,8 +61,7 @@ export function ToneCurveEditor({ project, onChange }: {
     onChange(channel, { ...latest, points: nextPoints }, groupId);
   };
 
-  const addPoint = (event: ReactPointerEvent<SVGSVGElement>): void => {
-    if (event.detail < 2) return;
+  const addPoint = (event: ReactMouseEvent<SVGSVGElement>): void => {
     const point = graphPoint(event);
     if (point === null || point.x <= 0 || point.x >= 1) return;
     const points = [...curve.points, point].sort((left, right) => left.x - right.x);
@@ -98,14 +108,15 @@ export function ToneCurveEditor({ project, onChange }: {
         viewBox="0 0 1 1"
         preserveAspectRatio="none"
         aria-label={`${channel.toUpperCase()} tone curve. Double click to add a point.`}
-        onPointerDown={addPoint}
+        onDoubleClick={addPoint}
         onPointerMove={dragPoint}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
+        <CurveHistogramBackdrop analysis={analysis} channel={channel} />
         <path className="curve-grid" d="M0 .25H1 M0 .5H1 M0 .75H1 M.25 0V1 M.5 0V1 M.75 0V1" />
         <polyline className="curve-line" points={curve.points.map((point) => `${point.x},${1 - point.y}`).join(' ')} />
-        {curve.points.map((point, index) => <circle className={index === selectedIndex ? 'selected' : ''} key={`${point.x}-${index}`} cx={point.x} cy={1 - point.y} r="0.025" tabIndex={0} aria-label={`Curve point ${index + 1}: x ${point.x}, y ${point.y}`} onPointerDown={(event) => beginDrag(event, index)} onFocus={() => setSelectedIndex(index)} />)}
+        {curve.points.map((point, index) => <circle className={index === selectedIndex ? 'selected' : ''} key={index} cx={point.x} cy={1 - point.y} r="0.025" tabIndex={0} aria-label={`Curve point ${index + 1}: x ${point.x}, y ${point.y}`} onPointerDown={(event) => beginDrag(event, index)} onFocus={() => setSelectedIndex(index)} />)}
       </svg>
       <div className="curve-point-values">
         <label>X <input aria-label="Curve point X" type="number" min={0} max={1} step={0.001} disabled={selectedIndex === 0 || selectedIndex === curve.points.length - 1} value={selected?.x ?? 0} onChange={(event) => movePoint(selectedIndex, event.currentTarget.valueAsNumber, selected?.y ?? 0, null)} /></label>
@@ -117,5 +128,30 @@ export function ToneCurveEditor({ project, onChange }: {
         <button type="button" onClick={reset}>Reset channel</button>
       </div>
     </div>
+  );
+}
+
+function CurveHistogramBackdrop({ analysis, channel }: {
+  analysis: PreviewAnalysis | null;
+  channel: CurveChannelPrimitive;
+}): ReactElement | null {
+  if (analysis === null) return null;
+  const areas = channel === 'rgb'
+    ? [
+        { values: analysis.luminance, className: 'luminance' },
+        { values: analysis.red, className: 'red' },
+        { values: analysis.green, className: 'green' },
+        { values: analysis.blue, className: 'blue' }
+      ]
+    : [{
+        values: channel === 'red' ? analysis.red : channel === 'green' ? analysis.green : channel === 'blue' ? analysis.blue : analysis.luminance,
+        className: channel === 'luminance' ? 'luminance' : channel
+      }];
+  return (
+    <svg className="curve-histogram-backdrop" x="0" y="0" width="1" height="1" viewBox="0 0 64 1" preserveAspectRatio="none" aria-hidden="true">
+      {areas.map((area) => (
+        <polygon key={area.className} className={area.className} points={['0,1', ...area.values.map((value, index) => `${index + 0.5},${1 - value}`), '64,1'].join(' ')} />
+      ))}
+    </svg>
   );
 }
