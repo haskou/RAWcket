@@ -109,9 +109,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Rule-of-thirds, dense twenty-division grid, diagonal, and golden-ratio overlays are available from both the canvas and geometry panel. The overlay stays fixed while the photograph moves below it, replacing a redundant separate level toggle. Guides are editing-only and excluded from export. Fit recalculates against the live canvas after either sidebar changes size.
 
-**Implemented.** Direct corner-to-corner crop selection, translucent excluded area, free/original/common locked aspect ratios, persistent four-corner resizing after placement, exact numeric alternatives, persistence, and one-step undo.
+**Implemented.** Direct corner-to-corner crop selection, translucent excluded area, free/original/common locked aspect ratios, persistent four-corner resizing after placement, exact numeric alternatives, persistence, and one-step undo. Deterministic on-device Sobel analysis estimates dominant horizontal or architectural vertical edges from a bounded 512 px preview, exposes confidence, refuses weak evidence, and applies a normal reversible rotation without AI or upload.
 
-**Remaining.** Perspective/vertical/horizontal pixel correction, automatic horizon estimation, and touch gesture polish.
+**Remaining.** Perspective/vertical/horizontal pixel correction and touch gesture polish.
 
 **Dependencies.** Existing `ViewportTransform`; renderer integration; pointer/touch/trackpad gestures; homography math; EXIF orientation.
 

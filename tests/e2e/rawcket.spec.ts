@@ -16,6 +16,12 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
     if (context === null) throw new Error('Canvas is unavailable in the test.');
     context.fillStyle = '#c9f06b';
     context.fillRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = '#172019';
+    context.lineWidth = 8;
+    context.beginPath();
+    context.moveTo(0, 140);
+    context.lineTo(canvas.width, 100);
+    context.stroke();
     return canvas.toDataURL('image/png').split(',')[1] ?? '';
   });
   const png = Buffer.from(pngBase64, 'base64');
@@ -135,6 +141,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   expect(horizontalCenterDelta).toBeLessThan(2);
   await page.getByRole('button', { name: 'Expand Active Recipe' }).click();
   await page.getByLabel('Editing tools').getByRole('button', { name: /Crop & Geometry/ }).click();
+  await page.getByRole('button', { name: 'Auto straighten · local' }).click();
+  await expect(page.getByText(/Applied [+-]\d+\.\d° from local edge evidence/)).toBeVisible();
+  await expect.poll(async () => Math.abs(Number(await page.getByLabel('Rotation numeric value').inputValue()))).toBeGreaterThan(3);
   await page.getByLabel('Geometry composition guide').selectOption('grid');
   await expect(page.getByLabel('Fixed composition grid')).toBeVisible();
   await expect(page.locator('.composition-guide-overlay .grid-minor')).toHaveCount(16);

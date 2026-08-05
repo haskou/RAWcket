@@ -16,6 +16,7 @@ import { CreateProject } from '@/contexts/projects/application/create-project/Cr
 import { CreateSemanticMask } from '@/contexts/projects/application/create-semantic-mask/CreateSemanticMask';
 import { DeleteProject } from '@/contexts/projects/application/delete-project/DeleteProject';
 import { DuplicateProject } from '@/contexts/projects/application/duplicate-project/DuplicateProject';
+import { EstimateHorizon } from '@/contexts/projects/application/estimate-horizon/EstimateHorizon';
 import { ExportProjectPhoto } from '@/contexts/projects/application/export-project-photo/ExportProjectPhoto';
 import { ExportProjectSidecar } from '@/contexts/projects/application/export-project-sidecar/ExportProjectSidecar';
 import { FindProject } from '@/contexts/projects/application/find-project/FindProject';
@@ -58,6 +59,7 @@ import { OpenAiEditProposalMapper } from '@/contexts/projects/infrastructure/adv
 import { OpenAiImportCandidateReviewer } from '@/contexts/projects/infrastructure/advisors/OpenAiImportCandidateReviewer';
 import { OpenAiPhotoOpinionAdvisor } from '@/contexts/projects/infrastructure/advisors/OpenAiPhotoOpinionAdvisor';
 import { BrowserSemanticSegmentationModel } from '@/contexts/projects/infrastructure/ai/BrowserSemanticSegmentationModel';
+import { BrowserHorizonEstimator } from '@/contexts/projects/infrastructure/analysis/BrowserHorizonEstimator';
 import { BrowserDevelopmentSettingsClipboard } from '@/contexts/projects/infrastructure/clipboard/BrowserDevelopmentSettingsClipboard';
 import { JsonProjectSidecarCodec } from '@/contexts/projects/infrastructure/sidecars/JsonProjectSidecarCodec';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
@@ -82,6 +84,7 @@ export type Application = {
   suggestPhotoTags: SuggestPhotoTags;
   deleteProject: DeleteProject;
   duplicateProject: DuplicateProject;
+  estimateHorizon: EstimateHorizon;
   sourceFiles: SourceFileRepository;
   projectExporter: ProjectExporter;
   projectImporter: ProjectImporter;
@@ -149,6 +152,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     suggestPhotoTags: new SuggestPhotoTags(semanticSegmentationModel),
     deleteProject: new DeleteProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     duplicateProject: new DuplicateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
+    estimateHorizon: new EstimateHorizon(new BrowserHorizonEstimator()),
     sourceFiles,
     projectExporter: bundle,
     projectImporter: bundle,

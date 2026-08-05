@@ -11,11 +11,14 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-export function GeometryControls({ project, onChange, guide, onGuideChange }: {
+export function GeometryControls({ project, onChange, guide, onGuideChange, horizonBusy, horizonMessage, onAutoStraighten }: {
   project: PhotoProject;
   onChange: (viewport: ViewportTransformPrimitives, groupId: string | null) => void;
   guide: CompositionGuide;
   onGuideChange: (guide: CompositionGuide) => void;
+  horizonBusy: boolean;
+  horizonMessage: string;
+  onAutoStraighten: () => void;
 }): ReactElement {
   const groups = useRef(new Map<string, string>());
   const viewport = project.getViewportTransform().toPrimitives();
@@ -55,6 +58,10 @@ export function GeometryControls({ project, onChange, guide, onGuideChange }: {
         <summary>Framing and straightening guides</summary>
         <p>Guides stay fixed while the photograph moves underneath them, so the dense grid can check both horizons and vertical architecture. They never appear in export.</p>
       </details>
+      <div className="auto-straighten-control">
+        <button className="button ghost full" type="button" disabled={horizonBusy} onClick={onAutoStraighten}>{horizonBusy ? 'Analyzing horizon…' : 'Auto straighten · local'}</button>
+        <small aria-live="polite">{horizonMessage}</small>
+      </div>
       <div className="composition-guide-controls">
         <label>Composition overlay<select aria-label="Geometry composition guide" value={guide} onChange={(event) => onGuideChange(event.target.value as CompositionGuide)}><option value="none">None</option><option value="thirds">Rule of thirds</option><option value="grid">Dense fixed grid</option><option value="diagonals">Diagonals</option><option value="golden-ratio">Golden ratio</option></select></label>
         <label>Crop aspect ratio<select aria-label="Crop aspect ratio" value={aspectRatioValue(viewport.aspectRatio, originalRatio)} onChange={(event) => onChange({ ...viewport, aspectRatio: ratioFromValue(event.target.value, originalRatio) }, null)}><option value="free">Free</option><option value="original">Original · locked</option><option value="1:1">1:1 · Square</option><option value="3:2">3:2</option><option value="4:3">4:3</option><option value="5:4">5:4</option><option value="16:9">16:9</option></select></label>

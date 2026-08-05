@@ -20,6 +20,7 @@ import { CreateSemanticMaskMessage } from '@/contexts/projects/application/creat
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { ExportProjectPhotoMessage } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
 import { ExportProjectSidecarMessage } from '@/contexts/projects/application/export-project-sidecar/messages/ExportProjectSidecarMessage';
+import { EstimateHorizonMessage } from '@/contexts/projects/application/estimate-horizon/messages/EstimateHorizonMessage';
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
@@ -135,6 +136,7 @@ export function EditorPage(): ReactElement {
   const cropGesture = useRef<CropGesture | null>(null);
   const cropDraftValue = useRef<ViewportTransformPrimitives['cropFrame'] | null>(null);
   const exportAbort = useRef<AbortController | null>(null);
+  const horizonAbort = useRef<AbortController | null>(null);
   const sidecarInput = useRef<HTMLInputElement>(null);
   const semanticAbort = useRef<AbortController | null>(null);
   const renderSequence = useRef(0);
@@ -183,6 +185,8 @@ export function EditorPage(): ReactElement {
   const [semanticCategory, setSemanticCategory] = useState<SemanticMaskCategoryPrimitive>('sky');
   const [semanticConsent, setSemanticConsent] = useState(false);
   const [semanticMessage, setSemanticMessage] = useState('The semantic model is optional. Manual and point-guided masks always remain available.');
+  const [horizonBusy, setHorizonBusy] = useState(false);
+  const [horizonMessage, setHorizonMessage] = useState('Local edge analysis can estimate a dominant horizon or architectural vertical.');
   const [loadError, setLoadError] = useState<string | null>(null);
   const sourceUrl = useObjectUrl(showOriginal ? beforeSource : preview ?? beforeSource);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
@@ -201,6 +205,7 @@ export function EditorPage(): ReactElement {
     return () => {
       mounted = false;
       semanticAbort.current?.abort();
+      horizonAbort.current?.abort();
     };
   }, [application]);
 
@@ -502,6 +507,33 @@ export function EditorPage(): ReactElement {
 
   const changeViewport = (viewport: ViewportTransformPrimitives, groupId: string | null): void => {
     apply({ kind: EDIT_OPERATION.SET_VIEWPORT_TRANSFORM, viewport, groupId });
+  };
+
+  const autoStraighten = async (): Promise<void> => {
+    if (beforeSource === null || project === null || horizonBusy) return;
+    horizonAbort.current?.abort();
+    const controller = new AbortController();
+    horizonAbort.current = controller;
+    setHorizonBusy(true);
+    setHorizonMessage('Analyzing strong horizontal and vertical edges locally…');
+    try {
+      const estimate = await application.estimateHorizon.estimate(new EstimateHorizonMessage(beforeSource), controller.signal);
+      if (!estimate.reliable) {
+        setHorizonMessage('No reliable horizon was found. Use the dense grid and exact rotation control.');
+        return;
+      }
+      const viewport = project.getViewportTransform().toPrimitives();
+      const rotationDegrees = Math.min(180, Math.max(-180, Math.round((viewport.rotationDegrees + estimate.correctionDegrees) * 10) / 10));
+      changeViewport({ ...viewport, rotationDegrees }, null);
+      setHorizonMessage(`Applied ${estimate.correctionDegrees > 0 ? '+' : ''}${estimate.correctionDegrees.toFixed(1)}° from local edge evidence · ${Math.round(estimate.confidence * 100)}% directional confidence.`);
+    } catch (error: unknown) {
+      setHorizonMessage(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Horizon estimation cancelled.'
+        : error instanceof Error ? error.message : 'The horizon could not be estimated.');
+    } finally {
+      horizonAbort.current = null;
+      setHorizonBusy(false);
+    }
   };
 
   const updateMask = (mask: MaskDefinitionPrimitives, groupId: string | null): void => {
@@ -1150,7 +1182,7 @@ export function EditorPage(): ReactElement {
           </ToolSection>
           <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel} badge="Rendered">
             <p>Drag from one corner to the opposite corner on the photograph. The translucent area is excluded; use a locked ratio or choose Free.</p>
-            <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} onGuideChange={setCompositionGuide} />
+            <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} onGuideChange={setCompositionGuide} horizonBusy={horizonBusy} horizonMessage={horizonMessage} onAutoStraighten={() => void autoStraighten()} />
           </ToolSection>
           <ToolSection id="masks" title="Masks" active={activePanel === 'masks'} onToggle={setActivePanel} badge="AI ready">
             <p>Local masks remain editable recipe data. Brush and radial coverage now render through the reference pipeline.</p>

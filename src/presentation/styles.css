@@ -279,6 +279,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .curve-point-values button, .curve-footer button, .curve-footer select { min-height: 30px; border: 1px solid #333834; border-radius: 6px; background: #1a1d1b; color: #aeb4af; padding: 0 7px; font-size: .61rem; }
 .curve-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .geometry-controls { display: grid; gap: 16px; }
+.auto-straighten-control { display: grid; gap: 6px; padding: 9px; border: 1px solid #354034; border-radius: 9px; background: rgba(201,240,107,.035); }
+.auto-straighten-control small { color: #8f9890; font-size: .62rem; line-height: 1.45; }
 .context-help { border: 1px solid #343a35; border-radius: 8px; background: #111412; color: #909991; }
 .context-help summary { padding: 9px 10px; color: #c3cac4; cursor: pointer; font-size: .65rem; font-weight: 750; }
 .context-help p, .context-help ol { margin: 0; padding: 0 11px 11px; font-size: .61rem; line-height: 1.55; }

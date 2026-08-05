@@ -12,6 +12,7 @@ flowchart LR
   BUNDLE[".rawcket bundle"] -. implements .-> PORTS
   RENDER["Cached worker preview renderer"] -. implements .-> PORTS
   ADVISOR["Local advisor + tutor"] -. implements .-> PORTS
+  ANALYSIS["Local horizon analysis"] -. implements .-> PORTS
   SEMANTIC["Consented browser semantic model"] -. implements .-> PORTS
   IDB --> ZOD["Zod + migrations"]
   BUNDLE --> ZOD
@@ -48,6 +49,7 @@ Project/source mutations cross IndexedDB and OPFS, so `projectAssetJournal` reco
 - `PreviewRenderer` isolates worker and image-pipeline concerns from React and the domain.
 - `EditingAdvisor` can return only `EditOperation` proposals and never receives authority to mutate an aggregate.
 - `SemanticSegmentationModel` owns the optional model lifecycle and returns only normalized suggestions. `CreateSemanticMask` converts region suggestions into domain-owned, versioned `MaskDefinition` values; `SuggestPhotoTags` validates category suggestions as `ProjectTags` before the import flow records the normal reversible tag operation.
+- `HorizonEstimator` reads only a bounded local preview and returns correction/confidence evidence. `EstimateHorizon` validates that result before presentation can convert it into the existing reversible viewport operation.
 - Portable development settings exclude source identity, geometry, masks, and disposable caches; paste and presets use one reversible aggregate operation.
 
 ## Save flow

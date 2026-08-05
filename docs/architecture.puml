@@ -6,6 +6,7 @@ component "Domain / PhotoProject" as Domain
 component "Infrastructure / IndexedDB snapshots + OPFS" as Persistence
 component "Infrastructure / .rawcket bundles" as Bundles
 component "Infrastructure / Local advisor + tutor" as Advisor
+component "Infrastructure / Local horizon analysis" as Horizon
 component "Infrastructure / Cached worker renderer" as Renderer
 component "Infrastructure / Consented semantic masks + tags" as Semantic
 
@@ -14,6 +15,7 @@ Application --> Domain
 Persistence ..> Application : implements ports
 Bundles ..> Application : implements ports
 Advisor ..> Application : implements port
+Horizon ..> Application : implements port
 Renderer ..> Application : implements ports
 Semantic ..> Application : implements port
 @enduml
