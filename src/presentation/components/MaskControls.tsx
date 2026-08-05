@@ -98,6 +98,11 @@ export function MaskControls({
     onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes: [{ x: 0.2, y: 0.2, width: 0.6, height: 0.6 }] } }, null);
   };
 
+  const removeAiBoundingBox = (): void => {
+    if (selected?.shape.kind !== 'ai-segmentation') return;
+    onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes: [] } }, null);
+  };
+
   const updateAiBoundingBox = (field: 'x' | 'y' | 'width' | 'height', value: number, groupId: string | null): void => {
     if (selected?.shape.kind !== 'ai-segmentation' || !Number.isFinite(value)) return;
     const current = selected.shape.boundingBoxes[0];
@@ -185,7 +190,7 @@ export function MaskControls({
                 <>
                   <div className="geometry-grid-heading">Constraint box</div>
                   {(['x', 'y', 'width', 'height'] as const).map((field) => <MaskNumberControl key={field} label={boxFieldLabel(field)} value={selectedAiBoundingBox?.[field] ?? 0} minimum={0} maximum={1} step={0.001} groupKey={`ai-box-${field}`} groups={groups.current} onChange={(value, groupId) => updateAiBoundingBox(field, value, groupId)} />)}
-                  <button className="button ghost full" type="button" onClick={() => onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes: [] } }, null)}>Remove constraint box</button>
+                  <button className="button ghost full" type="button" onClick={removeAiBoundingBox}>Remove constraint box</button>
                 </>
               )}
             </>
