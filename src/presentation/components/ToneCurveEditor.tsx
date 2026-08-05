@@ -29,6 +29,8 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
   const keyboardGroup = useRef<string | null>(null);
   const [channel, setChannel] = useState<CurveChannelPrimitive>('rgb');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [copiedCurve, setCopiedCurve] = useState<ToneCurvePrimitives | null>(null);
+  const [copiedChannel, setCopiedChannel] = useState<CurveChannelPrimitive | null>(null);
   const curve = project.getCurve(CurveChannel.fromPrimitives(channel))?.toPrimitives() ?? ToneCurve.identity().toPrimitives();
   const selected = selectedIndex === null ? undefined : curve.points[selectedIndex];
   const identity = curve.points.length === 2
@@ -128,6 +130,15 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
   };
 
   const changeInterpolation = (interpolation: CurveInterpolationPrimitive): void => onChange(channel, { ...curve, interpolation }, null);
+  const copyChannel = (): void => {
+    setCopiedCurve(ToneCurve.fromPrimitives(curve).toPrimitives());
+    setCopiedChannel(channel);
+  };
+  const pasteChannel = (): void => {
+    if (copiedCurve === null) return;
+    onChange(channel, ToneCurve.fromPrimitives(copiedCurve).toPrimitives(), null);
+    setSelectedIndex(null);
+  };
   const reset = (): void => {
     onChange(channel, channel === 'luminance' ? null : ToneCurve.identity().toPrimitives(), null);
     setSelectedIndex(null);
@@ -166,9 +177,15 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
       <div className="curve-footer">
         <select aria-label="Curve interpolation" value={curve.interpolation} onChange={(event) => changeInterpolation(event.target.value === 'linear' ? 'linear' : 'monotonic-cubic')}><option value="monotonic-cubic">Monotonic cubic</option><option value="linear">Linear</option></select>
         <button type="button" onClick={reset}>Reset channel</button>
+        <button type="button" onClick={copyChannel}>Copy {channelLabel(channel)} curve</button>
+        <button type="button" disabled={copiedCurve === null} onClick={pasteChannel}>{copiedChannel === null ? 'Paste curve' : `Paste ${channelLabel(copiedChannel)} to ${channelLabel(channel)}`}</button>
       </div>
     </div>
   );
+}
+
+function channelLabel(channel: CurveChannelPrimitive): string {
+  return channels.find((candidate) => candidate.value === channel)?.label ?? channel.toUpperCase();
 }
 
 function CurveHistogramBackdrop({ analysis, channel }: {

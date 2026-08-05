@@ -147,6 +147,10 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await middlePoint.focus();
   await page.keyboard.press('Shift+ArrowUp');
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.11');
+  await page.getByRole('button', { name: 'Copy RGB curve' }).click();
+  await page.getByRole('tab', { name: 'Red' }).click();
+  await page.getByRole('button', { name: 'Paste RGB to Red' }).click();
+  await expect(page.locator('.curve-graph.channel-red circle')).toHaveCount(3);
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
   await page.getByRole('button', { name: 'Rate night 4 stars' }).click();

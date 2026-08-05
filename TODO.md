@@ -90,7 +90,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Every visible control point is keyboard-focusable. Arrow keys move it in precise 0.001 increments, Shift increases the step to 0.01, Delete removes an internal point, and held-key repeats collapse into one history gesture. Exact X/Y fields remain the non-visual alternative.
 
-**Remaining.** Per-channel copy/paste, local mask curves, deeper educational channel help, and final touch audit.
+**Implemented.** A validated in-editor channel clipboard can copy the complete point/interpolation definition and paste it into RGB, R, G, B, or luminance as one reversible operation.
+
+**Remaining.** Local mask curves, deeper educational channel help, and final touch audit.
 
 **Acceptance.** X coordinates never cross or duplicate; a drag is one history action; monotonic cubic interpolation does not overshoot; LUT and CPU evaluator agree; reset/copy preserve the channel; clipping is not communicated by color alone.
 

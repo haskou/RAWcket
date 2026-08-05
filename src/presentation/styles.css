@@ -275,7 +275,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .curve-point-values label { display: flex; align-items: center; gap: 4px; color: #818983; font-size: .62rem; }
 .curve-point-values input { width: 100%; min-width: 0; height: 30px; border: 1px solid #333834; border-radius: 6px; background: #0d0f0e; color: var(--accent); padding: 0 4px; font-size: .65rem; }
 .curve-point-values button, .curve-footer button, .curve-footer select { min-height: 30px; border: 1px solid #333834; border-radius: 6px; background: #1a1d1b; color: #aeb4af; padding: 0 7px; font-size: .61rem; }
-.curve-footer { display: grid; grid-template-columns: 1fr auto; gap: 5px; }
+.curve-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .geometry-controls { display: grid; gap: 16px; }
 .context-help { border: 1px solid #343a35; border-radius: 8px; background: #111412; color: #909991; }
 .context-help summary { padding: 9px 10px; color: #c3cac4; cursor: pointer; font-size: .65rem; font-weight: 750; }
