@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
+import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import {
@@ -61,18 +61,23 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
     onChange(channel, { ...latest, points: nextPoints }, groupId);
   };
 
-  const addPoint = (event: ReactMouseEvent<SVGSVGElement>): void => {
+  const beginGraphDrag = (event: ReactPointerEvent<SVGSVGElement>): void => {
+    if (event.target instanceof SVGCircleElement) return;
     const point = graphPoint(event);
     if (point === null || point.x <= 0 || point.x >= 1) return;
-    const points = [...curve.points, point].sort((left, right) => left.x - right.x);
+    const latest = project.getCurve(CurveChannel.fromPrimitives(channel))?.toPrimitives() ?? ToneCurve.identity().toPrimitives();
+    const points = [...latest.points, point].sort((left, right) => left.x - right.x);
     const index = points.findIndex((candidate) => candidate === point);
+    const groupId = crypto.randomUUID();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { pointerId: event.pointerId, pointIndex: index, groupId };
     setSelectedIndex(index);
-    onChange(channel, { ...curve, points }, null);
+    onChange(channel, { ...latest, points }, groupId);
   };
 
   const beginDrag = (event: ReactPointerEvent<SVGCircleElement>, pointIndex: number): void => {
     event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    graph.current?.setPointerCapture(event.pointerId);
     drag.current = { pointerId: event.pointerId, pointIndex, groupId: crypto.randomUUID() };
     setSelectedIndex(pointIndex);
   };
@@ -85,7 +90,9 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
   };
 
   const endDrag = (event: ReactPointerEvent<SVGSVGElement>): void => {
-    if (drag.current?.pointerId === event.pointerId) drag.current = null;
+    if (drag.current?.pointerId !== event.pointerId) return;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
   const removeSelected = (): void => {
@@ -107,8 +114,8 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
         className={`curve-graph channel-${channel}`}
         viewBox="0 0 1 1"
         preserveAspectRatio="none"
-        aria-label={`${channel.toUpperCase()} tone curve. Double click to add a point.`}
-        onDoubleClick={addPoint}
+        aria-label={`${channel.toUpperCase()} tone curve. Click or drag to add a point.`}
+        onPointerDown={beginGraphDrag}
         onPointerMove={dragPoint}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
@@ -118,6 +125,8 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
         <polyline className="curve-line" points={curve.points.map((point) => `${point.x},${1 - point.y}`).join(' ')} />
         {curve.points.map((point, index) => <circle className={index === selectedIndex ? 'selected' : ''} key={index} cx={point.x} cy={1 - point.y} r="0.025" tabIndex={0} aria-label={`Curve point ${index + 1}: x ${point.x}, y ${point.y}`} onPointerDown={(event) => beginDrag(event, index)} onFocus={() => setSelectedIndex(index)} />)}
       </svg>
+      <div className="curve-axis-labels"><span>Output (Y)</span><span>Input (X)</span></div>
+      <p className="curve-interaction-hint">Click or drag on the graph to create and position a control point.</p>
       <div className="curve-point-values">
         <label>X <input aria-label="Curve point X" type="number" min={0} max={1} step={0.001} disabled={selectedIndex === 0 || selectedIndex === curve.points.length - 1} value={selected?.x ?? 0} onChange={(event) => movePoint(selectedIndex, event.currentTarget.valueAsNumber, selected?.y ?? 0, null)} /></label>
         <label>Y <input aria-label="Curve point Y" type="number" min={0} max={1} step={0.001} value={selected?.y ?? 0} onChange={(event) => movePoint(selectedIndex, selected?.x ?? 0, event.currentTarget.valueAsNumber, null)} /></label>
