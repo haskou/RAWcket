@@ -11,26 +11,31 @@ The original is never modified. Every human, preset, or AI change becomes a seri
 Implemented:
 
 - Strict TypeScript React/Vite application with responsive, accessible foundations.
-- Local library with JPEG/PNG import, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, and portable project bundles.
+- Local library with JPEG/PNG/Sony ARW import, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, quota preflight, and portable project bundles.
 - Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
 - Navigable Active Recipe sidebar with a reversible enable switch for every global parameter.
-- Reference CPU renderer in a cancellable Web Worker for all current global adjustments, independent RGB/luminance curves, progress, timeout, and bounded concurrency.
+- Reference CPU renderer in a cancellable Web Worker for sixteen global adjustments, independent RGB/luminance curves, geometry, local masks, histograms, clipping analysis, progress, timeout, bounded concurrency, and a versioned LRU preview cache.
 - Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
-- IndexedDB project/index/settings persistence and OPFS originals with an IndexedDB fallback.
+- IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
-- Versioned schema migrations through version 2.
-- AI disabled by default, with an optional AES-GCM/PBKDF2 key vault whose master password is never stored.
-- Optional PWA installation and an offline app shell after the first successful load.
+- Versioned schema migrations through version 3.
+- AI-first workspace with local, reviewable recipe proposals, a measurement-backed development tutor, and deterministic positive/negative-point smart masks. Optional cloud AI remains disabled by default.
+- Optional AES-GCM/PBKDF2 API-key vault whose master password is never stored.
+- Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
+- Interactive curves, before/after, exact geometry, brush/radial/linear/luminance masks, portable development settings, and built-in reversible presets.
+- Optional PWA installation, an offline app shell after first load, and user-controlled update activation.
 - Unit, integration, and Chromium E2E coverage; CI for lint, typecheck, tests, build, and E2E.
 
 Not implemented yet:
 
-- RAW/ARW decoding, demosaicing, or a high-depth linear pipeline.
-- WebGPU/WebGL2 rendering, interactive curve graph, geometry rasterization, histograms, and rendered masks.
-- Local AI segmentation, a connected editing advisor, or provider calls.
-- Final photographic JPEG/PNG/TIFF export. The current Export action creates a portable project bundle.
+- Full LibRaw/WASM demosaicing and a high-depth linear RAW pipeline. Sony ARW currently uses its embedded JPEG preview while preserving the original `.arw` in storage and bundles.
+- WebGPU/WebGL2 rendering and GPU/CPU golden-image parity.
+- Downloadable ONNX segmentation models, semantic categories, and a consented optional cloud provider.
+- Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
+- 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.
+- Tags, ratings, collections, sidecars, filesystem links, complete orphan cleanup, and a full WCAG/browser-device audit.
 
 The detailed, actively maintained plan is in [TODO.md](TODO.md).
 
@@ -72,7 +77,7 @@ See [docs/architecture.md](docs/architecture.md) and the [ADRs](docs/adr/).
 
 ## Local storage
 
-Projects, indexes, and preferences live in IndexedDB. JPEG/PNG originals use OPFS when available and an IndexedDB object store otherwise. RAWcket requests persistent storage but remains functional when the browser rejects it.
+Projects, indexes, snapshots, and preferences live in IndexedDB. JPEG/PNG/ARW originals use OPFS when available and an IndexedDB object store otherwise. RAWcket requests persistent storage, reports quota and eviction status, and refuses unsafe imports before exhausting the browser quota.
 
 A browser may purge data because of quota, policy, or user action. **Local storage is not a replacement for a backup.** Export `.rawcket` bundles regularly.
 
@@ -83,7 +88,7 @@ A `.rawcket` file is a ZIP containing:
 ```text
 manifest.json    format, versions, sizes, and SHA-256 values
 project.json     versioned recipe, metadata, history, and UI state
-original.jpg     or original.png
+original.jpg     or original.png / original.arw
 ```
 
 Import validates the manifest, format version, every hash, and the Zod schema before hydrating the domain model. If an ID already exists, RAWcket generates a new one to prevent overwriting.
@@ -92,7 +97,7 @@ Import validates the manifest, format version, every hash, and the Zod schema be
 
 - There is no backend, account, authentication, analytics, or mandatory SaaS.
 - No image or metadata leaves the device without an explicit future consent flow.
-- AI is disabled by default and its disabled adapter fails explicitly.
+- Local AI-style assistance runs without a network. Optional provider access is disabled by default.
 - An API key can remain in session memory or be encrypted with AES-GCM; its decryption key is derived from a master password that is never stored.
 - Keys never become part of projects, bundles, logs, or errors.
 
@@ -118,11 +123,12 @@ docs/adr/                      architecture decisions
 
 ## Known limitations
 
-- Only JPEG and PNG can currently be imported.
+- Sony ARW development currently uses the embedded JPEG preview; sensor mosaics are not demosaiced yet.
 - The reference CPU algorithms prioritize deterministic architecture and testability over production photographic quality.
 - OPFS, persistent-storage requests, workers, and PWA behavior depend on browser capabilities and degrade safely.
 - `pagehide` cannot guarantee completion of asynchronous writes when a process terminates abruptly; debouncing reduces the loss window.
 - The vault protects data at rest, not against XSS executing in the same origin.
+- TIFF export is currently uncompressed RGB 8-bit because the reference pipeline is 8-bit.
 - The experience prioritizes desktop while retaining a functional tablet/mobile layout.
 
 ## Contributing

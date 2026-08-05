@@ -3,13 +3,15 @@ skinparam componentStyle rectangle
 component "Presentation / React" as Presentation
 component "Application / use cases" as Application
 component "Domain / PhotoProject" as Domain
-component "Infrastructure / IndexedDB + OPFS" as Persistence
+component "Infrastructure / IndexedDB snapshots + OPFS" as Persistence
 component "Infrastructure / .rawcket bundles" as Bundles
-component "Infrastructure / Disabled advisor" as Advisor
+component "Infrastructure / Local advisor + tutor" as Advisor
+component "Infrastructure / Cached worker renderer" as Renderer
 
 Presentation --> Application
 Application --> Domain
 Persistence ..> Application : implements ports
 Bundles ..> Application : implements ports
 Advisor ..> Application : implements port
+Renderer ..> Application : implements ports
 @enduml

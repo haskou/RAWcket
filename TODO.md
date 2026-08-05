@@ -10,16 +10,23 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 - [x] Sliders, exact numeric entry, reset, grouped history, and per-adjustment enable/disable state.
 - [x] Navigable Active Recipe sidebar, preview pan/zoom, and keyboard shortcuts.
 - [x] English UI and user-facing errors.
-- [ ] LibRaw/WASM and Sony A6600 ARW support.
+- [x] Interactive RGB/R/G/B/luminance curve graph with draggable and exact points.
+- [x] Rendered non-destructive crop/geometry, before/after, masks, histogram, and clipping.
+- [x] Local reviewable AI proposals, measurement-backed tutor, and deterministic smart-point masks.
+- [x] JPEG/PNG/TIFF worker export with resize, progress, and cancellation.
+- [x] ARW embedded-preview extraction while preserving the original RAW.
+- [x] Versioned LRU previews, quota preflight, SHA-256 snapshots, and corruption recovery.
+- [x] Safe, postponable PWA updates and a production CSP without `unsafe-eval`.
+- [ ] Full LibRaw/WASM A6600 demosaicing and high-depth linear development.
 - [ ] WebGPU/WebGL2 pipeline and the remaining capabilities below.
 
 ## Recommended implementation order
 
-1. Finish the interactive tone-curve editor and geometry tools on the reference renderer.
-2. Prototype LibRaw/WASM in a worker with a redistributable Sony A6600 ARW fixture.
-3. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
-4. Add WebGPU and WebGL2 renderers behind the existing preview boundary.
-5. Build manual masks before local AI segmentation and optional cloud assistance.
+1. Prototype LibRaw/WASM in a worker with a redistributable Sony A6600 ARW fixture.
+2. Establish golden-image tests for the versioned sRGB CPU/WASM reference pipeline.
+3. Add WebGPU and WebGL2 renderers behind the existing preview boundary.
+4. Add consented ONNX model management and semantic segmentation after manual/local deterministic masks.
+5. Add optional cloud assistance only after privacy, cost, and structured-output contracts are complete.
 
 ---
 
@@ -53,7 +60,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Exposure, temperature, tint, contrast, highlights, shadows, whites, blacks, saturation, vibrance, clarity, dehaze, sharpening, and noise reduction affect pixels in the reference renderer. Each has a slider, exact numeric entry, reset, undo/redo, and a non-destructive enable switch.
 
-**Remaining.** Texture, vignette, lens profiles, chromatic aberration, distortion, stronger production-grade algorithms, presets, copy/paste recipe, and a future batch-editing foundation.
+**Implemented.** Texture and vignette render through the reference pipeline. Natural, Cinematic, and Monochrome presets replace portable development settings as one reversible operation. Copy/paste excludes source, geometry, masks, IDs, and caches.
+
+**Remaining.** Lens profiles, chromatic aberration, distortion, stronger production-grade algorithms, and a future batch-editing foundation.
 
 **Acceptance.** Every control changes recipe and pixels consistently; reset is identity; undo/redo does not drift; ranges and units are documented; presets remain auditable operations; copy/paste excludes IDs and caches; optical corrections can be disabled.
 
@@ -65,7 +74,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Master RGB, independent R/G/B, and optional luminance curves are versioned domain values. Linear and monotonic-cubic evaluators produce bounded LUTs and render through the CPU worker. Basic RGB presets are undoable.
 
-**Remaining.** Interactive graph; background histogram; draggable/addable/removable points; channel selector; clipping display; per-channel reset and copy/paste; exact numeric editing; local mask curves; educational channel help; keyboard and touch interaction.
+**Implemented.** Interactive channel graph, draggable/addable/removable points, RGB/R/G/B/luminance selector, per-channel reset, exact numeric editing, interpolation choice, and presets. The rendered histogram and clipping measurements remain visible alongside it.
+
+**Remaining.** Per-channel copy/paste, local mask curves, deeper educational channel help, dedicated keyboard point manipulation, and final touch audit.
 
 **Acceptance.** X coordinates never cross or duplicate; a drag is one history action; monotonic cubic interpolation does not overshoot; LUT and CPU evaluator agree; reset/copy preserve the channel; clipping is not communicated by color alone.
 
@@ -75,7 +86,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Reframe without physically altering the original until export.
 
-**Scope.** Fixed crop frame; free image translation underneath; development scale; rotation/straightening; aspect ratios; flips; perspective/vertical/horizontal correction; rule-of-thirds and golden-ratio overlays; later re-editing; geometry rasterized only for final output.
+**Implemented.** Fixed crop frame, free image translation, development scale, rotation/straightening, aspect ratios, flips, persistence, undo/redo, and identical preview/export rasterization.
+
+**Remaining.** Perspective/vertical/horizontal correction, direct-manipulation crop handles, rule-of-thirds/golden-ratio overlays, and touch gesture polish.
 
 **Dependencies.** Existing `ViewportTransform`; renderer integration; pointer/touch/trackpad gestures; homography math; EXIF orientation.
 
@@ -87,7 +100,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Apply precise local changes from editable vector sources with disposable raster caches.
 
-**Scope.** Brush and eraser; size, hardness, flow, and pressure; linear/radial gradients; luminance/color ranges; feather, density, expand/contract, invert, and overlay. Add local adjustments/curves, add/subtract/intersect composition, vector persistence, regenerable raster caches, and GPU rendering.
+**Implemented.** Editable brush strokes, radial and linear gradients, luminance ranges, local exposure, opacity, feather, density, invert, overlay, vector persistence, and deterministic CPU rasterization.
+
+**Remaining.** Eraser/pressure interaction, color sampling, expand/contract, local curves, composition UI, disposable raster caches, and GPU rasterization.
 
 **Dependencies.** Existing `MaskDefinition`; local render stages; Pointer Events pressure; GPU/CPU rasterizer; versioned caches; curve editor.
 
@@ -99,7 +114,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Select by clicking without sending the photograph off-device.
 
-**Scope.** Positive/negative points, bounding boxes, and iterative refinement. Evaluate SAM, SAM 2, or a compatible alternative on ONNX Runtime Web/WebGPU. Download models only after consent into Cache Storage or OPFS; compute one embedding per preview; decode subsequent prompts quickly; offer light/advanced models and manual fallback.
+**Implemented foundation.** Positive/negative points and editable bounding boxes persist as normal AI-mask recipe data. The current `local-spatial-luminance` strategy is deterministic, offline, requires no download, and is labeled honestly rather than presented as SAM.
+
+**Remaining.** Evaluate SAM, SAM 2, or a compatible alternative on ONNX Runtime Web/WebGPU. Download models only after consent into Cache Storage or OPFS; compute one embedding per preview; decode subsequent prompts quickly; offer light/advanced models and manual fallback.
 
 **Acceptance.** Nothing downloads without consent; cancellation stops network and compute; embeddings reuse a preview/model hash; the project preserves prompts/points/boxes/model/version rather than depending on a raster; the model works offline after download; unsupported devices retain manual tools.
 
@@ -129,7 +146,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Propose explainable, bounded edits without giving AI direct authority over a project.
 
-**Scope.** OpenAI as the first replaceable adapter and a future local VLM. With explicit consent, send only a reduced preview plus selected EXIF, histograms, clipping, percentiles, estimated noise, current values, and user intent. Structured output produces validated operations. Review each proposal step; accept/reject individually; try a weaker version; ask for an explanation; show cost and support cancellation. Never send full RAW or log images.
+**Implemented locally.** The prominent AI Studio translates intent into bounded, validated operations locally; every operation is individually reviewable and unapplied proposals change nothing. No pixels or metadata leave the browser.
+
+**Remaining optional cloud scope.** OpenAI as the first replaceable adapter and a future local VLM. With explicit consent, send only a reduced preview plus selected EXIF, histograms, clipping, percentiles, estimated noise, current values, and user intent. Structured output produces validated operations. Add weaker variants, cost display, cancellation, and provider-specific explanations. Never send full RAW or log images.
 
 **Acceptance.** RAWcket works with no key; every call describes data and estimated cost; invalid output is rejected; operations pass through the aggregate and history; an unapplied proposal changes nothing; keys/previews never enter logs, errors, projects, or bundles.
 
@@ -139,7 +158,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Teach photographic decisions without replacing the user’s judgment.
 
-**Scope.** Explain every proposal; detect clipping, over-lifted shadows, noise, and unrecoverable data; teach RGB curves and white balance; preview consequences. Offer guided, copilot, and manual-observation modes with optional local preference learning.
+**Implemented.** The Local Development Tutor distinguishes measured facts from suggestions, explains rendered clipping, flags likely noise after strong shadow lift, warns when clarity and sharpening compound, and links directly to the relevant panel. It never auto-applies advice.
+
+**Remaining.** White-balance/curve lessons, unrecoverable RAW-data analysis after LibRaw, guided/copilot/manual modes, consequence previews, and opt-in local preference learning.
 
 **Acceptance.** Explanations link to visible measurements; facts and suggestions are clearly distinguished; the tutor can be silenced; preference learning is opt-in and local; deletion is complete; advice is never auto-applied.
 
@@ -149,7 +170,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Rasterize original plus recipe into a high-quality image while keeping project export separate.
 
-**Scope.** JPEG, PNG, and TIFF; quality, dimensions, resize, output sharpening, sRGB, metadata controls, metadata removal, watermark, full resolution, progress, cancellation, and worker execution.
+**Implemented.** JPEG, PNG, and uncompressed baseline RGB 8-bit TIFF; JPEG quality; exact longest-edge resize; full source size by default; recipe/geometry parity; worker execution; progress; cancellation; and extension/MIME agreement. Canvas/worker encoding strips source metadata by construction.
+
+**Remaining.** 16-bit TIFF after a high-depth pipeline, output sharpening, explicit ICC profiles, selective metadata preservation, watermarking, and tiled full-resolution export.
 
 **Acceptance.** Export preview and file agree within tolerance; cancellation leaves no partial file; metadata follows choices; full resolution does not block the main thread; sharpening follows output dimensions; extension, MIME, and bytes agree.
 
@@ -159,7 +182,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Make the library resilient to interrupted writes, quota pressure, corruption, and large collections.
 
-**Scope.** Journaling, snapshots, crash recovery, corruption detection, backups, `.rawcket.json` sidecars, browser portability, optional File System Access links, default OPFS copy, quota management, orphan cleanup, search, tags, ratings, and future collections.
+**Implemented.** Five per-project SHA-256 snapshots, newest-valid corruption recovery without overwriting damaged data, portable checksummed bundles, OPFS/IndexedDB original storage, persistent-storage request, quota visibility, and import safety reserve.
+
+**Remaining.** Write-ahead journaling across IndexedDB/OPFS, `.rawcket.json` sidecars, optional File System Access links, orphan cleanup, search, tags, ratings, and future collections.
 
 **Acceptance.** Interrupted saves recover the last consistent snapshot; corruption never overwrites the backup; cleanup never deletes a referenced original; quota errors are explained early; sidecars and bundles migrate by version; revoked file permissions fall back to OPFS.
 
@@ -169,7 +194,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Reduce local and optional-integration risk with understandable controls.
 
-**Scope.** In-memory and password-encrypted API keys; AES-GCM and safe derivation; verifiable deletion; strict CSP; XSS prevention and Trusted Types; no analytics by default; opt-in telemetry only; dependency/supply-chain audit; cloud-preview minimization; explicit storage transparency.
+**Implemented.** In-memory and password-encrypted API keys, AES-GCM/PBKDF2-SHA-256 with a non-persisted master password, deletion from session/device settings, no analytics, storage transparency, and a production CSP that excludes `unsafe-eval`, external scripts, frames, and objects.
+
+**Remaining.** Trusted Types compatibility, automated dependency/supply-chain auditing, verifiable browser-storage deletion caveats, opt-in telemetry controls if telemetry is ever added, and cloud-preview minimization/consent when a provider adapter exists.
 
 **Acceptance.** Production CSP excludes `unsafe-eval`; secrets never enter serializable state, logs, or telemetry; a removed key cannot be recovered; cloud previews are minimized and consented; telemetry off means zero telemetry requests; CI audits dependencies.
 
@@ -179,7 +206,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Keep the website useful offline and make installation optional.
 
-**Scope.** The service-worker app shell is in place. Add downloadable AI models, safe updates, new-version notices, schema-aware activation/rollback, and optional non-intrusive install prompts.
+**Implemented.** The service-worker app shell, offline-ready notice, outdated-cache cleanup, and a new-version prompt that can be postponed rather than auto-activating while editing.
+
+**Remaining.** Downloadable AI models, schema-aware rollback, model size/status, and optional non-intrusive install prompts.
 
 **Acceptance.** The library opens offline after first load; incompatible code never activates before data can migrate; updates can be postponed; failed updates recover the previous shell; model size/status is visible; the normal website keeps every capability.
 
@@ -189,7 +218,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Keep interaction fluid with large files across heterogeneous devices.
 
-**Scope.** Worker pools, bounded WASM memory, tiled rendering, multi-level previews, OffscreenCanvas, ImageBitmap, cancellation, profiling, low-memory modes, Chrome/Safari/Firefox fallbacks, and explicit large-file limits.
+**Implemented.** Bounded worker concurrency, OffscreenCanvas/ImageBitmap, cancellation, timeouts, 2560 px interactive previews, full-size export, versioned recipe/source/size LRU caching, and quota preflight.
+
+**Remaining.** Bounded WASM memory, tiled rendering, multi-level preview scheduling, profiling UI, low-memory modes, expanded Safari/Firefox fallbacks, and explicit decode-memory limits.
 
 **Acceptance.** Frame budget is measured; obsolete work is cancelled; memory returns near baseline after close; visible tiles are prioritized; low-RAM mode reduces resolution with notice; limits are detected before OOM; a browser/device matrix is documented.
 
@@ -201,7 +232,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Simple/Advanced modes, collapsible tools, exact labels, reduced-motion support, keyboard shortcuts, pan/zoom gestures, visible save/render states, English UI, and a navigable Active Recipe that never hides applied state.
 
-**Remaining.** Visual history, favorites, educational tooltips, onboarding, complete touch/trackpad polish, before/after comparison, clipping and mask overlays, accessible canvas alternatives, full responsive review, and WCAG audit.
+**Implemented.** Before/after comparison, histogram/clipping display, brush/radial/linear/smart-point overlays, and AI tutor explanations now join the existing keyboard, pan/zoom, responsive, and Active Recipe work.
+
+**Remaining.** Visual history, favorites, onboarding, complete touch/trackpad polish, accessible non-visual alternatives for every canvas interaction, full responsive review, and WCAG audit.
 
 **Acceptance.** Primary flows work entirely by keyboard; focus, labels, and live regions are correct; contrast is WCAG AA; meaning never relies on color alone; touch targets are adequate; pending features never appear active.
 

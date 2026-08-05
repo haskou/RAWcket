@@ -9,8 +9,8 @@ Projects need queries and indexes; originals and future caches are potentially l
 
 ## Decision
 
-IndexedDB stores serialized aggregates, indexes, and settings. `SourceFileRepository` uses OPFS where available and an IndexedDB object store as fallback. The application requests persistent storage without assuming it will be granted.
+IndexedDB stores serialized aggregates, indexes, settings, and the five newest checksummed project snapshots. `SourceFileRepository` uses OPFS where available and an IndexedDB object store as fallback. The application requests persistent storage without assuming it will be granted and performs a quota/safety-reserve assessment before importing an original.
 
 ## Consequences
 
-There is no network dependency. Quota, orphan cleanup, and migrations require active management. Close-time persistence is best effort and does not replace backups.
+There is no network dependency. A corrupt current record can recover from the newest verified snapshot without overwriting the damaged bytes. Orphan cleanup and migrations still require active management. Close-time persistence is best effort and does not replace backups.
