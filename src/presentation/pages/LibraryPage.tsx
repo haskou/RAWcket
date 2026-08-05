@@ -42,6 +42,7 @@ export function LibraryPage(): ReactElement {
   const [selectedCandidate, setSelectedCandidate] = useState(0);
   const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
   const [imageDropActive, setImageDropActive] = useState(false);
+  const [pendingImportFiles, setPendingImportFiles] = useState<File[] | null>(null);
   const projectFilter = useMemo(() => new ListProjectsMessage(searchQuery, minimumRating, favoritesOnly), [favoritesOnly, minimumRating, searchQuery]);
   const filteredProjects = useMemo(() => projects.filter((project) => project.matches(
     projectFilter.getQuery(),
@@ -134,6 +135,13 @@ export function LibraryPage(): ReactElement {
     setBusy(true);
     setError(null);
     try {
+      const configuration = await application.inspectAiConfiguration.inspect();
+      if (!configuration.ready) {
+        setPendingImportFiles(files);
+        setSettingsOpen(true);
+        setError('Configure OpenAI API to compare these photographs by their post-edit potential. Your selection is being held.');
+        return;
+      }
       const reviewed = await application.reviewImportCandidates.review(new ReviewImportCandidatesMessage(files));
       setImportCandidates(reviewed);
       setSelectedCandidate(0);
@@ -142,6 +150,13 @@ export function LibraryPage(): ReactElement {
     } finally {
       setBusy(false);
     }
+  };
+
+  const continuePendingImport = (): void => {
+    const files = pendingImportFiles;
+    setPendingImportFiles(null);
+    setError(null);
+    if (files !== null) void reviewImportCandidates(files);
   };
 
   const continueWithCandidate = (): void => {
@@ -349,7 +364,7 @@ export function LibraryPage(): ReactElement {
           </div>
         )}
       </section>
-      <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onConfigured={continuePendingImport} />
       {importCandidates !== null && <ImportSelectionDialog candidates={importCandidates} selected={selectedCandidate} onSelect={setSelectedCandidate} onCancel={() => setImportCandidates(null)} onContinue={continueWithCandidate} />}
     </main>
   );

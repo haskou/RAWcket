@@ -23,11 +23,11 @@ Implemented:
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
 - Versioned schema migrations through version 6.
 - Safe TIFF/EXIF inspection for Sony ARW camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern, with an honest in-editor source-information view.
-- AI-first workspace with local, reviewable recipe proposals, a measurement-backed development tutor, deterministic positive/negative-point smart masks, and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Optional cloud AI remains disabled by default.
-- Optional AES-GCM/PBKDF2 API-key vault whose master password is never stored.
+- AI-first workspace with real OpenAI vision advice and reviewable slider proposals, a measurement-backed local tutor, deterministic positive/negative-point smart masks, and optional consented on-device semantic selection for sky, water, vegetation, people, and buildings. Cloud AI remains unconfigured by default.
+- Explicit OpenAI API provider and user-entered model configuration. Missing configuration opens the setup dialog and resumes the pending action after setup; keys can stay in memory or use the optional AES-GCM/PBKDF2 vault whose master password is never stored.
 - Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
 - Interactive curves, before/after, workspace-relative Fit, a dense fixed composition grid, drag-to-crop with an outside veil and locked ratios, explained masks, portable development settings, and reversible presets.
-- A clearly separated AI Companion and Manual workspace, deterministic no-AI Auto Enhance, companion-authored editable briefs, one-click recipe clearing, and local multi-photo import review with photographer override.
+- A clearly separated AI Companion and Manual workspace, deterministic no-AI Auto Enhance, OpenAI-authored editable briefs, one-click recipe clearing, and comparative multi-photo review based on post-edit potential with photographer override.
 - Local library search across names and tags, validated comma-separated tags, and reversible zero-to-five-star ratings.
 - Persistent favorites with instant filtering and a visual editor history derived from real undo/redo operations.
 - Optional, browser-gated PWA installation from the library header, an offline app shell after first load, and user-controlled update activation.
@@ -37,7 +37,7 @@ Not implemented yet:
 
 - Full LibRaw/WASM demosaicing and a high-depth linear RAW pipeline. Sony ARW currently uses its embedded JPEG preview while preserving the original `.arw` in storage and bundles.
 - WebGPU/WebGL2 passes for masks and spatial filters, device-loss recovery, and a complete GPU/CPU golden-image parity corpus.
-- A consented optional cloud provider and larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
+- Larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
 - Full LibRaw mosaic demosaicing, 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking.
 - Collections, optional filesystem links, and a full WCAG/browser-device audit.
@@ -103,9 +103,10 @@ Recipe-only sidecars use the separate `.rawcket.json` format. They contain a ver
 ## Privacy and security
 
 - There is no backend, account, authentication, analytics, or mandatory SaaS.
-- No image or metadata leaves the device. Future cloud assistance requires a separate explicit consent flow.
-- Local proposals and point masks require no network. Semantic Select downloads pinned model weights only after consent, verifies each resource, then performs inference on-device. Optional provider access is disabled by default.
-- An API key can remain in session memory or be encrypted with AES-GCM; its decryption key is derived from a master password that is never stored.
+- Manual editing, Auto Enhance, the Development Tutor, point masks, and installed Semantic Select run locally. Semantic Select downloads pinned model weights only after consent, verifies each resource, then performs inference on-device.
+- OpenAI-powered opinions, editable proposals, and multi-photo comparison are optional cloud actions. They send reduced JPEG previews plus the visible task context to the OpenAI Responses API with response storage disabled; originals, RAW files, complete recipes, and API keys are not sent as request content.
+- RAWcket never silently selects an OpenAI model. The provider and user-entered model are visible in setup, which links directly to [OpenAI API key management](https://platform.openai.com/api-keys).
+- An API key can remain in session memory or be encrypted with AES-GCM; its decryption key is derived from a master password that is never stored. Browser-side keys remain exposed to the risks of the active page and installed browser extensions.
 - Keys never become part of projects, bundles, logs, or errors.
 
 Storing secrets in a shared browser still carries risk. The threat model and planned hardening are documented in [TODO.md](TODO.md).

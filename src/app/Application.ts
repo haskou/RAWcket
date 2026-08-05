@@ -1,3 +1,11 @@
+import { Queue, QueueOptions } from '@haskou/flow';
+import { ConfigureAi } from '@/contexts/ai/application/configure-ai/ConfigureAi';
+import { InspectAiConfiguration } from '@/contexts/ai/application/inspect-ai-configuration/InspectAiConfiguration';
+import { RemoveAi } from '@/contexts/ai/application/remove-ai/RemoveAi';
+import { UnlockAi } from '@/contexts/ai/application/unlock-ai/UnlockAi';
+import { BrowserAiImageEncoder } from '@/contexts/ai/infrastructure/openai/BrowserAiImageEncoder';
+import { OpenAiResponsesClient } from '@/contexts/ai/infrastructure/openai/OpenAiResponsesClient';
+import { BrowserApiKeyVault } from '@/contexts/ai/infrastructure/security/BrowserApiKeyVault';
 import { ApplyEditOperation } from '@/contexts/projects/application/apply-edit-operation/ApplyEditOperation';
 import { ApplyProjectSidecar } from '@/contexts/projects/application/apply-project-sidecar/ApplyProjectSidecar';
 import { AssessImportCapacity } from '@/contexts/projects/application/assess-import-capacity/AssessImportCapacity';
@@ -17,6 +25,7 @@ import { InspectSourceImage } from '@/contexts/projects/application/inspect-sour
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
+import { RequestPhotoOpinion } from '@/contexts/projects/application/request-photo-opinion/RequestPhotoOpinion';
 import { ReviewDevelopment } from '@/contexts/projects/application/review-development/ReviewDevelopment';
 import { ReviewImportCandidates } from '@/contexts/projects/application/review-import-candidates/ReviewImportCandidates';
 import { ReconcileProjectAssets } from '@/contexts/projects/application/reconcile-project-assets/ReconcileProjectAssets';
@@ -39,14 +48,14 @@ import { IndexedDbProjectAssetJournal } from '@/contexts/projects/infrastructure
 import { WorkerPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/WorkerPreviewRenderer';
 import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/renderers/CachingPreviewRenderer';
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
-import { LocalRecipeAdvisor } from '@/contexts/projects/infrastructure/advisors/LocalRecipeAdvisor';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
-import { BrowserImportCandidateReviewer } from '@/contexts/projects/infrastructure/advisors/BrowserImportCandidateReviewer';
+import { OpenAiEditingAdvisor } from '@/contexts/projects/infrastructure/advisors/OpenAiEditingAdvisor';
+import { OpenAiImportCandidateReviewer } from '@/contexts/projects/infrastructure/advisors/OpenAiImportCandidateReviewer';
+import { OpenAiPhotoOpinionAdvisor } from '@/contexts/projects/infrastructure/advisors/OpenAiPhotoOpinionAdvisor';
 import { BrowserSemanticSegmentationModel } from '@/contexts/projects/infrastructure/ai/BrowserSemanticSegmentationModel';
 import { BrowserDevelopmentSettingsClipboard } from '@/contexts/projects/infrastructure/clipboard/BrowserDevelopmentSettingsClipboard';
 import { JsonProjectSidecarCodec } from '@/contexts/projects/infrastructure/sidecars/JsonProjectSidecarCodec';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
-import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
 import { PersistentStorageRequest } from '@/shared/infrastructure/storage/PersistentStorageRequest';
 import { BrowserLocalStorageInspector } from '@/shared/infrastructure/storage/BrowserLocalStorageInspector';
@@ -70,10 +79,14 @@ export type Application = {
   sourceFiles: SourceFileRepository;
   projectExporter: ProjectExporter;
   projectImporter: ProjectImporter;
-  apiKeyVault: BrowserApiKeyVault;
+  configureAi: ConfigureAi;
+  inspectAiConfiguration: InspectAiConfiguration;
+  unlockAi: UnlockAi;
+  removeAi: RemoveAi;
   persistentStorage: PersistentStorageRequest;
   renderProjectPreview: RenderProjectPreview;
   requestEditingAdvice: RequestEditingAdvice;
+  requestPhotoOpinion: RequestPhotoOpinion;
   reviewDevelopment: ReviewDevelopment;
   reviewImportCandidates: ReviewImportCandidates;
   reconcileProjectAssets: ReconcileProjectAssets;
@@ -103,6 +116,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const semanticSegmentationModel = new BrowserSemanticSegmentationModel();
   const sourceImageInspector = new BrowserSourceImageInspector();
   const projectSidecarCodec = new JsonProjectSidecarCodec();
+  const aiCredentialVault = new BrowserApiKeyVault(settings);
+  const openAi = new OpenAiResponsesClient(aiCredentialVault, new BrowserAiImageEncoder());
   return {
     createProject: new CreateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     createSemanticMask: new CreateSemanticMask(semanticSegmentationModel),
@@ -122,16 +137,19 @@ export function createApplication(databaseName = 'rawcket'): Application {
     sourceFiles,
     projectExporter: bundle,
     projectImporter: bundle,
-    apiKeyVault: new BrowserApiKeyVault(settings),
+    configureAi: new ConfigureAi(aiCredentialVault),
+    inspectAiConfiguration: new InspectAiConfiguration(aiCredentialVault),
+    unlockAi: new UnlockAi(aiCredentialVault),
+    removeAi: new RemoveAi(aiCredentialVault),
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
-    requestEditingAdvice: new RequestEditingAdvice(new LocalRecipeAdvisor()),
+    requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi)),
+    requestPhotoOpinion: new RequestPhotoOpinion(new OpenAiPhotoOpinionAdvisor(openAi)),
     reviewDevelopment: new ReviewDevelopment(new LocalDevelopmentTutor()),
-    reviewImportCandidates: new ReviewImportCandidates(sourceImageInspector, new BrowserImportCandidateReviewer()),
+    reviewImportCandidates: new ReviewImportCandidates(sourceImageInspector, new OpenAiImportCandidateReviewer(openAi)),
     reconcileProjectAssets: new ReconcileProjectAssets(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles)),
     exportProjectSidecar: new ExportProjectSidecar(projectSidecarCodec),
     inspectSourceImage: new InspectSourceImage(sourceImageInspector)
   };
 }
-import { Queue, QueueOptions } from '@haskou/flow';

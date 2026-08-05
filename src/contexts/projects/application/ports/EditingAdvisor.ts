@@ -3,6 +3,7 @@ import type { EditOperation } from '../../domain/EditOperation';
 export type EditingContext = {
   projectName: string;
   intent: string;
+  preview: Blob;
   currentAdjustments: Record<string, number>;
 };
 

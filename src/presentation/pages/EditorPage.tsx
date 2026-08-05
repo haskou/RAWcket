@@ -23,6 +23,7 @@ import { ExportProjectSidecarMessage } from '@/contexts/projects/application/exp
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
+import { RequestPhotoOpinionMessage } from '@/contexts/projects/application/request-photo-opinion/messages/RequestPhotoOpinionMessage';
 import { ReviewDevelopmentMessage } from '@/contexts/projects/application/review-development/messages/ReviewDevelopmentMessage';
 import { PasteDevelopmentSettingsMessage } from '@/contexts/projects/application/paste-development-settings/messages/PasteDevelopmentSettingsMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
@@ -67,6 +68,7 @@ type BrushGesture = { pointerId: number; maskId: string; groupId: string };
 type CropGesture = { pointerId: number; start: { x: number; y: number } };
 type AiPointPolarity = 'positive' | 'negative';
 type ImageDimensions = { width: number; height: number };
+type PendingAiAction = 'proposal' | 'opinion' | null;
 
 const minimumZoom = 0.1;
 const maximumZoom = 8;
@@ -169,11 +171,12 @@ export function EditorPage(): ReactElement {
   const [photoInformationOpen, setPhotoInformationOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recipeTransferMessage, setRecipeTransferMessage] = useState<string | undefined>();
-  const [aiPrompt, setAiPrompt] = useState('Give this photograph a refined cinematic look while preserving natural skin tones.');
-  const [aiMessage, setAiMessage] = useState('Local Smart Edit is ready. No photograph or metadata will leave this browser.');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiMessage, setAiMessage] = useState('Connect OpenAI API to request a visual opinion or an editable proposal. Cloud AI actions send only a reduced preview.');
   const [aiProposal, setAiProposal] = useState<EditProposal | null>(null);
   const [aiSelection, setAiSelection] = useState<Set<number>>(new Set());
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [pendingAiAction, setPendingAiAction] = useState<PendingAiAction>(null);
   const [semanticStatus, setSemanticStatus] = useState<SemanticModelStatus | 'checking'>('checking');
   const [semanticTask, setSemanticTask] = useState<SemanticModelTask>(null);
   const [semanticProgress, setSemanticProgress] = useState(0);
@@ -696,13 +699,20 @@ export function EditorPage(): ReactElement {
   };
 
   const generateAiProposal = async (): Promise<void> => {
-    if (project === null) return;
+    if (project === null || preview === null) return;
+    const configuration = await application.inspectAiConfiguration.inspect();
+    if (!configuration.ready) {
+      setPendingAiAction('proposal');
+      setAiMessage('Configure OpenAI API to generate this proposal. Your draft will be kept.');
+      setSettingsOpen(true);
+      return;
+    }
     setAiGenerating(true);
-    setAiMessage('Analyzing your intent locally…');
+    setAiMessage('Sending a reduced preview to OpenAI for visual editing advice…');
     try {
       const proposal = await application.requestEditingAdvice.propose(
         project,
-        new RequestEditingAdviceMessage(projectId, aiPrompt)
+        new RequestEditingAdviceMessage(projectId, aiPrompt, preview)
       );
       setAiProposal(proposal);
       setAiSelection(new Set(proposal.operations.map((_, index) => index)));
@@ -719,16 +729,38 @@ export function EditorPage(): ReactElement {
     setAiMessage('Classic Auto Enhance applied a deterministic tonal preset without AI. Every change remains in Active Recipe.');
   };
 
-  const askCompanionOpinion = (): void => {
-    const intent = previewAnalysis === null
-      ? 'Create a natural, balanced edit with gentle contrast and realistic color.'
-      : previewAnalysis.highlightClipping > 0.01
-        ? 'Recover bright highlights while keeping the midtones lively and the result natural.'
-        : previewAnalysis.shadowClipping > 0.01
-          ? 'Open the deep shadows carefully, control noise, and preserve convincing contrast.'
-          : 'Refine this balanced frame with natural color, subtle subject separation, and restrained detail.';
-    setAiPrompt(intent);
-    setAiMessage('AI Companion reviewed the rendered histogram locally and filled the brief. You can edit it before generating a proposal.');
+  const askCompanionOpinion = async (): Promise<void> => {
+    if (project === null || preview === null) return;
+    const configuration = await application.inspectAiConfiguration.inspect();
+    if (!configuration.ready) {
+      setPendingAiAction('opinion');
+      setAiMessage('Configure OpenAI API to request a visual opinion.');
+      setSettingsOpen(true);
+      return;
+    }
+    setAiGenerating(true);
+    setAiMessage('OpenAI is reviewing subject, framing, light, focus, and story in a reduced preview…');
+    try {
+      const opinion = await application.requestPhotoOpinion.review(project, new RequestPhotoOpinionMessage(
+        projectId,
+        preview,
+        previewAnalysis?.shadowClipping ?? 0,
+        previewAnalysis?.highlightClipping ?? 0
+      ));
+      setAiPrompt(opinion.suggestedIntent);
+      setAiMessage(`${opinion.critique} Suggested brief filled in above; edit it before generating a proposal.`);
+    } catch (error: unknown) {
+      setAiMessage(error instanceof Error ? error.message : 'AI Companion could not review this photograph.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const continuePendingAiAction = (): void => {
+    const pending = pendingAiAction;
+    setPendingAiAction(null);
+    if (pending === 'proposal') void generateAiProposal();
+    if (pending === 'opinion') void askCompanionOpinion();
   };
 
   const applyAiProposal = (): void => {
@@ -1032,13 +1064,10 @@ export function EditorPage(): ReactElement {
             <label className="field-label" htmlFor="ai-edit-prompt">What should RAWcket create?</label>
             <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} />
             <div className="ai-companion-actions">
-              <button type="button" onClick={askCompanionOpinion}>Ask Companion for an opinion</button>
+              <button type="button" disabled={aiGenerating || preview === null} onClick={() => void askCompanionOpinion()}>Ask Companion for an opinion</button>
               <button type="button" onClick={applyClassicAutoEnhance}>Auto Enhance · no AI</button>
             </div>
-            <div className="ai-quick-prompts" aria-label="AI prompt ideas">
-              {['Natural portrait', 'Cinematic night', 'Recover highlights'].map((prompt) => <button key={prompt} type="button" onClick={() => setAiPrompt(prompt)}>{prompt}</button>)}
-            </div>
-            <button className="button ai-primary full" type="button" disabled={aiGenerating || aiPrompt.trim().length < 3} onClick={() => void generateAiProposal()}>{aiGenerating ? 'Generating locally…' : 'Generate editable proposal'}</button>
+            <button className="button ai-primary full" type="button" disabled={aiGenerating || preview === null || aiPrompt.trim().length < 3} onClick={() => void generateAiProposal()}>{aiGenerating ? 'Working with OpenAI…' : 'Generate editable proposal'}</button>
             <p className="ai-status" aria-live="polite">{aiMessage}</p>
             {aiProposal !== null && (
               <div className="ai-proposal" aria-label="AI edit proposal">
@@ -1133,7 +1162,7 @@ export function EditorPage(): ReactElement {
           </>}
         </aside>
       </section>
-      <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onConfigured={continuePendingAiAction} />
       <PhotoInformationDialog project={project} open={photoInformationOpen} onClose={() => setPhotoInformationOpen(false)} />
       {historyOpen && <HistoryDialog project={project} onClose={() => setHistoryOpen(false)} onUndo={() => changeHistory('undo')} onRedo={() => changeHistory('redo')} />}
       <ExportPhotoDialog

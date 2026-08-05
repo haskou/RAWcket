@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
 
+function openAiEnvelope(result: unknown): string {
+  return JSON.stringify({ output: [{ content: [{ type: 'output_text', text: JSON.stringify(result) }] }] });
+}
+
 test('imports, edits, saves, closes, and reopens a local project', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Your photographs. Your browser.' })).toBeVisible();
@@ -56,9 +60,23 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: 'Download local model' })).toBeDisabled();
   await page.getByRole('checkbox', { name: /consent to download and store/ }).check();
   await expect(page.getByRole('button', { name: 'Download local model' })).toBeEnabled();
+  await page.route('https://api.openai.com/v1/responses', async (route) => {
+    const body = route.request().postDataJSON() as { text?: { format?: { name?: string } } };
+    const result = body.text?.format?.name === 'rawcket_photo_opinion'
+      ? { suggestedIntent: 'Shape a cinematic night portrait while keeping skin believable.', critique: 'The face carries the frame, while the bright edge can be controlled to improve hierarchy.', strengths: ['Clear subject'], opportunities: ['Tighter crop'] }
+      : { explanation: 'A restrained contrast increase gives the subject more separation.', operations: [{ key: 'contrast', value: 14 }, { key: 'highlights', value: -22 }] };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: openAiEnvelope(result) });
+  });
   await page.getByRole('button', { name: 'Ask Companion for an opinion' }).click();
-  await expect(page.getByLabel('What should RAWcket create?')).toHaveValue(/Refine this balanced frame|Recover bright highlights|Open the deep shadows/);
-  await page.getByRole('button', { name: 'Cinematic night' }).click();
+  const aiSettings = page.getByRole('dialog', { name: 'Configure AI Companion' });
+  await expect(aiSettings).toBeVisible();
+  await expect(aiSettings.getByText('OpenAI API', { exact: true }).first()).toBeVisible();
+  await expect(aiSettings.getByRole('link', { name: /Create or manage an OpenAI API key/ })).toHaveAttribute('href', 'https://platform.openai.com/api-keys');
+  await aiSettings.getByLabel('OpenAI model').fill('test-vision-model');
+  await aiSettings.getByLabel('OpenAI API key').fill('sk-e2e-test-key');
+  await aiSettings.getByRole('button', { name: 'Use OpenAI API' }).click();
+  await expect(page.getByLabel('What should RAWcket create?')).toHaveValue(/cinematic night portrait/);
+  await page.getByLabel('What should RAWcket create?').fill('Create a cinematic night treatment');
   await page.getByRole('button', { name: 'Generate editable proposal' }).click();
   await expect(page.getByLabel('AI edit proposal')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Contrast: +14' })).toBeChecked();
@@ -220,8 +238,14 @@ test('imports a photograph by dropping it onto the library', async ({ page }) =>
   await dataTransfer.dispose();
 });
 
-test('compares multiple local imports and lets the photographer override the recommendation', async ({ page }) => {
+test('compares multiple imports by post-edit potential and lets the photographer override the recommendation', async ({ page }) => {
   await page.goto('/');
+  await page.route('https://api.openai.com/v1/responses', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: openAiEnvelope({ assessments: [
+      { candidateId: 'candidate-1', score: 91, rank: 1, reasons: ['The split light can be shaped into a stronger visual hierarchy.', 'The edge remains usable for a deliberate crop.', 'The contrast supports a clearer story after editing.'], focusPotential: 'Strong graphic edges remain usable.', reframingPotential: 'A tighter vertical crop has room to breathe.', editingPotential: 'The tonal split offers flexible shaping.', visualInterest: 'The frame has immediate graphic tension.', story: 'The light-dark relationship creates a clear visual idea.' },
+      { candidateId: 'candidate-2', score: 58, rank: 2, reasons: ['The frame is technically clean but visually quiet.', 'Cropping options do not reveal a stronger subject.', 'Editing can add polish but not a clearer moment.'], focusPotential: 'Technically acceptable.', reframingPotential: 'Limited subject structure.', editingPotential: 'Clean tones with modest transformation potential.', visualInterest: 'Low visual tension.', story: 'No distinct moment is visible.' }
+    ] }) });
+  });
   const images = await page.evaluate(() => {
     const render = (split: boolean): string => {
       const canvas = document.createElement('canvas');
@@ -242,10 +266,17 @@ test('compares multiple local imports and lets the photographer override the rec
     { name: 'soft.png', mimeType: 'image/png', buffer: Buffer.from(images.soft, 'base64') }
   ]);
 
+  const aiSettings = page.getByRole('dialog', { name: 'Configure AI Companion' });
+  await expect(aiSettings).toBeVisible();
+  await aiSettings.getByLabel('OpenAI model').fill('test-vision-model');
+  await aiSettings.getByLabel('OpenAI API key').fill('sk-e2e-test-key');
+  await aiSettings.getByRole('button', { name: 'Use OpenAI API' }).click();
+
   const dialog = page.getByRole('dialog', { name: 'Choose the strongest photograph' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('Recommended')).toBeVisible();
-  await expect(dialog.getByText(/Highlights and shadows|near clipping/).first()).toBeVisible();
+  await expect(dialog.getByText(/visual hierarchy/).first()).toBeVisible();
+  await expect(dialog.getByText(/clear visual idea/).first()).toBeVisible();
   await dialog.getByRole('button', { name: /soft\.png/ }).click();
   await dialog.getByRole('button', { name: 'Continue with soft.png' }).click();
   await expect(page.getByLabel('Project name')).toHaveValue('soft');

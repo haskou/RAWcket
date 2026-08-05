@@ -411,13 +411,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .import-candidate strong { margin-top: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .72rem; }
 .import-candidate > small { margin-top: 2px; color: var(--accent); font-size: .58rem; }
 .import-candidate ul { margin: 8px 0 0; padding-left: 15px; color: #8f9991; font-size: .55rem; line-height: 1.45; }
+.candidate-evaluation { display: grid; gap: 5px; margin: 10px 0 0; padding-top: 8px; border-top: 1px solid #2d342f; }
+.candidate-evaluation > div { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 6px; }
+.candidate-evaluation dt { color: #a9b88d; font-size: .51rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.candidate-evaluation dd { margin: 0; color: #818b83; font-size: .53rem; line-height: 1.35; }
 
 .dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(4,5,5,.76); backdrop-filter: blur(6px); }
 .dialog { width: min(520px, 100%); max-height: 90vh; overflow: auto; border: 1px solid #3a3f3b; border-radius: 18px; background: #171918; padding: 24px; box-shadow: 0 30px 100px #000; }
 .dialog-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
 .dialog h2 { margin: 5px 0 16px; font-size: 1.65rem; }
 .field-label { display: block; margin: 15px 0 6px; color: #c8ccc9; font-size: .78rem; font-weight: 650; }
-.dialog input[type='password'] { width: 100%; min-height: 42px; border: 1px solid var(--line); border-radius: 9px; background: #0f1110; color: var(--text); padding: 0 12px; }
+.dialog input[type='password'], .dialog input[type='text'], .dialog select { width: 100%; min-height: 42px; border: 1px solid var(--line); border-radius: 9px; background: #0f1110; color: var(--text); padding: 0 12px; }
+.dialog select:disabled { opacity: 1; color: #dbe6d0; background: #151a16; }
+.provider-card { margin: 2px 0 14px; padding: 13px; border: 1px solid #3d4b38; border-radius: 10px; background: #111611; }
+.provider-card strong { color: #dce9cf; }
+.provider-card p { margin: 5px 0 8px; color: #9ca69e; font-size: .7rem; line-height: 1.5; }
+.provider-card a { color: var(--accent); font-size: .7rem; text-underline-offset: 3px; }
+.encrypted-key-panel { display: grid; gap: 7px; margin: 14px 0; padding: 12px; border: 1px solid #4a513d; border-radius: 10px; background: #14160f; }
+.encrypted-key-panel strong { color: #d4dab8; font-size: .72rem; }
+.encrypted-key-panel .field-label { margin-top: 4px; }
 .export-dialog select { width: 100%; min-height: 42px; border: 1px solid var(--line); border-radius: 9px; background: #0f1110; color: var(--text); padding: 0 10px; }
 .export-value-control { margin-top: 16px; }
 .export-value-control > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #c8ccc9; font-size: .78rem; font-weight: 650; }

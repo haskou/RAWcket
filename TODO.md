@@ -170,9 +170,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Propose explainable, bounded edits without giving AI direct authority over a project.
 
-**Implemented locally.** The prominent AI Companion translates intent into bounded, validated operations locally; every operation is individually reviewable and unapplied proposals change nothing. It can derive an editable brief from rendered histogram facts, while a separately labelled classic Auto Enhance applies a deterministic non-AI treatment. No pixels or metadata leave the browser.
+**Implemented.** OpenAI is the first provider adapter. Provider, key, and vision-capable model are configured explicitly; no model is silently selected. Missing configuration opens setup and resumes the pending opinion, proposal, or contact-sheet comparison after success. AI Companion sends a reduced JPEG preview through the Responses API with `store: false`, requests strict structured JSON, validates it again with Zod and domain Value Objects, and returns ordinary reviewable operations. A visual opinion evaluates subject, framing, focus, light, and story before filling the editable brief. Classic Auto Enhance remains clearly labelled deterministic non-AI behavior.
 
-**Remaining optional cloud scope.** OpenAI as the first replaceable adapter and a future local VLM. With explicit consent, send only a reduced preview plus selected EXIF, histograms, clipping, percentiles, estimated noise, current values, and user intent. Structured output produces validated operations. Add weaker variants, cost display, cancellation, and provider-specific explanations. Never send full RAW or log images.
+**Remaining optional cloud scope.** A future local VLM, per-request cost/token estimates, cancellation, provider/model capability discovery, weaker proposal variants, and selected opt-in EXIF/noise facts. Never send full RAW or log images.
 
 **Acceptance.** RAWcket works with no key; every call describes data and estimated cost; invalid output is rejected; operations pass through the aggregate and history; an unapplied proposal changes nothing; keys/previews never enter logs, errors, projects, or bundles.
 
@@ -226,7 +226,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** In-memory and password-encrypted API keys, AES-GCM/PBKDF2-SHA-256 with a non-persisted master password, deletion from session/device settings, no analytics, storage transparency, and a production CSP that excludes `unsafe-eval`, external scripts, frames, and objects.
 
-**Remaining.** Trusted Types compatibility, automated dependency/supply-chain auditing, verifiable browser-storage deletion caveats, opt-in telemetry controls if telemetry is ever added, and cloud-preview minimization/consent when a provider adapter exists.
+**Implemented.** The OpenAI adapter reduces previews to bounded JPEGs, sets API response storage off, keeps the model explicit, schema-validates every result, never reads keys from serializable project state, and returns provider failures without response bodies or secret-bearing errors. The CSP permits only the explicit OpenAI endpoint in addition to pinned local-model hosts.
+
+**Remaining.** Trusted Types compatibility, automated dependency/supply-chain auditing, verifiable browser-storage deletion caveats, a per-request confirmation mode, opt-in telemetry controls if telemetry is ever added, and clearer provider retention/account-policy links.
 
 **Acceptance.** Production CSP excludes `unsafe-eval`; secrets never enter serializable state, logs, or telemetry; a removed key cannot be recovered; cloud previews are minimized and consented; telemetry off means zero telemetry requests; CI audits dependencies.
 
@@ -268,7 +270,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Before/after comparison, histogram/clipping display, fixed dense composition guides, drag-to-crop with an outside veil, brush/radial/linear/smart-point overlays, per-mask workflow explanations, modified-control marks, and AI tutor explanations now join the keyboard, pan/zoom, responsive, and Active Recipe work. Active Recipe can be cleared as one undoable operation. Luminance masks explicitly disclose that their per-pixel colored overlay is still pending even though their effect renders.
 
-**Implemented.** Multi-file import opens a local AI Companion contact sheet ranked by measurable clipping, tonal balance, detail, and resolution. Reasons are visible and the photographer can override the recommendation before any project is created. The editor exposes a visual timeline derived directly from cloned undo/redo operations, while library favorites persist and filter instantly.
+**Implemented.** Multi-file import opens an OpenAI-powered AI Companion contact sheet. All reduced previews are compared together and ranked by predicted post-edit potential: focus, recoverability, crop/reframing options, visual interest, and story—not pixel count alone. Category explanations and reasons are visible, and the photographer can override the recommendation before any project is created. The editor exposes a visual timeline derived directly from cloned undo/redo operations, while library favorites persist and filter instantly.
 
 **Remaining.** Onboarding, complete touch/trackpad polish, accessible non-visual alternatives for every canvas interaction, full responsive review, and WCAG audit.
 

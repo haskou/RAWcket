@@ -1,19 +1,26 @@
 import { deleteDB } from 'idb';
+import { AiModel } from '@/contexts/ai/domain/AiModel';
+import { AiProvider } from '@/contexts/ai/domain/AiProvider';
+import { BrowserApiKeyVault } from '@/contexts/ai/infrastructure/security/BrowserApiKeyVault';
 import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabase';
-import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
 
 describe('BrowserApiKeyVault', () => {
-  it('encrypts with a password, unlocks, and deletes without persisting the password', async () => {
+  it('encrypts provider metadata and key, unlocks into memory, and deletes the configuration', async () => {
     const databaseName = `rawcket-vault-${crypto.randomUUID()}`;
     const connection = RawcketDatabase.open(databaseName);
     const vault = new BrowserApiKeyVault(new RawcketSettingsRepository(connection));
+    const model = new AiModel('vision-model-from-user');
 
-    await vault.saveEncrypted('sk-test-secret-123', 'una-contrasena-segura');
-    expect(await vault.hasEncryptedKey()).toBe(true);
-    expect(await vault.unlock('una-contrasena-segura')).toBe('sk-test-secret-123');
+    await vault.saveEncrypted(AiProvider.OPENAI, model, 'sk-test-secret-123', 'una-contrasena-segura');
+    expect((await vault.getEncryptedSummary())?.model.isEqual(model)).toBe(true);
+    const credential = await vault.unlock('una-contrasena-segura');
+    expect(credential.apiKey).toBe('sk-test-secret-123');
+    expect(credential.provider.isOpenAi()).toBe(true);
+    expect(vault.getSessionCredential()?.model.isEqual(model)).toBe(true);
     await vault.remove();
-    expect(await vault.hasEncryptedKey()).toBe(false);
+    expect(await vault.getEncryptedSummary()).toBeNull();
+    expect(vault.getSessionCredential()).toBeNull();
 
     (await connection).close();
     await deleteDB(databaseName);

@@ -13,6 +13,7 @@ export class RequestEditingAdvice {
     return this.advisor.propose({
       projectName: project.getName().valueOf(),
       intent: message.getIntent(),
+      preview: message.getPreview(),
       currentAdjustments: {
         exposure: project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).valueOf(),
         temperature: project.getGlobalAdjustment(AdjustmentKey.TEMPERATURE).valueOf(),

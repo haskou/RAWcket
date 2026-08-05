@@ -17,15 +17,20 @@ describe('ReviewImportCandidates', () => {
       embeddedPreview: null,
       captureMetadata: emptyCaptureMetadata
     });
-    review.mockResolvedValueOnce({ score: 42, reasons: ['Soft detail.'] }).mockResolvedValueOnce({ score: 91, reasons: ['Strong detail.'] });
+    review.mockResolvedValue([
+      { candidateId: 'candidate-1', score: 42, rank: 2, reasons: ['Soft detail.'], evaluation: { focusPotential: 'Soft', reframingPotential: 'Limited', editingPotential: 'Moderate', visualInterest: 'Quiet', story: 'Weak' } },
+      { candidateId: 'candidate-2', score: 91, rank: 1, reasons: ['Strong moment.'], evaluation: { focusPotential: 'Strong', reframingPotential: 'Flexible', editingPotential: 'High', visualInterest: 'Strong', story: 'Clear' } }
+    ]);
     const soft = new File(['soft'], 'soft.jpg', { type: 'image/jpeg' });
     const strong = new File(['strong'], 'strong.jpg', { type: 'image/jpeg' });
 
     const candidates = await new ReviewImportCandidates(inspector, reviewer).review(new ReviewImportCandidatesMessage([soft, strong]));
 
     expect(candidates.map((candidate) => candidate.file.name)).toEqual(['strong.jpg', 'soft.jpg']);
-    expect(candidates[0]?.reasons).toEqual(['Strong detail.']);
+    expect(candidates[0]?.reasons).toEqual(['Strong moment.']);
     expect(inspect).toHaveBeenCalledTimes(2);
+    expect(review).toHaveBeenCalledTimes(1);
+    expect(review.mock.calls[0]?.[0]).toHaveLength(2);
   });
 
   it('rejects contact sheets outside the supported size', () => {
