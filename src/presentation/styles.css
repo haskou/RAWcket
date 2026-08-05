@@ -149,6 +149,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-hero p { margin: 13px 0; color: #aeb6aa; font-size: .7rem; line-height: 1.5; }
 .ai-orb { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #7f9a47; border-radius: 50%; background: #202c18; color: var(--accent); box-shadow: 0 0 20px rgba(201,240,107,.2); }
 .button.ai-primary { border-color: var(--accent); background: linear-gradient(120deg, #c9f06b, #99c946); color: #11150d; }
+.histogram-panel { margin: 0 14px 14px; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: #0d0f0e; }
+.histogram-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; color: #c4cac5; font-size: .68rem; font-weight: 700; }
+.histogram-heading small { color: #666e68; font-size: .56rem; font-weight: 500; }
+.histogram-panel svg { width: 100%; height: 68px; display: block; overflow: hidden; border-radius: 5px; background: linear-gradient(to right, transparent 49.8%, #242824 50%, transparent 50.2%); }
+.histogram-panel polygon { mix-blend-mode: screen; }
+.histogram-panel polygon.luminance { fill: rgba(180,185,181,.24); }
+.histogram-panel polygon.red { fill: rgba(255,72,63,.32); }
+.histogram-panel polygon.green { fill: rgba(62,220,95,.3); }
+.histogram-panel polygon.blue { fill: rgba(67,118,255,.38); }
+.histogram-loading { height: 68px; display: grid; place-items: center; color: #626963; font-size: .62rem; }
+.clipping-readout { display: flex; justify-content: space-between; gap: 8px; margin-top: 7px; color: #777f79; font-size: .56rem; }
+.clipping-readout span { display: flex; align-items: center; gap: 4px; }
+.clipping-readout i { width: 6px; height: 6px; border-radius: 50%; background: #3d443e; }
+.clipping-readout i.warning { background: #f1a35b; box-shadow: 0 0 6px rgba(241,163,91,.45); }
 .mode-switch { display: grid; grid-template-columns: 1fr 1fr; margin: 14px; padding: 3px; border-radius: 9px; background: #0c0d0d; }
 .mode-switch button { height: 32px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; font-size: .75rem; }
 .mode-switch button.active { background: #292d2a; color: var(--text); box-shadow: 0 1px 5px #000; }

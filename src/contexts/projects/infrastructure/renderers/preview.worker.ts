@@ -2,6 +2,7 @@
 import { CpuPixelDeveloper } from './CpuPixelDeveloper';
 import { CpuViewportTransformer } from './CpuViewportTransformer';
 import { ArwEmbeddedPreviewExtractor } from '../codecs/ArwEmbeddedPreviewExtractor';
+import { PixelHistogramAnalyzer } from './PixelHistogramAnalyzer';
 import {
   previewWorkerRequestSchema,
   type PreviewWorkerResponse
@@ -11,6 +12,7 @@ const worker = self as DedicatedWorkerGlobalScope;
 const developer = new CpuPixelDeveloper();
 const viewportTransformer = new CpuViewportTransformer();
 const arw = new ArwEmbeddedPreviewExtractor();
+const histogram = new PixelHistogramAnalyzer();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -48,9 +50,11 @@ async function render(input: unknown): Promise<void> {
     if (outputContext === null) throw new Error('The output preview context could not be created.');
     outputContext.putImageData(new ImageData(transformed.pixels, transformed.width, transformed.height), 0, 0);
     progress(request.id, 'developing', 0.8);
+    const analysis = histogram.analyze(transformed.pixels);
+    progress(request.id, 'analyzing', 0.88);
     const image = await outputCanvas.convertToBlob({ type: request.output.mimeType, quality: request.output.quality });
     progress(request.id, 'encoding', 0.95);
-    post({ kind: 'completed', id: request.id, image });
+    post({ kind: 'completed', id: request.id, image, analysis });
   } catch (error: unknown) {
     post({
       kind: 'failed',
@@ -62,7 +66,7 @@ async function render(input: unknown): Promise<void> {
 
 function progress(
   id: string,
-  stage: 'queued' | 'decoding' | 'developing' | 'encoding',
+  stage: 'queued' | 'decoding' | 'developing' | 'analyzing' | 'encoding',
   completed: number
 ): void {
   post({ kind: 'progress', id, stage, completed });

@@ -2,7 +2,16 @@ import type { ProjectId } from '../../domain/value-objects/ProjectId';
 import type { PhotoProject } from '../../domain/PhotoProject';
 import type { PreviewSize } from '../render-project-preview/PreviewSize';
 
-export type PreviewRenderStage = 'queued' | 'decoding' | 'developing' | 'encoding';
+export type PreviewRenderStage = 'queued' | 'decoding' | 'developing' | 'analyzing' | 'encoding';
+
+export type PreviewAnalysis = {
+  red: number[];
+  green: number[];
+  blue: number[];
+  luminance: number[];
+  shadowClipping: number;
+  highlightClipping: number;
+};
 
 export type PreviewRenderProgress = {
   stage: PreviewRenderStage;
@@ -32,6 +41,7 @@ export class PreviewRenderRequest {
 export type PreviewRenderControl = {
   signal?: AbortSignal;
   onProgress?: (progress: PreviewRenderProgress) => void;
+  onAnalysis?: (analysis: PreviewAnalysis) => void;
 };
 
 export interface PreviewRenderer {

@@ -22,6 +22,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   });
 
   await expect(page.getByLabel('Project name')).toHaveValue('night');
+  await expect(page.getByLabel('Rendered frame histogram')).toBeVisible();
   await page.getByRole('button', { name: 'Generate editable proposal' }).click();
   await expect(page.getByLabel('AI edit proposal')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Contrast: +14' })).toBeChecked();

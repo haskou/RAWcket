@@ -23,14 +23,23 @@ export const previewWorkerRequestSchema = z.object({
 
 export type PreviewWorkerRequest = z.infer<typeof previewWorkerRequestSchema>;
 
+const histogramSchema = z.object({
+  red: z.array(z.number().min(0).max(1)).length(64),
+  green: z.array(z.number().min(0).max(1)).length(64),
+  blue: z.array(z.number().min(0).max(1)).length(64),
+  luminance: z.array(z.number().min(0).max(1)).length(64),
+  shadowClipping: z.number().min(0).max(1),
+  highlightClipping: z.number().min(0).max(1)
+});
+
 export const previewWorkerResponseSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('progress'),
     id: z.uuid(),
-    stage: z.enum(['queued', 'decoding', 'developing', 'encoding']),
+    stage: z.enum(['queued', 'decoding', 'developing', 'analyzing', 'encoding']),
     completed: z.number().min(0).max(1)
   }),
-  z.object({ kind: z.literal('completed'), id: z.uuid(), image: z.instanceof(Blob) }),
+  z.object({ kind: z.literal('completed'), id: z.uuid(), image: z.instanceof(Blob), analysis: histogramSchema }),
   z.object({ kind: z.literal('failed'), id: z.uuid(), message: z.string().min(1) })
 ]);
 

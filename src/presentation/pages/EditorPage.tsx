@@ -19,6 +19,7 @@ import { InspectSourceImageMessage } from '@/contexts/projects/application/inspe
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
+import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
@@ -34,6 +35,7 @@ import { GeometryControls } from '../components/GeometryControls';
 import { ExportPhotoDialog, type PhotoExportSettings } from '../components/ExportPhotoDialog';
 import { MaskControls } from '../components/MaskControls';
 import { ToneCurveEditor } from '../components/ToneCurveEditor';
+import { HistogramPanel } from '../components/HistogramPanel';
 import {
   adjustmentDefinitions,
   type AdjustmentSection
@@ -87,6 +89,7 @@ export function EditorPage(): ReactElement {
   const [preview, setPreview] = useState<Blob | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [renderProgress, setRenderProgress] = useState('Preparing preview');
+  const [previewAnalysis, setPreviewAnalysis] = useState<PreviewAnalysis | null>(null);
   const [revision, setRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
@@ -142,7 +145,8 @@ export function EditorPage(): ReactElement {
       new RenderProjectPreviewMessage(projectId, 2560),
       {
         signal: controller.signal,
-        onProgress: (progress) => setRenderProgress(`${progress.stage} ${Math.round(progress.completed * 100)}%`)
+        onProgress: (progress) => setRenderProgress(`${progress.stage} ${Math.round(progress.completed * 100)}%`),
+        onAnalysis: setPreviewAnalysis
       }
     ).then((result) => {
       if (result instanceof Blob) {
@@ -599,6 +603,7 @@ export function EditorPage(): ReactElement {
             <p>Describe the result you want. Local Smart Edit turns it into explicit, reversible recipe changes.</p>
             <button className="button ai-primary full" type="button" onClick={() => setActivePanel('ai')}>Create with AI</button>
           </section>
+          <HistogramPanel analysis={previewAnalysis} />
           <div className="mode-switch" aria-label="Interface level">
             <button className={mode === 'simple' ? 'active' : ''} type="button" onClick={() => changeMode('simple')}>Simple</button>
             <button className={mode === 'advanced' ? 'active' : ''} type="button" onClick={() => changeMode('advanced')}>Advanced</button>

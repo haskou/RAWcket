@@ -83,7 +83,10 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
         }
         cleanup();
         if (response.data.kind === 'failed') reject(new Error(response.data.message));
-        else resolve(response.data.image);
+        else {
+          control.onAnalysis?.(response.data.analysis);
+          resolve(response.data.image);
+        }
       };
       worker.postMessage(workerRequest);
     });
