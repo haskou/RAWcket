@@ -15,6 +15,8 @@ export class RequestEditingAdvice {
       projectName: project.getName().valueOf(),
       intent: message.getIntent(),
       preview: message.getPreview(),
+      shadowClipping: message.getShadowClipping(),
+      highlightClipping: message.getHighlightClipping(),
       currentAdjustments: {
         exposure: project.getGlobalAdjustment(AdjustmentKey.EXPOSURE).valueOf(),
         temperature: project.getGlobalAdjustment(AdjustmentKey.TEMPERATURE).valueOf(),

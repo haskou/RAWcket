@@ -4,8 +4,10 @@ import type { ViewportTransformPrimitives } from '../../domain/ViewportTransform
 
 export type EditingContext = {
   projectName: string;
-  intent: string;
+  intent: string | null;
   preview: Blob;
+  shadowClipping: number;
+  highlightClipping: number;
   currentAdjustments: Record<string, number>;
   currentCurves: CurveSetPrimitives;
   currentViewport: ViewportTransformPrimitives;
@@ -13,6 +15,10 @@ export type EditingContext = {
 };
 
 export type EditProposal = {
+  suggestedIntent: string;
+  critique: string;
+  strengths: string[];
+  opportunities: string[];
   explanation: string;
   operations: EditOperation[];
 };

@@ -62,10 +62,26 @@ const operationSchema = z.discriminatedUnion('kind', [
     feather: z.number().min(0).max(1),
     density: z.number().min(0).max(1),
     localAdjustments: z.array(adjustmentSchema).min(1).max(8)
+  }),
+  z.object({
+    kind: z.literal('smart-mask'),
+    prompt: z.string().min(1).max(300),
+    positivePoints: z.array(pointSchema).min(1).max(8),
+    negativePoints: z.array(pointSchema).max(8),
+    boundingBoxes: z.array(z.object({ ...cropSchema.shape })).max(3),
+    inverted: z.boolean(),
+    opacity: z.number().min(0).max(1),
+    feather: z.number().min(0).max(1),
+    density: z.number().min(0).max(1),
+    localAdjustments: z.array(adjustmentSchema).min(1).max(8)
   })
 ]);
 
 export const openAiEditProposalSchema = z.object({
+  suggestedIntent: z.string().min(3).max(500),
+  critique: z.string().min(1).max(1200),
+  strengths: z.array(z.string().min(1).max(300)).min(1).max(4),
+  opportunities: z.array(z.string().min(1).max(300)).min(1).max(4),
   explanation: z.string().min(1).max(1200),
   operations: z.array(operationSchema).min(1).max(16)
 });
@@ -100,8 +116,12 @@ const maskRequired = ['kind', 'inverted', 'opacity', 'feather', 'density', 'loca
 export const openAiEditProposalJsonSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['explanation', 'operations'],
+  required: ['suggestedIntent', 'critique', 'strengths', 'opportunities', 'explanation', 'operations'],
   properties: {
+    suggestedIntent: { type: 'string', minLength: 3, maxLength: 500 },
+    critique: { type: 'string', minLength: 1, maxLength: 1200 },
+    strengths: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string', minLength: 1, maxLength: 300 } },
+    opportunities: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string', minLength: 1, maxLength: 300 } },
     explanation: { type: 'string', minLength: 1, maxLength: 1200 },
     operations: {
       type: 'array', minItems: 1, maxItems: 16,
@@ -154,6 +174,23 @@ export const openAiEditProposalJsonSchema = {
             type: 'object', additionalProperties: false,
             required: [...maskRequired, 'minimum', 'maximum'],
             properties: { kind: { type: 'string', enum: ['luminance-range-mask'] }, ...maskProperties, minimum: number(0, 1), maximum: number(0, 1) }
+          },
+          {
+            type: 'object', additionalProperties: false,
+            required: [...maskRequired, 'prompt', 'positivePoints', 'negativePoints', 'boundingBoxes'],
+            properties: {
+              kind: { type: 'string', enum: ['smart-mask'] }, ...maskProperties,
+              prompt: { type: 'string', minLength: 1, maxLength: 300 },
+              positivePoints: { type: 'array', minItems: 1, maxItems: 8, items: pointJsonSchema },
+              negativePoints: { type: 'array', maxItems: 8, items: pointJsonSchema },
+              boundingBoxes: {
+                type: 'array', maxItems: 3,
+                items: {
+                  type: 'object', additionalProperties: false, required: ['x', 'y', 'width', 'height'],
+                  properties: { x: number(0, 1), y: number(0, 1), width: number(0, 1, true), height: number(0, 1, true) }
+                }
+              }
+            }
           }
         ]
       }

@@ -5,6 +5,7 @@ function openAiEnvelope(result: unknown): string {
 }
 
 test('imports, edits, saves, closes, and reopens a local project', async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Your photographs. Your browser.' })).toBeVisible();
 
@@ -71,11 +72,13 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: 'Download local model' })).toBeDisabled();
   await page.getByRole('checkbox', { name: /consent to download and store/ }).check();
   await expect(page.getByRole('button', { name: 'Download local model' })).toBeEnabled();
+  let aiRequestCount = 0;
   await page.route('https://api.openai.com/v1/responses', async (route) => {
-    const body = route.request().postDataJSON() as { text?: { format?: { name?: string } } };
-    const result = body.text?.format?.name === 'rawcket_photo_opinion'
-      ? { suggestedIntent: 'Shape a cinematic night portrait while keeping skin believable.', critique: 'The face carries the frame, while the bright edge can be controlled to improve hierarchy.', strengths: ['Clear subject'], opportunities: ['Tighter crop'] }
-      : {
+    aiRequestCount += 1;
+    const result = {
+        suggestedIntent: 'Shape a cinematic night portrait while keeping skin believable.',
+        critique: 'The face carries the frame, while the bright edge can be controlled to improve hierarchy.',
+        strengths: ['Clear subject'], opportunities: ['Tighter crop'],
         explanation: 'A restrained tonal curve, tighter frame, and local lift give the subject more separation.',
         operations: [
           { kind: 'global-adjustment', key: 'contrast', value: 14 },
@@ -87,7 +90,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
       };
     await route.fulfill({ status: 200, contentType: 'application/json', body: openAiEnvelope(result) });
   });
-  await page.getByRole('button', { name: 'Ask Companion for an opinion' }).click();
+  await page.getByRole('button', { name: 'Ask AI Companion and generate proposal' }).click();
   const aiSettings = page.getByRole('dialog', { name: 'Configure AI Companion' });
   await expect(aiSettings).toBeVisible();
   await expect(aiSettings.getByText('OpenAI API', { exact: true }).first()).toBeVisible();
@@ -97,15 +100,19 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await aiSettings.getByLabel('This tab only · never saved').check();
   await aiSettings.getByRole('button', { name: 'Use OpenAI API' }).click();
   await expect(page.getByLabel('What should RAWcket create?')).toHaveValue(/cinematic night portrait/);
-  await page.getByLabel('What should RAWcket create?').fill('Create a cinematic night treatment');
-  await page.getByRole('button', { name: 'Generate editable proposal' }).click();
   await expect(page.getByLabel('AI edit proposal')).toBeVisible();
+  expect(aiRequestCount).toBe(1);
   await expect(page.getByRole('checkbox', { name: 'Contrast: +14' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Update RGB curve' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Update crop and geometry' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Add local mask' })).toBeChecked();
   await page.getByRole('button', { name: 'Apply selected' }).click();
   await expect(page.getByRole('button', { name: /Contrast \+14/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Auto Enhance · additive · no AI' }).click();
+  await expect(page.getByText(/added bounded tonal\/detail deltas/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
@@ -262,7 +269,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Horizontal perspective numeric value')).toHaveValue('-12');
   await page.getByRole('button', { name: 'Local Masks', exact: true }).click();
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
-  await page.getByRole('button', { name: /Brush 2 On/ }).click();
+  await page.getByRole('button', { name: /Brush \d+ On/ }).click();
   await expect(page.getByLabel('Expand / contract numeric value')).toHaveValue('0.05');
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();

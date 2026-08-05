@@ -10,6 +10,10 @@ describe('RequestEditingAdvice', () => {
     const before = project.toPrimitives();
     const preview = new Blob(['rendered-preview'], { type: 'image/jpeg' });
     const propose = vi.fn<EditingAdvisor['propose']>().mockResolvedValue({
+      suggestedIntent: 'Keep the portrait natural.',
+      critique: 'The window competes with the face.',
+      strengths: ['Expression'],
+      opportunities: ['Window control'],
       explanation: 'Recover the face while protecting the window.',
       operations: [{ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'highlights', value: -25, groupId: null }]
     });
@@ -21,6 +25,8 @@ describe('RequestEditingAdvice', () => {
     expect(propose).toHaveBeenCalledWith(expect.objectContaining({
       intent: 'Keep the portrait natural',
       preview,
+      shadowClipping: 0,
+      highlightClipping: 0,
       currentCurves: before.recipe.curves,
       currentViewport: before.recipe.viewport,
       existingMaskCount: 0

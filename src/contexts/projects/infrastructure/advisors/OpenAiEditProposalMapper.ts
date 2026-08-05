@@ -44,7 +44,7 @@ export class OpenAiEditProposalMapper {
     });
   }
 
-  private mask(operation: Extract<OpenAiEditProposal['operations'][number], { kind: 'radial-mask' | 'linear-gradient-mask' | 'luminance-range-mask' }>): MaskDefinitionPrimitives {
+  private mask(operation: Extract<OpenAiEditProposal['operations'][number], { kind: 'radial-mask' | 'linear-gradient-mask' | 'luminance-range-mask' | 'smart-mask' }>): MaskDefinitionPrimitives {
     const common = {
       id: crypto.randomUUID(),
       enabled: true,
@@ -63,7 +63,18 @@ export class OpenAiEditProposalMapper {
     if (operation.kind === 'linear-gradient-mask') {
       return { ...common, shape: { kind: 'linear-gradient', start: operation.start, end: operation.end } };
     }
-    return { ...common, shape: { kind: 'luminance-range', minimum: operation.minimum, maximum: operation.maximum } };
+    if (operation.kind === 'luminance-range-mask') {
+      return { ...common, shape: { kind: 'luminance-range', minimum: operation.minimum, maximum: operation.maximum } };
+    }
+    return {
+      ...common,
+      shape: {
+        kind: 'ai-segmentation', prompt: operation.prompt,
+        positivePoints: operation.positivePoints, negativePoints: operation.negativePoints,
+        boundingBoxes: operation.boundingBoxes, strategy: 'openai-visual-points-local-spatial-luminance',
+        version: '1', rasterCacheKey: null
+      }
+    };
   }
 
   private rejectDuplicateTargets(proposal: OpenAiEditProposal): void {

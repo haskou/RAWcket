@@ -24,7 +24,6 @@ import { EstimateHorizonMessage } from '@/contexts/projects/application/estimate
 import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
-import { RequestPhotoOpinionMessage } from '@/contexts/projects/application/request-photo-opinion/messages/RequestPhotoOpinionMessage';
 import { ReviewDevelopmentMessage } from '@/contexts/projects/application/review-development/messages/ReviewDevelopmentMessage';
 import { PasteDevelopmentSettingsMessage } from '@/contexts/projects/application/paste-development-settings/messages/PasteDevelopmentSettingsMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
@@ -40,6 +39,7 @@ import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectU
 import { CurveSet, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
+import { GlobalAdjustmentValue } from '@/contexts/projects/domain/value-objects/GlobalAdjustmentValue';
 import type { SemanticMaskCategoryPrimitive } from '@/contexts/projects/domain/value-objects/SemanticMaskCategory';
 import { useApplication } from '../ApplicationContext';
 import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
@@ -69,7 +69,7 @@ type BrushGesture = { pointerId: number; maskId: string; groupId: string };
 type CropGesture = { pointerId: number; start: { x: number; y: number } };
 type AiPointPolarity = 'positive' | 'negative';
 type ImageDimensions = { width: number; height: number };
-type PendingAiAction = 'proposal' | 'opinion' | null;
+type PendingAiAction = 'companion' | null;
 
 const minimumZoom = 0.1;
 const maximumZoom = 8;
@@ -735,21 +735,28 @@ export function EditorPage(): ReactElement {
     if (project === null || preview === null) return;
     const configuration = await application.inspectAiConfiguration.inspect();
     if (!configuration.ready) {
-      setPendingAiAction('proposal');
-      setAiMessage('Configure OpenAI API to generate this proposal. Your draft will be kept.');
+      setPendingAiAction('companion');
+      setAiMessage('Configure OpenAI API to ask the Companion. Your draft will be kept.');
       setSettingsOpen(true);
       return;
     }
     setAiGenerating(true);
-    setAiMessage('Sending a reduced preview to OpenAI for visual editing advice…');
+    setAiMessage('Reviewing subject, story, light, crop, curves, geometry, and local masks in one request…');
     try {
       const proposal = await application.requestEditingAdvice.propose(
         project,
-        new RequestEditingAdviceMessage(projectId, aiPrompt, preview)
+        new RequestEditingAdviceMessage(
+          projectId,
+          aiPrompt,
+          preview,
+          previewAnalysis?.shadowClipping ?? 0,
+          previewAnalysis?.highlightClipping ?? 0
+        )
       );
+      setAiPrompt(proposal.suggestedIntent);
       setAiProposal(proposal);
       setAiSelection(new Set(proposal.operations.map((_, index) => index)));
-      setAiMessage('Proposal ready. Review every operation before applying it.');
+      setAiMessage('Opinion and editable proposal ready. Review every operation before applying it.');
     } catch (error: unknown) {
       setAiMessage(error instanceof Error ? error.message : 'The proposal could not be generated.');
     } finally {
@@ -758,42 +765,31 @@ export function EditorPage(): ReactElement {
   };
 
   const applyClassicAutoEnhance = (): void => {
-    applyBuiltInPreset('Natural');
-    setAiMessage('Classic Auto Enhance applied a deterministic tonal preset without AI. Every change remains in Active Recipe.');
-  };
-
-  const askCompanionOpinion = async (): Promise<void> => {
-    if (project === null || preview === null) return;
-    const configuration = await application.inspectAiConfiguration.inspect();
-    if (!configuration.ready) {
-      setPendingAiAction('opinion');
-      setAiMessage('Configure OpenAI API to request a visual opinion.');
-      setSettingsOpen(true);
-      return;
-    }
-    setAiGenerating(true);
-    setAiMessage('OpenAI is reviewing subject, framing, light, focus, and story in a reduced preview…');
-    try {
-      const opinion = await application.requestPhotoOpinion.review(project, new RequestPhotoOpinionMessage(
-        projectId,
-        preview,
-        previewAnalysis?.shadowClipping ?? 0,
-        previewAnalysis?.highlightClipping ?? 0
-      ));
-      setAiPrompt(opinion.suggestedIntent);
-      setAiMessage(`${opinion.critique} Suggested brief filled in above; edit it before generating a proposal.`);
-    } catch (error: unknown) {
-      setAiMessage(error instanceof Error ? error.message : 'AI Companion could not review this photograph.');
-    } finally {
-      setAiGenerating(false);
-    }
+    if (project === null) return;
+    const current = project.toPrimitives().recipe;
+    const additions = builtInPreset('Natural').globalAdjustments;
+    const changedKeys = (Object.keys(additions) as AdjustmentKeyPrimitive[]).filter((key) => additions[key] !== 0);
+    const globalAdjustments = { ...current.globalAdjustments };
+    changedKeys.forEach((key) => {
+      const adjustmentKey = AdjustmentKey.fromPrimitives(key);
+      globalAdjustments[key] = GlobalAdjustmentValue.clamp(adjustmentKey, globalAdjustments[key] + additions[key]).valueOf();
+    });
+    apply({
+      kind: EDIT_OPERATION.REPLACE_DEVELOPMENT_SETTINGS,
+      settings: {
+        globalAdjustments,
+        curves: current.curves,
+        disabledGlobalAdjustments: current.disabledGlobalAdjustments.filter((key) => !changedKeys.includes(key))
+      },
+      groupId: null
+    });
+    setAiMessage('Classic Auto Enhance added bounded tonal/detail deltas to the current recipe. Existing curves and unrelated edits were preserved.');
   };
 
   const continuePendingAiAction = (): void => {
     const pending = pendingAiAction;
     setPendingAiAction(null);
-    if (pending === 'proposal') void generateAiProposal();
-    if (pending === 'opinion') void askCompanionOpinion();
+    if (pending === 'companion') void generateAiProposal();
   };
 
   const applyAiProposal = (): void => {
@@ -1122,15 +1118,16 @@ export function EditorPage(): ReactElement {
               ))}
             </div>
             <label className="field-label" htmlFor="ai-edit-prompt">What should RAWcket create?</label>
-            <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} />
-            <div className="ai-companion-actions">
-              <button type="button" disabled={aiGenerating || preview === null} onClick={() => void askCompanionOpinion()}>Ask Companion for an opinion</button>
-              <button type="button" onClick={applyClassicAutoEnhance}>Auto Enhance · no AI</button>
+            <div className="ai-prompt-shell">
+              <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} disabled={aiGenerating} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Describe a result, or leave this empty and ask RAWcket for its opinion." />
+              <button className="ai-prompt-submit" type="button" aria-label="Ask AI Companion and generate proposal" title="Review the photograph and create one editable proposal" disabled={aiGenerating || preview === null} onClick={() => void generateAiProposal()}>{aiGenerating ? <span className="mini-spinner" aria-hidden="true" /> : <span aria-hidden="true">✦</span>}</button>
             </div>
-            <button className="button ai-primary full" type="button" disabled={aiGenerating || preview === null || aiPrompt.trim().length < 3} onClick={() => void generateAiProposal()}>{aiGenerating ? 'Working with OpenAI…' : 'Generate editable proposal'}</button>
+            <button className="button ghost full" type="button" disabled={aiGenerating} title="Adds bounded Natural preset deltas without removing existing curves or unrelated edits" onClick={applyClassicAutoEnhance}>Auto Enhance · additive · no AI</button>
+            {aiGenerating && <div className="ai-working-state" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>AI Companion is building one editable proposal</strong><small>Reviewing framing, curves, geometry, light, and local masks. The current recipe is unchanged while you wait.</small></span></div>}
             <p className="ai-status" aria-live="polite">{aiMessage}</p>
             {aiProposal !== null && (
               <div className="ai-proposal" aria-label="AI edit proposal">
+                <div className="ai-opinion-summary"><strong>Companion opinion</strong><p>{aiProposal.critique}</p><div><span>Strengths · {aiProposal.strengths.join(' · ')}</span><span>Opportunities · {aiProposal.opportunities.join(' · ')}</span></div></div>
                 <p>{aiProposal.explanation}</p>
                 <div className="ai-proposal-operations">
                   {aiProposal.operations.map((operation, index) => (
