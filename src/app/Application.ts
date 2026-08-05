@@ -1,4 +1,5 @@
 import { ApplyEditOperation } from '@/contexts/projects/application/apply-edit-operation/ApplyEditOperation';
+import { AssessImportCapacity } from '@/contexts/projects/application/assess-import-capacity/AssessImportCapacity';
 import { ChangeHistory } from '@/contexts/projects/application/change-history/ChangeHistory';
 import { ChooseInterfaceMode } from '@/contexts/projects/application/choose-interface-mode/ChooseInterfaceMode';
 import { CopyDevelopmentSettings } from '@/contexts/projects/application/copy-development-settings/CopyDevelopmentSettings';
@@ -34,9 +35,11 @@ import { RawcketDatabase } from '@/shared/infrastructure/database/RawcketDatabas
 import { BrowserApiKeyVault } from '@/shared/infrastructure/security/BrowserApiKeyVault';
 import { RawcketSettingsRepository } from '@/shared/infrastructure/settings/RawcketSettingsRepository';
 import { PersistentStorageRequest } from '@/shared/infrastructure/storage/PersistentStorageRequest';
+import { BrowserLocalStorageInspector } from '@/shared/infrastructure/storage/BrowserLocalStorageInspector';
 
 export type Application = {
   createProject: CreateProject;
+  assessImportCapacity: AssessImportCapacity;
   findProject: FindProject;
   listProjects: ListProjects;
   applyEditOperation: ApplyEditOperation;
@@ -74,6 +77,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const developmentSettingsClipboard = new BrowserDevelopmentSettingsClipboard();
   return {
     createProject: new CreateProject(projects, sourceFiles),
+    assessImportCapacity: new AssessImportCapacity(new BrowserLocalStorageInspector()),
     findProject: new FindProject(projects),
     listProjects: new ListProjects(projects),
     applyEditOperation: new ApplyEditOperation(),

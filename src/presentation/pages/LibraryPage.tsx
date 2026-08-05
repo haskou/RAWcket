@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
+import { AssessImportCapacityMessage } from '@/contexts/projects/application/assess-import-capacity/messages/AssessImportCapacityMessage';
+import type { ImportCapacityAssessment } from '@/contexts/projects/application/assess-import-capacity/AssessImportCapacity';
 import { CreateProjectMessage } from '@/contexts/projects/application/create-project/messages/CreateProjectMessage';
 import { DeleteProjectMessage } from '@/contexts/projects/application/delete-project/messages/DeleteProjectMessage';
 import { DuplicateProjectMessage } from '@/contexts/projects/application/duplicate-project/messages/DuplicateProjectMessage';
@@ -22,6 +24,7 @@ export function LibraryPage(): ReactElement {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [storageCapacity, setStorageCapacity] = useState<ImportCapacityAssessment | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     setProjects(await application.listProjects.list());
@@ -29,12 +32,18 @@ export function LibraryPage(): ReactElement {
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    void application.assessImportCapacity.assess(new AssessImportCapacityMessage(1)).then(setStorageCapacity);
+  }, [application, refresh]);
 
   const createFromFile = async (file: File): Promise<void> => {
     setBusy(true);
     setError(null);
     try {
+      const capacity = await application.assessImportCapacity.assess(new AssessImportCapacityMessage(file.size));
+      setStorageCapacity(capacity);
+      if (!capacity.canImport) {
+        throw new Error(`This original needs ${formatBytes(file.size)}, but RAWcket is preserving ${formatBytes(capacity.safetyReserveBytes)} as a safety reserve. Free browser storage or export and remove older projects first.`);
+      }
       const inspection = await application.inspectSourceImage.inspect(new InspectSourceImageMessage(file, file.name));
       const normalizedFile = new File([file], file.name, { type: inspection.mimeType });
       const name = file.name.replace(/\.(jpe?g|png|arw)$/i, '') || 'Untitled project';
@@ -133,7 +142,10 @@ export function LibraryPage(): ReactElement {
           <span aria-hidden="true">→</span>
         </button>
       </section>
-      <p className="storage-note">Local browser storage · private by default · not a replacement for a backup</p>
+      <p className="storage-note">
+        Local browser storage · private by default · not a replacement for a backup
+        {storageCapacity?.supported === true && <span> · {formatBytes(storageCapacity.usageBytes)} used of {formatBytes(storageCapacity.quotaBytes)} · {storageCapacity.persistent ? 'persistent storage granted' : 'storage may be reclaimed by the browser'}</span>}
+      </p>
       {error !== null && <p className="notice error" role="alert">{error}</p>}
       <section aria-labelledby="projects-title">
         <div className="section-heading"><h2 id="projects-title">Recent projects</h2><span>{projects.length} {projects.length === 1 ? 'project' : 'projects'}</span></div>
@@ -170,4 +182,11 @@ export function LibraryPage(): ReactElement {
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
