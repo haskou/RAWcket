@@ -24,6 +24,7 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
         'Return absolute slider values, not deltas. Exposure must be between -5 and 5. Sharpness and noiseReduction must be between 0 and 100; every other value must be between -100 and 100.',
         'Curve points use normalized x/y coordinates, must start at (0,0), end at (1,1), and have strictly increasing unique x values. Keep curves purposeful and normally use 3–6 points.',
         'Crop, mask, and point coordinates are normalized to the visible image: top-left is (0,0), bottom-right is (1,1). Crop width and height must remain inside the image. Use masks only when a local edit is visually justified.',
+        'Horizontal and vertical perspective corrections range from -100 to 100. Keep both at zero unless visible converging architecture or a receding plane clearly benefits from a bounded keystone correction.',
         'Do not claim that edits were applied. Explain the visual reasoning so every proposed value remains reviewable.'
       ].join('\n')
     }), 'an editing proposal');

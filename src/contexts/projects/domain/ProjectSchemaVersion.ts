@@ -1,7 +1,7 @@
 import { Integer } from '@haskou/value-objects';
 
 export class ProjectSchemaVersion extends Integer {
-  public static readonly CURRENT = 6;
+  public static readonly CURRENT = 7;
   public constructor(value: number) {
     super(value);
     if (this.isLessThan(0)) throw new Error('The schema version cannot be negative.');

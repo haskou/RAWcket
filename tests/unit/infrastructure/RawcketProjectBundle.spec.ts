@@ -8,6 +8,7 @@ import { VersionTwoToThreeProjectMigration } from '@/contexts/projects/infrastru
 import { VersionThreeToFourProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionThreeToFourProjectMigration';
 import { VersionFourToFiveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFourToFiveProjectMigration';
 import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionFiveToSixProjectMigration';
+import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSixToSevenProjectMigration';
 import { InMemoryProjectRepository } from '@/contexts/projects/infrastructure/repositories/InMemoryProjectRepository';
 import { InMemorySourceFileRepository } from '@/contexts/projects/infrastructure/repositories/InMemorySourceFileRepository';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
@@ -26,7 +27,8 @@ describe('RawcketProjectBundle', () => {
         new VersionTwoToThreeProjectMigration(),
         new VersionThreeToFourProjectMigration(),
         new VersionFourToFiveProjectMigration(),
-        new VersionFiveToSixProjectMigration()
+        new VersionFiveToSixProjectMigration(),
+        new VersionSixToSevenProjectMigration()
       ]),
       journal(),
       new Queue(QueueOptions.withConcurrency(1))

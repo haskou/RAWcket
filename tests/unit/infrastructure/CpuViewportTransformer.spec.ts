@@ -56,4 +56,13 @@ describe('CpuViewportTransformer', () => {
       0, 255, 0, 255
     ]);
   });
+
+  it('applies vertical perspective as a real keystone transform', () => {
+    const source = new Uint8ClampedArray(5 * 5 * 4).fill(255);
+
+    const result = new CpuViewportTransformer().transform(source, 5, 5, viewport({ verticalPerspective: 100 }));
+
+    expect(result.pixels[0]).toBe(0);
+    expect(result.pixels[(4 * 5) * 4]).toBe(255);
+  });
 });

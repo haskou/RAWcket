@@ -3,7 +3,7 @@ import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import { ViewportTransform, type ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import type { CompositionGuide } from '../editor/CompositionGuide';
 
-type NumericViewportField = 'rotationDegrees' | 'scale';
+type NumericViewportField = 'rotationDegrees' | 'horizontalPerspective' | 'verticalPerspective' | 'scale';
 type CropField = keyof ViewportTransformPrimitives['cropFrame'];
 type TranslationField = keyof ViewportTransformPrimitives['translation'];
 
@@ -56,7 +56,7 @@ export function GeometryControls({ project, onChange, guide, onGuideChange, hori
     <div className="geometry-controls">
       <details className="context-help" open>
         <summary>Framing and straightening guides</summary>
-        <p>Guides stay fixed while the photograph moves underneath them, so the dense grid can check both horizons and vertical architecture. They never appear in export.</p>
+        <p>Guides stay fixed while the photograph moves underneath them, so the dense grid can check horizons and converging architecture. Rotation levels the frame; vertical and horizontal perspective reshape opposite edges. Guides never appear in export.</p>
       </details>
       <div className="auto-straighten-control">
         <button className="button ghost full" type="button" disabled={horizonBusy} onClick={onAutoStraighten}>{horizonBusy ? 'Analyzing horizon…' : 'Auto straighten · local'}</button>
@@ -67,6 +67,8 @@ export function GeometryControls({ project, onChange, guide, onGuideChange, hori
         <label>Crop aspect ratio<select aria-label="Crop aspect ratio" value={aspectRatioValue(viewport.aspectRatio, originalRatio)} onChange={(event) => onChange({ ...viewport, aspectRatio: ratioFromValue(event.target.value, originalRatio) }, null)}><option value="free">Free</option><option value="original">Original · locked</option><option value="1:1">1:1 · Square</option><option value="3:2">3:2</option><option value="4:3">4:3</option><option value="5:4">5:4</option><option value="16:9">16:9</option></select></label>
       </div>
       <GeometryNumberControl label="Rotation" unit="°" value={viewport.rotationDegrees} modified={viewport.rotationDegrees !== defaults.rotationDegrees} minimum={-180} maximum={180} step={0.1} groupKey="rotation" groups={groups.current} onChange={(value, groupId) => changeNumeric('rotationDegrees', value, groupId)} />
+      <GeometryNumberControl label="Vertical perspective" unit="%" value={viewport.verticalPerspective} modified={viewport.verticalPerspective !== defaults.verticalPerspective} minimum={-100} maximum={100} step={1} groupKey="vertical-perspective" groups={groups.current} onChange={(value, groupId) => changeNumeric('verticalPerspective', value, groupId)} />
+      <GeometryNumberControl label="Horizontal perspective" unit="%" value={viewport.horizontalPerspective} modified={viewport.horizontalPerspective !== defaults.horizontalPerspective} minimum={-100} maximum={100} step={1} groupKey="horizontal-perspective" groups={groups.current} onChange={(value, groupId) => changeNumeric('horizontalPerspective', value, groupId)} />
       <GeometryNumberControl label="Development scale" unit="×" value={viewport.scale} modified={viewport.scale !== defaults.scale} minimum={0.1} maximum={4} step={0.01} groupKey="scale" groups={groups.current} onChange={(value, groupId) => changeNumeric('scale', value, groupId)} />
       <div className="geometry-grid-heading">Image position</div>
       <GeometryNumberControl label="X" value={viewport.translation.x} modified={viewport.translation.x !== defaults.translation.x} minimum={0} maximum={1} step={0.001} groupKey="translation-x" groups={groups.current} onChange={(value, groupId) => changeTranslation('x', value, groupId)} />

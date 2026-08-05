@@ -34,6 +34,8 @@ describe('Active recipe state', () => {
         translation: { x: 0.5, y: 0.5 },
         scale: 1,
         rotationDegrees: 1,
+        horizontalPerspective: 0,
+        verticalPerspective: 0,
         flipHorizontal: false,
         flipVertical: false,
         aspectRatio: null

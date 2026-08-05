@@ -26,6 +26,8 @@ Dependency arrows point toward the application and domain layers. The domain dep
 
 Schema version 4 introduced `ProjectOrganization`: a bounded zero-to-five `ProjectRating` and at most twenty normalized `ProjectTag` values. Schema version 6 adds the favorite decision to the same domain concept and lightweight index. Rating, tag, and favorite changes use serializable history. `PhotoProjectSummary` exposes matching behavior so library filters do not extract and compare primitive domain values.
 
+Schema version 7 adds bounded horizontal and vertical perspective values to `ViewportTransform`. Its migration updates the active recipe plus viewport operations nested in both undo and redo history, keeping old projects and sidecars neutral while preserving future reversibility.
+
 Schema version 5 adds immutable `CaptureMetadata`. The bounded TIFF reader extracts only validated, size-limited EXIF fields from Sony ARW containers; the aggregate persists those facts separately from editable project state. Missing fields remain explicitly null and the UI distinguishes embedded-preview development from future high-depth RAW demosaicing.
 
 `JsonProjectSidecarCodec` is an infrastructure boundary for recipe-only `.rawcket.json` files. Application messages validate project identity and file size; importing delegates to the aggregate’s `replace-recipe` operation so the entire change is validated, serializable, and undoable without copying source bytes or project identity.
@@ -38,7 +40,7 @@ Project/source mutations cross IndexedDB and OPFS, so `projectAssetJournal` reco
 
 - `GlobalAdjustments`: sixteen adjustments with concept-specific ranges and independent enabled state.
 - `CurveSet`: RGB, R, G, B, and optional luminance; normalized points and validated interpolation.
-- `ViewportTransform`: a fixed crop frame and reversible original-image transform.
+- `ViewportTransform`: a fixed crop frame plus reversible translation, scale, rotation, flips, aspect ratio, and horizontal/vertical perspective.
 - `MaskDefinition[]`: vector/semantic source definitions; rasters and embeddings are caches, never source of truth.
 
 ## Boundaries

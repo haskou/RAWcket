@@ -26,4 +26,22 @@ describe('Project sidecar workflow', () => {
   it('rejects malformed sidecars with an actionable error', async () => {
     await expect(new JsonProjectSidecarCodec().decode(new Blob(['{}']))).rejects.toThrow(/valid RAWcket recipe sidecar/);
   });
+
+  it('keeps older sidecars neutral when perspective fields are absent', async () => {
+    const project = PhotoProjectMother.create().toPrimitives();
+    const recipe = structuredClone(project.recipe);
+    delete (recipe.viewport as Partial<typeof recipe.viewport>).horizontalPerspective;
+    delete (recipe.viewport as Partial<typeof recipe.viewport>).verticalPerspective;
+    const sidecar = new Blob([JSON.stringify({
+      format: 'rawcket-sidecar',
+      formatVersion: 1,
+      projectSchemaVersion: 6,
+      source: { fileName: project.source.fileName, width: project.metadata.width, height: project.metadata.height },
+      recipe
+    })], { type: 'application/json' });
+
+    await expect(new JsonProjectSidecarCodec().decode(sidecar)).resolves.toMatchObject({
+      viewport: { horizontalPerspective: 0, verticalPerspective: 0 }
+    });
+  });
 });

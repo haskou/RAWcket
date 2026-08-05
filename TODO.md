@@ -109,9 +109,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Rule-of-thirds, dense twenty-division grid, diagonal, and golden-ratio overlays are available from both the canvas and geometry panel. The overlay stays fixed while the photograph moves below it, replacing a redundant separate level toggle. Guides are editing-only and excluded from export. Fit recalculates against the live canvas after either sidebar changes size.
 
-**Implemented.** Direct corner-to-corner crop selection, translucent excluded area, free/original/common locked aspect ratios, persistent four-corner resizing after placement, exact numeric alternatives, persistence, and one-step undo. Deterministic on-device Sobel analysis estimates dominant horizontal or architectural vertical edges from a bounded 512 px preview, exposes confidence, refuses weak evidence, and applies a normal reversible rotation without AI or upload.
+**Implemented.** Direct corner-to-corner crop selection, translucent excluded area, free/original/common locked aspect ratios, persistent four-corner resizing after placement, exact numeric alternatives, persistence, and one-step undo. Deterministic on-device Sobel analysis estimates dominant horizontal or architectural vertical edges from a bounded 512 px preview, exposes confidence, refuses weak evidence, and applies a normal reversible rotation without AI or upload. Horizontal and vertical perspective controls apply bounded keystone transforms in the shared preview/export renderer; they persist in schema version 7, migrate recipes and history safely, and are available to validated AI proposals.
 
-**Remaining.** Perspective/vertical/horizontal pixel correction and touch gesture polish.
+**Remaining.** Touch gesture polish and future automatic perspective estimation.
 
 **Dependencies.** Existing `ViewportTransform`; renderer integration; pointer/touch/trackpad gestures; homography math; EXIF orientation.
 
@@ -211,7 +211,7 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** Five per-project SHA-256 snapshots, newest-valid corruption recovery without overwriting damaged data, portable checksummed bundles, OPFS/IndexedDB original storage, persistent-storage request, quota visibility, and import safety reserve.
 
-**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes. Schema version 6 adds reversible favorites and an indexed favorites-only filter.
+**Implemented.** Schema version 4 adds domain-validated ratings and normalized tags. Both are reversible operations, persist in projects and the lightweight library index, survive bundles, and can be filtered through name/tag search plus a minimum-rating query. Schema version 5 adds immutable capture metadata without changing existing recipes. Schema version 6 adds reversible favorites and an indexed favorites-only filter. Schema version 7 adds horizontal/vertical perspective to the viewport and recursively migrates recorded recipe history.
 
 **Implemented.** Versioned `.rawcket.json` sidecars export only source dimensions and validated recipe data. They exclude the original, project identity, history, ratings, and tags; applying one is a single undoable aggregate operation with a 5 MB input limit.
 

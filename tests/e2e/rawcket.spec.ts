@@ -81,7 +81,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
           { kind: 'global-adjustment', key: 'contrast', value: 14 },
           { kind: 'global-adjustment', key: 'highlights', value: -22 },
           { kind: 'tone-curve', channel: 'rgb', interpolation: 'monotonic-cubic', points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.2 }, { x: 0.75, y: 0.82 }, { x: 1, y: 1 }] },
-          { kind: 'viewport', cropFrame: { x: 0.05, y: 0.05, width: 0.9, height: 0.9 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
+          { kind: 'viewport', cropFrame: { x: 0.05, y: 0.05, width: 0.9, height: 0.9 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
           { kind: 'radial-mask', center: { x: 0.5, y: 0.45 }, radiusX: 0.2, radiusY: 0.28, rotationDegrees: 0, inverted: false, opacity: 0.8, feather: 0.6, density: 1, localAdjustments: [{ key: 'exposure', value: 0.3 }] }
         ]
       };
@@ -172,6 +172,10 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect.poll(async () => Number(await page.getByLabel('Width numeric value').inputValue()) / Number(await page.getByLabel('Height numeric value').inputValue())).toBeCloseTo(0.5, 1);
   await page.getByLabel('Rotation numeric value').fill('10');
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
+  await page.getByLabel('Vertical perspective numeric value').fill('18');
+  await page.getByLabel('Horizontal perspective numeric value').fill('-12');
+  await expect(page.getByLabel('Vertical perspective numeric value')).toHaveValue('18');
+  await expect(page.getByLabel('Horizontal perspective numeric value')).toHaveValue('-12');
   await page.getByLabel('Editing tools').getByRole('button', { name: 'Masks AI ready' }).click();
   await expect(page.getByText('How local masks work')).toBeVisible();
   await page.getByRole('button', { name: '+ Radial mask' }).click();
@@ -237,6 +241,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
   await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
+  await expect(page.getByLabel('Vertical perspective numeric value')).toHaveValue('18');
+  await expect(page.getByLabel('Horizontal perspective numeric value')).toHaveValue('-12');
   await page.getByRole('button', { name: 'Local Masks', exact: true }).click();
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();

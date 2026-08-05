@@ -25,6 +25,8 @@ const operationSchema = z.discriminatedUnion('kind', [
     translation: pointSchema,
     scale: z.number().min(0.1).max(32),
     rotationDegrees: z.number().min(-180).max(180),
+    horizontalPerspective: z.number().min(-100).max(100),
+    verticalPerspective: z.number().min(-100).max(100),
     flipHorizontal: z.boolean(),
     flipVertical: z.boolean(),
     aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
@@ -119,7 +121,7 @@ export const openAiEditProposalJsonSchema = {
           },
           {
             type: 'object', additionalProperties: false,
-            required: ['kind', 'cropFrame', 'translation', 'scale', 'rotationDegrees', 'flipHorizontal', 'flipVertical', 'aspectRatio'],
+            required: ['kind', 'cropFrame', 'translation', 'scale', 'rotationDegrees', 'horizontalPerspective', 'verticalPerspective', 'flipHorizontal', 'flipVertical', 'aspectRatio'],
             properties: {
               kind: { type: 'string', enum: ['viewport'] },
               cropFrame: {
@@ -128,6 +130,7 @@ export const openAiEditProposalJsonSchema = {
               },
               translation: pointJsonSchema,
               scale: number(0.1, 32), rotationDegrees: number(-180, 180),
+              horizontalPerspective: number(-100, 100), verticalPerspective: number(-100, 100),
               flipHorizontal: { type: 'boolean' }, flipVertical: { type: 'boolean' },
               aspectRatio: {
                 anyOf: [

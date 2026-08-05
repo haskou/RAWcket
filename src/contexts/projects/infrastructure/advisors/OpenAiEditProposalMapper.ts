@@ -31,6 +31,8 @@ export class OpenAiEditProposalMapper {
           translation: operation.translation,
           scale: operation.scale,
           rotationDegrees: operation.rotationDegrees,
+          horizontalPerspective: operation.horizontalPerspective,
+          verticalPerspective: operation.verticalPerspective,
           flipHorizontal: operation.flipHorizontal,
           flipVertical: operation.flipVertical,
           aspectRatio: operation.aspectRatio

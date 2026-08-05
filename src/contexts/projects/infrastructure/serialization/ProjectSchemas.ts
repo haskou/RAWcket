@@ -20,6 +20,17 @@ const curveSetSchema = z.object({
   blue: toneCurveSchema,
   luminance: toneCurveSchema.nullable()
 });
+const viewportSchema = z.object({
+  cropFrame: rectangleSchema,
+  translation: pointSchema,
+  scale: z.number().min(0.1).max(32),
+  rotationDegrees: z.number().min(-180).max(180),
+  horizontalPerspective: z.number().min(-100).max(100).default(0),
+  verticalPerspective: z.number().min(-100).max(100).default(0),
+  flipHorizontal: z.boolean(),
+  flipVertical: z.boolean(),
+  aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
+});
 
 export const developmentSettingsSchema = z.object({
   globalAdjustments: adjustmentSchema,
@@ -120,15 +131,7 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
     recipe: z.object({
       globalAdjustments: adjustmentSchema,
       curves: curveSetSchema,
-      viewport: z.object({
-        cropFrame: rectangleSchema,
-        translation: pointSchema,
-        scale: z.number().min(0.1).max(32),
-        rotationDegrees: z.number().min(-180).max(180),
-        flipHorizontal: z.boolean(),
-        flipVertical: z.boolean(),
-        aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
-      }),
+      viewport: viewportSchema,
       masks: z.array(maskSchema),
       disabledGlobalAdjustments: z.array(adjustmentKeySchema)
     }),
@@ -136,15 +139,7 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('set-viewport-transform'),
-    viewport: z.object({
-      cropFrame: rectangleSchema,
-      translation: pointSchema,
-      scale: z.number().min(0.1).max(32),
-      rotationDegrees: z.number().min(-180).max(180),
-      flipHorizontal: z.boolean(),
-      flipVertical: z.boolean(),
-      aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
-    }),
+    viewport: viewportSchema,
     groupId: z.string().nullable()
   }),
   z.object({ kind: z.literal('rename-project'), name: z.string().min(1).max(120), groupId: z.string().nullable() })
@@ -192,15 +187,7 @@ export const photoProjectSchema = z.object({
   recipe: z.object({
     globalAdjustments: adjustmentSchema,
     curves: curveSetSchema,
-    viewport: z.object({
-      cropFrame: rectangleSchema,
-      translation: pointSchema,
-      scale: z.number().min(0.1).max(32),
-      rotationDegrees: z.number().min(-180).max(180),
-      flipHorizontal: z.boolean(),
-      flipVertical: z.boolean(),
-      aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
-    }),
+    viewport: viewportSchema,
     masks: z.array(maskSchema),
     disabledGlobalAdjustments: z.array(adjustmentKeySchema)
   }),

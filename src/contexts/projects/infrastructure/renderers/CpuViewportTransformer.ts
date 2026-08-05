@@ -1,5 +1,7 @@
 import type { ViewportTransformPrimitives } from '../../domain/ViewportTransform';
 
+const perspectiveStrengthDivisor = 125;
+
 export type TransformedPixelBuffer = {
   pixels: Uint8ClampedArray<ArrayBuffer>;
   width: number;
@@ -29,6 +31,12 @@ export class CpuViewportTransformer {
       for (let x = 0; x < outputWidth; x += 1) {
         let relativeX = (x + 0.5 - outputWidth / 2) / viewport.scale;
         let relativeY = (y + 0.5 - outputHeight / 2) / viewport.scale;
+        const normalizedX = relativeX / Math.max(1, outputWidth / 2);
+        const normalizedY = relativeY / Math.max(1, outputHeight / 2);
+        const verticalPerspectiveScale = Math.max(0.2, 1 + viewport.verticalPerspective / perspectiveStrengthDivisor * normalizedY);
+        const horizontalPerspectiveScale = Math.max(0.2, 1 + viewport.horizontalPerspective / perspectiveStrengthDivisor * normalizedX);
+        relativeX /= verticalPerspectiveScale;
+        relativeY /= horizontalPerspectiveScale;
         if (viewport.flipHorizontal) relativeX *= -1;
         if (viewport.flipVertical) relativeY *= -1;
         const sourceX = centerX + relativeX * cosine + relativeY * sine - 0.5;

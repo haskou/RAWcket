@@ -5,6 +5,8 @@ export type ViewportTransformPrimitives = {
   translation: { x: number; y: number };
   scale: number;
   rotationDegrees: number;
+  horizontalPerspective: number;
+  verticalPerspective: number;
   flipHorizontal: boolean;
   flipVertical: boolean;
   aspectRatio: { width: number; height: number } | null;
@@ -16,6 +18,8 @@ export class ViewportTransform {
     private readonly translation: NormalizedPoint,
     private readonly scale: number,
     private readonly rotationDegrees: number,
+    private readonly horizontalPerspective: number,
+    private readonly verticalPerspective: number,
     private readonly flipHorizontal: boolean,
     private readonly flipVertical: boolean,
     private readonly aspectRatio: AspectRatio | null
@@ -26,6 +30,10 @@ export class ViewportTransform {
     if (!Number.isFinite(rotationDegrees) || rotationDegrees < -180 || rotationDegrees > 180) {
       throw new Error('Rotation must be between -180 and 180 degrees.');
     }
+    if (!Number.isFinite(horizontalPerspective) || horizontalPerspective < -100 || horizontalPerspective > 100
+      || !Number.isFinite(verticalPerspective) || verticalPerspective < -100 || verticalPerspective > 100) {
+      throw new Error('Perspective corrections must be between -100 and 100.');
+    }
   }
 
   public static reset(): ViewportTransform {
@@ -34,6 +42,8 @@ export class ViewportTransform {
       translation: { x: 0.5, y: 0.5 },
       scale: 1,
       rotationDegrees: 0,
+      horizontalPerspective: 0,
+      verticalPerspective: 0,
       flipHorizontal: false,
       flipVertical: false,
       aspectRatio: null
@@ -57,6 +67,8 @@ export class ViewportTransform {
       ),
       input.scale,
       input.rotationDegrees,
+      input.horizontalPerspective,
+      input.verticalPerspective,
       input.flipHorizontal,
       input.flipVertical,
       input.aspectRatio === null ? null : new AspectRatio(input.aspectRatio.width, input.aspectRatio.height)
@@ -78,6 +90,8 @@ export class ViewportTransform {
       },
       scale: this.scale,
       rotationDegrees: this.rotationDegrees,
+      horizontalPerspective: this.horizontalPerspective,
+      verticalPerspective: this.verticalPerspective,
       flipHorizontal: this.flipHorizontal,
       flipVertical: this.flipVertical,
       aspectRatio:
@@ -97,6 +111,8 @@ export class ViewportTransform {
       && this.translation.getY().isEqual(new NormalizedCoordinate(0.5))
       && this.scale === 1
       && this.rotationDegrees === 0
+      && this.horizontalPerspective === 0
+      && this.verticalPerspective === 0
       && !this.flipHorizontal
       && !this.flipVertical
       && this.aspectRatio === null;
