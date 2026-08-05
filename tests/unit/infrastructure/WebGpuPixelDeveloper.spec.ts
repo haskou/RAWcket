@@ -31,8 +31,8 @@ describe('WebGpuPixelDeveloper', () => {
     )).resolves.toBeNull();
   });
 
-  it('does not request a GPU adapter for unsupported spatial adjustments', async () => {
-    const requestAdapter = vi.fn();
+  it('keeps spatial adjustments on the WebGPU path before falling back for missing hardware', async () => {
+    const requestAdapter = vi.fn().mockResolvedValue(null);
     Object.defineProperty(navigator, 'gpu', { configurable: true, value: { requestAdapter } });
     const development = settings();
     development.adjustments.texture = 1;
@@ -43,6 +43,22 @@ describe('WebGpuPixelDeveloper', () => {
       1,
       development
     )).resolves.toBeNull();
-    expect(requestAdapter).not.toHaveBeenCalled();
+    expect(requestAdapter).toHaveBeenCalledWith({ powerPreference: 'high-performance' });
+  });
+
+  it('returns control to the fallback pipeline when a GPU device cannot be acquired', async () => {
+    const requestDevice = vi.fn().mockRejectedValue(new Error('Device was lost during acquisition'));
+    Object.defineProperty(navigator, 'gpu', {
+      configurable: true,
+      value: { requestAdapter: vi.fn().mockResolvedValue({ limits: { maxStorageBufferBindingSize: 1_000_000 }, requestDevice }) }
+    });
+
+    await expect(new WebGpuPixelDeveloper().develop(
+      new Uint8ClampedArray([64, 32, 16, 255]),
+      1,
+      1,
+      settings()
+    )).resolves.toBeNull();
+    expect(requestDevice).toHaveBeenCalledTimes(1);
   });
 });

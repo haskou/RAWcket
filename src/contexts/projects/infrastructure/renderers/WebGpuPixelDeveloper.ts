@@ -24,7 +24,7 @@ export class WebGpuPixelDeveloper {
     try {
       device = await adapter.requestDevice();
       const sourceWords = this.packSource(source);
-      const sourceBuffer = this.buffer(device, sourceWords.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      const sourceBuffer = this.buffer(device, sourceWords.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC);
       const outputBuffer = this.buffer(device, sourceWords.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
       const readBuffer = this.buffer(device, sourceWords.byteLength, GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ);
       const parameters = this.parameters(settings, width, height);
@@ -56,9 +56,22 @@ export class WebGpuPixelDeveloper {
       pass.setBindGroup(0, bindGroup);
       pass.dispatchWorkgroups(Math.ceil(sourceWords.length / 256));
       pass.end();
-      encoder.copyBufferToBuffer(outputBuffer, 0, readBuffer, 0, sourceWords.byteLength);
+      const finalBuffer = this.encodeSpatialPasses(
+        device,
+        encoder,
+        outputBuffer,
+        sourceBuffer,
+        width,
+        height,
+        this.activeAdjustments(settings),
+        buffers
+      );
+      encoder.copyBufferToBuffer(finalBuffer, 0, readBuffer, 0, sourceWords.byteLength);
       device.queue.submit([encoder.finish()]);
-      await readBuffer.mapAsync(GPUMapMode.READ);
+      await Promise.race([
+        readBuffer.mapAsync(GPUMapMode.READ),
+        device.lost.then((loss) => Promise.reject(new Error(`WebGPU device lost: ${loss.message}`)))
+      ]);
       const copy = new Uint32Array(new ArrayBuffer(sourceWords.byteLength));
       copy.set(new Uint32Array(readBuffer.getMappedRange()));
       readBuffer.unmap();
@@ -72,9 +85,65 @@ export class WebGpuPixelDeveloper {
   }
 
   private canDevelop(settings: CpuDevelopmentSettings): boolean {
-    if (settings.masks.length > 0) return false;
-    const active = this.activeAdjustments(settings);
-    return active.texture === 0 && active.sharpness === 0 && active.noiseReduction === 0;
+    return settings.masks.length === 0;
+  }
+
+  private encodeSpatialPasses(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    globalOutput: GPUBuffer,
+    reusableSource: GPUBuffer,
+    width: number,
+    height: number,
+    adjustments: GlobalAdjustmentsPrimitives,
+    buffers: GPUBuffer[]
+  ): GPUBuffer {
+    const passes = [
+      { mode: 0, amount: adjustments.noiseReduction / 100 },
+      { mode: 1, amount: adjustments.texture / 125 },
+      { mode: 1, amount: adjustments.sharpness / 100 }
+    ].filter((pass) => pass.amount > 0);
+    if (passes.length === 0) return globalOutput;
+    const module = device.createShaderModule({ label: 'RAWcket spatial development', code: spatialComputeShader });
+    const pipeline = device.createComputePipeline({
+      label: 'RAWcket spatial development pipeline',
+      layout: 'auto',
+      compute: { module, entryPoint: 'filter' }
+    });
+    let input = globalOutput;
+    let output = reusableSource;
+    for (const definition of passes) {
+      const parameters = this.spatialParameters(width, height, definition.mode, definition.amount);
+      const parameterBuffer = this.buffer(device, parameters.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      buffers.push(parameterBuffer);
+      device.queue.writeBuffer(parameterBuffer, 0, parameters);
+      const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: input } },
+          { binding: 1, resource: { buffer: output } },
+          { binding: 2, resource: { buffer: parameterBuffer } }
+        ]
+      });
+      const pass = encoder.beginComputePass({ label: definition.mode === 0 ? 'RAWcket denoise pass' : 'RAWcket sharpen pass' });
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, bindGroup);
+      pass.dispatchWorkgroups(Math.ceil(width * height / 256));
+      pass.end();
+      [input, output] = [output, input];
+    }
+    return input;
+  }
+
+  private spatialParameters(width: number, height: number, mode: number, amount: number): ArrayBuffer {
+    const buffer = new ArrayBuffer(16);
+    const integers = new Uint32Array(buffer);
+    const floats = new Float32Array(buffer);
+    integers[0] = width;
+    integers[1] = height;
+    integers[2] = mode;
+    floats[3] = amount;
+    return buffer;
   }
 
   private gpu(): GPU | null {
@@ -231,4 +300,56 @@ fn develop(@builtin(global_invocation_id) invocation: vec3u) {
     rgb = clamp(rgb * (1.0 + vignette / 100.0 * edge * strength), vec3f(0.0), vec3f(1.0));
   }
   output[index] = pack(vec4f(rgb, original.a));
+}`;
+
+const spatialComputeShader = `
+struct SpatialParameters {
+  dimensions: vec2u,
+  mode: u32,
+  amount: f32,
+}
+
+@group(0) @binding(0) var<storage, read> source: array<u32>;
+@group(0) @binding(1) var<storage, read_write> output: array<u32>;
+@group(0) @binding(2) var<uniform> parameters: SpatialParameters;
+
+fn unpack(value: u32) -> vec4f {
+  return vec4f(
+    f32(value & 255u),
+    f32((value >> 8u) & 255u),
+    f32((value >> 16u) & 255u),
+    f32((value >> 24u) & 255u)
+  ) / 255.0;
+}
+fn pack(value: vec4f) -> u32 {
+  let bytes = vec4u(round(clamp(value, vec4f(0.0), vec4f(1.0)) * 255.0));
+  return bytes.r | (bytes.g << 8u) | (bytes.b << 16u) | (bytes.a << 24u);
+}
+fn sourceAt(x: i32, y: i32) -> vec4f {
+  let safeX = u32(clamp(x, 0, i32(parameters.dimensions.x) - 1));
+  let safeY = u32(clamp(y, 0, i32(parameters.dimensions.y) - 1));
+  return unpack(source[safeY * parameters.dimensions.x + safeX]);
+}
+
+@compute @workgroup_size(256)
+fn filter(@builtin(global_invocation_id) invocation: vec3u) {
+  let index = invocation.x;
+  let pixelCount = parameters.dimensions.x * parameters.dimensions.y;
+  if (index >= pixelCount) { return; }
+  let x = i32(index % parameters.dimensions.x);
+  let y = i32(index / parameters.dimensions.x);
+  let center = sourceAt(x, y);
+  var average = vec3f(0.0);
+  for (var offsetY = -1; offsetY <= 1; offsetY += 1) {
+    for (var offsetX = -1; offsetX <= 1; offsetX += 1) {
+      average += sourceAt(x + offsetX, y + offsetY).rgb;
+    }
+  }
+  average /= 9.0;
+  let rgb = select(
+    mix(center.rgb, average, parameters.amount),
+    clamp(center.rgb + (center.rgb - average) * parameters.amount * 1.5, vec3f(0.0), vec3f(1.0)),
+    parameters.mode == 1u
+  );
+  output[index] = pack(vec4f(rgb, center.a));
 }`;

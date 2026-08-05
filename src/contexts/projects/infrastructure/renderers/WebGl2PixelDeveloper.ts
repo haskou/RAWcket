@@ -35,9 +35,7 @@ export class WebGl2PixelDeveloper {
   }
 
   private canDevelop(settings: CpuDevelopmentSettings): boolean {
-    if (settings.masks.length > 0) return false;
-    const active = this.activeAdjustments(settings);
-    return active.texture === 0 && active.sharpness === 0 && active.noiseReduction === 0;
+    return settings.masks.length === 0;
   }
 
   private render(
@@ -48,7 +46,7 @@ export class WebGl2PixelDeveloper {
     settings: CpuDevelopmentSettings
   ): Uint8ClampedArray<ArrayBuffer> {
     if (source.length !== width * height * 4) throw new Error('Image dimensions do not match the WebGL2 pixel buffer.');
-    const program = this.createProgram(gl);
+    const program = this.createProgram(gl, fragmentShader);
     gl.useProgram(program);
     const vertexArray = gl.createVertexArray();
     gl.bindVertexArray(vertexArray);
@@ -70,15 +68,42 @@ export class WebGl2PixelDeveloper {
     gl.uniform1fv(location, new Float32Array(adjustmentOrder.map((key) => adjustments[key])));
     this.uniform1i(gl, program, 'uHasLuminanceCurve', curves.luminance === null ? 0 : 1);
     this.uniform2f(gl, program, 'uDimensions', width, height);
+    const framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    let inputTexture = this.createOutputTexture(gl, width, height);
+    let outputTexture = this.createOutputTexture(gl, width, height);
+    textures.push(inputTexture, outputTexture);
+    this.attachOutput(gl, inputTexture);
     gl.viewport(0, 0, width, height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    const output = new Uint8ClampedArray(new ArrayBuffer(source.length));
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, output);
+    const spatialProgram = this.createProgram(gl, spatialFragmentShader);
+    const spatialPasses = [
+      { mode: 0, amount: adjustments.noiseReduction / 100 },
+      { mode: 1, amount: adjustments.texture / 125 },
+      { mode: 1, amount: adjustments.sharpness / 100 }
+    ].filter((pass) => pass.amount > 0);
+    if (spatialPasses.length > 0) {
+      gl.useProgram(spatialProgram);
+      this.uniform2f(gl, spatialProgram, 'uDimensions', width, height);
+      for (const definition of spatialPasses) {
+        this.bindTexture(gl, spatialProgram, inputTexture, 'uSource', 0);
+        this.uniform1i(gl, spatialProgram, 'uMode', definition.mode);
+        this.uniform1f(gl, spatialProgram, 'uAmount', definition.amount);
+        this.attachOutput(gl, outputTexture);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        [inputTexture, outputTexture] = [outputTexture, inputTexture];
+      }
+    }
+    this.attachOutput(gl, inputTexture);
+    const outputPixels = new Uint8ClampedArray(new ArrayBuffer(source.length));
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, outputPixels);
     if (gl.getError() !== gl.NO_ERROR) throw new Error('The WebGL2 development pass failed.');
     textures.forEach((texture) => gl.deleteTexture(texture));
     gl.deleteVertexArray(vertexArray);
     gl.deleteProgram(program);
-    return output;
+    gl.deleteProgram(spatialProgram);
+    gl.deleteFramebuffer(framebuffer);
+    return outputPixels;
   }
 
   private activeAdjustments(settings: CpuDevelopmentSettings): GlobalAdjustmentsPrimitives {
@@ -87,14 +112,14 @@ export class WebGl2PixelDeveloper {
     return active;
   }
 
-  private createProgram(gl: WebGL2RenderingContext): WebGLProgram {
+  private createProgram(gl: WebGL2RenderingContext, fragmentSource: string): WebGLProgram {
     const vertex = this.compile(gl, gl.VERTEX_SHADER, `#version 300 es
       void main() {
         vec2 position = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
         gl_Position = vec4(position * 2.0 - 1.0, 0.0, 1.0);
       }
     `);
-    const fragment = this.compile(gl, gl.FRAGMENT_SHADER, fragmentShader);
+    const fragment = this.compile(gl, gl.FRAGMENT_SHADER, fragmentSource);
     const program = gl.createProgram();
     gl.attachShader(program, vertex);
     gl.attachShader(program, fragment);
@@ -135,6 +160,19 @@ export class WebGl2PixelDeveloper {
     return texture;
   }
 
+  private createOutputTexture(gl: WebGL2RenderingContext, width: number, height: number): WebGLTexture {
+    const texture = this.texture(gl);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    return texture;
+  }
+
+  private attachOutput(gl: WebGL2RenderingContext, texture: WebGLTexture): void {
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error('The WebGL2 development framebuffer is incomplete.');
+    }
+  }
+
   private texture(gl: WebGL2RenderingContext): WebGLTexture {
     const texture = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0 + 15);
@@ -162,6 +200,12 @@ export class WebGl2PixelDeveloper {
     const location = gl.getUniformLocation(program, name);
     if (location === null) throw new Error(`The WebGL2 ${name} uniform is unavailable.`);
     gl.uniform2f(location, first, second);
+  }
+
+  private uniform1f(gl: WebGL2RenderingContext, program: WebGLProgram, name: string, value: number): void {
+    const location = gl.getUniformLocation(program, name);
+    if (location === null) throw new Error(`The WebGL2 ${name} uniform is unavailable.`);
+    gl.uniform1f(location, value);
   }
 }
 
@@ -236,4 +280,30 @@ void main() {
     rgb = clamp(rgb * (1.0 + vignette / 100.0 * edge * strength), 0.0, 1.0);
   }
   outputColor = vec4(rgb, source.a);
+}`;
+
+const spatialFragmentShader = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 outputColor;
+uniform sampler2D uSource;
+uniform vec2 uDimensions;
+uniform int uMode;
+uniform float uAmount;
+
+void main() {
+  ivec2 centerCoordinate = ivec2(gl_FragCoord.xy - vec2(0.5));
+  vec4 center = texelFetch(uSource, centerCoordinate, 0);
+  vec3 average = vec3(0.0);
+  ivec2 maximum = ivec2(uDimensions) - ivec2(1);
+  for (int offsetY = -1; offsetY <= 1; offsetY += 1) {
+    for (int offsetX = -1; offsetX <= 1; offsetX += 1) {
+      average += texelFetch(uSource, clamp(centerCoordinate + ivec2(offsetX, offsetY), ivec2(0), maximum), 0).rgb;
+    }
+  }
+  average /= 9.0;
+  vec3 rgb = uMode == 0
+    ? mix(center.rgb, average, uAmount)
+    : clamp(center.rgb + (center.rgb - average) * uAmount * 1.5, 0.0, 1.0);
+  outputColor = vec4(rgb, center.a);
 }`;
