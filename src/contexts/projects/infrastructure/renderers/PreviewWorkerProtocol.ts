@@ -9,7 +9,7 @@ export const previewWorkerRequestSchema = z.object({
   sourceMimeType: z.enum(['image/jpeg', 'image/png', 'image/x-sony-arw']),
   maximumEdge: z.int().min(64).max(32_768).nullable(),
   output: z.object({
-    mimeType: z.enum(['image/webp', 'image/jpeg', 'image/png']),
+    mimeType: z.enum(['image/webp', 'image/jpeg', 'image/png', 'image/tiff']),
     quality: z.number().min(0.1).max(1)
   }),
   development: z.object({

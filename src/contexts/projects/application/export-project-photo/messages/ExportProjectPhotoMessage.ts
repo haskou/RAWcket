@@ -1,6 +1,6 @@
 import { ProjectId } from '../../../domain/value-objects/ProjectId';
 
-export type PhotoExportFormat = 'jpeg' | 'png';
+export type PhotoExportFormat = 'jpeg' | 'png' | 'tiff';
 
 export class ExportProjectPhotoMessage {
   private readonly projectId: ProjectId;
@@ -22,7 +22,10 @@ export class ExportProjectPhotoMessage {
 
   public getProjectId(): ProjectId { return this.projectId; }
   public getFormat(): PhotoExportFormat { return this.format; }
-  public getMimeType(): 'image/jpeg' | 'image/png' { return this.format === 'jpeg' ? 'image/jpeg' : 'image/png'; }
+  public getMimeType(): 'image/jpeg' | 'image/png' | 'image/tiff' {
+    if (this.format === 'jpeg') return 'image/jpeg';
+    return this.format === 'png' ? 'image/png' : 'image/tiff';
+  }
   public getQuality(): number { return this.quality; }
   public getMaximumEdge(): number | null { return this.maximumEdge; }
 }

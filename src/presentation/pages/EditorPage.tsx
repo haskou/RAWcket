@@ -302,7 +302,8 @@ export function EditorPage(): ReactElement {
         }
       );
       const safeName = project.getName().valueOf().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'rawcket-photo';
-      downloadBlob(image, `${safeName}.${settings.format === 'jpeg' ? 'jpg' : 'png'}`);
+      const extension = settings.format === 'jpeg' ? 'jpg' : settings.format === 'tiff' ? 'tif' : 'png';
+      downloadBlob(image, `${safeName}.${extension}`);
       setExportMessage('Photo exported successfully.');
       setExportProgress(1);
     } catch (error: unknown) {

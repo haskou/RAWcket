@@ -3,6 +3,7 @@ import { CpuPixelDeveloper } from './CpuPixelDeveloper';
 import { CpuViewportTransformer } from './CpuViewportTransformer';
 import { ArwEmbeddedPreviewExtractor } from '../codecs/ArwEmbeddedPreviewExtractor';
 import { PixelHistogramAnalyzer } from './PixelHistogramAnalyzer';
+import { TiffEncoder } from './TiffEncoder';
 import {
   previewWorkerRequestSchema,
   type PreviewWorkerResponse
@@ -13,6 +14,7 @@ const developer = new CpuPixelDeveloper();
 const viewportTransformer = new CpuViewportTransformer();
 const arw = new ArwEmbeddedPreviewExtractor();
 const histogram = new PixelHistogramAnalyzer();
+const tiff = new TiffEncoder();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -52,7 +54,9 @@ async function render(input: unknown): Promise<void> {
     progress(request.id, 'developing', 0.8);
     const analysis = histogram.analyze(transformed.pixels);
     progress(request.id, 'analyzing', 0.88);
-    const image = await outputCanvas.convertToBlob({ type: request.output.mimeType, quality: request.output.quality });
+    const image = request.output.mimeType === 'image/tiff'
+      ? tiff.encode(transformed.pixels, transformed.width, transformed.height)
+      : await outputCanvas.convertToBlob({ type: request.output.mimeType, quality: request.output.quality });
     progress(request.id, 'encoding', 0.95);
     post({ kind: 'completed', id: request.id, image, analysis });
   } catch (error: unknown) {
