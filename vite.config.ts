@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'RAWcket',
         short_name: 'RAWcket',
@@ -16,7 +16,11 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/'
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,png,webp,woff2}'] }
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,png,webp,svg,woff2}'],
+        cleanupOutdatedCaches: true,
+        navigateFallback: '/index.html'
+      }
     })
   ],
   resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
