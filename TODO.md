@@ -236,7 +236,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Implemented.** The semantic model is downloaded only from an explicit AI control that shows its source, pinned revision, model size, possible compatibility-runtime size, status, terms link, progress, cancellation, and removal.
 
-**Remaining.** Schema-aware rollback and optional non-intrusive PWA install prompts.
+**Implemented.** Chromium-compatible installation is offered as a quiet library-header action only after the browser emits its installability event. RAWcket suppresses the browser's ambient prompt and never opens installation without an explicit click; unsupported or already-installed environments show nothing.
+
+**Remaining.** Schema-aware rollback.
 
 **Acceptance.** The library opens offline after first load; incompatible code never activates before data can migrate; updates can be postponed; failed updates recover the previous shell; model size/status is visible; the normal website keeps every capability.
 

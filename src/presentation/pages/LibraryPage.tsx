@@ -20,6 +20,7 @@ import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { ProjectThumbnail } from '../components/ProjectThumbnail';
 import { ProjectOrganizationControls } from '../components/ProjectOrganizationControls';
 import { ImportSelectionDialog } from '../components/ImportSelectionDialog';
+import { PwaInstallButton } from '../components/PwaInstallButton';
 import { createDemoImageBlob, downloadBlob } from '../lib/browserImages';
 
 export function LibraryPage(): ReactElement {
@@ -270,6 +271,7 @@ export function LibraryPage(): ReactElement {
       <header className="library-header">
         <a className="brand" href="/" aria-label="RAWcket library"><span className="brand-mark">R</span><span>RAWcket</span></a>
         <div className="header-actions">
+          <PwaInstallButton />
           <button className="button ai-header-button" type="button" onClick={() => setSettingsOpen(true)}>✦ AI Companion</button>
           <button className="button ghost" type="button" onClick={() => bundleInput.current?.click()}>Import .rawcket</button>
           <button className="button primary" type="button" onClick={() => imageInput.current?.click()} disabled={busy}>{busy ? 'Importing…' : 'Import image'}</button>

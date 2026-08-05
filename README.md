@@ -30,7 +30,7 @@ Implemented:
 - A clearly separated AI Companion and Manual workspace, deterministic no-AI Auto Enhance, companion-authored editable briefs, one-click recipe clearing, and local multi-photo import review with photographer override.
 - Local library search across names and tags, validated comma-separated tags, and reversible zero-to-five-star ratings.
 - Persistent favorites with instant filtering and a visual editor history derived from real undo/redo operations.
-- Optional PWA installation, an offline app shell after first load, and user-controlled update activation.
+- Optional, browser-gated PWA installation from the library header, an offline app shell after first load, and user-controlled update activation.
 - Unit, integration, and Chromium E2E coverage; CI for lint, typecheck, tests, build, and E2E.
 
 Not implemented yet:
