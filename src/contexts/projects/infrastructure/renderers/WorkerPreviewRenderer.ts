@@ -48,6 +48,7 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
     const workerRequest: PreviewWorkerRequest = {
       id: crypto.randomUUID(),
       source,
+      sourceMimeType: primitives.source.mimeType,
       maximumEdge: request.getSize().valueOf(),
       output: { mimeType: 'image/webp', quality: 0.9 },
       development: {

@@ -6,6 +6,7 @@ const recipeSchema = photoProjectSchema.shape.recipe;
 export const previewWorkerRequestSchema = z.object({
   id: z.uuid(),
   source: z.instanceof(Blob),
+  sourceMimeType: z.enum(['image/jpeg', 'image/png', 'image/x-sony-arw']),
   maximumEdge: z.int().min(64).max(32_768).nullable(),
   output: z.object({
     mimeType: z.enum(['image/webp', 'image/jpeg', 'image/png']),

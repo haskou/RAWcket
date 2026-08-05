@@ -9,7 +9,7 @@ import { type ProjectDomainEvent } from './ProjectDomainEvent';
 import { ProjectSchemaVersion } from './ProjectSchemaVersion';
 import { InterfaceMode, ProjectUiState, type InterfaceModePrimitive } from './ProjectUiState';
 import { PhotoProjectSummary } from './PhotoProjectSummary';
-import { SourceImageReference } from './SourceImageReference';
+import { SourceImageReference, type SourceImageMimeType } from './SourceImageReference';
 import { ViewportTransform } from './ViewportTransform';
 import { AdjustmentKey } from './value-objects/AdjustmentKey';
 import { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
@@ -21,7 +21,7 @@ export type PhotoProjectPrimitives = {
   schemaVersion: number;
   id: string;
   name: string;
-  source: { fileName: string; mimeType: string; size: number; storageKey: string };
+  source: { fileName: string; mimeType: SourceImageMimeType; size: number; storageKey: string };
   metadata: { createdAt: number; updatedAt: number; width: number; height: number };
   recipe: DevelopmentRecipePrimitives;
   history: EditHistoryPrimitives;
@@ -183,7 +183,7 @@ export class PhotoProject {
       name: this.name.valueOf(),
       source: {
         fileName: this.source.getFileName().valueOf(),
-        mimeType: this.source.getMimeType().valueOf(),
+        mimeType: this.source.getSupportedMimeType(),
         size: this.source.getSize(),
         storageKey: this.source.getStorageKey().valueOf()
       },

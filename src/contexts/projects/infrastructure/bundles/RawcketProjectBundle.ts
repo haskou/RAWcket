@@ -24,7 +24,8 @@ export class RawcketProjectBundle implements ProjectExporter, ProjectImporter {
     if (project === null || source === null) throw new Error('The project is incomplete and cannot be exported.');
     const projectBytes = strToU8(JSON.stringify(project.toPrimitives(), null, 2));
     const sourceBytes = new Uint8Array(await this.readBlob(source));
-    const sourceEntry = source.type === 'image/png' ? 'original.png' : 'original.jpg';
+    const mimeType = project.getSource().getMimeType().valueOf();
+    const sourceEntry = mimeType === 'image/png' ? 'original.png' : mimeType === 'image/x-sony-arw' ? 'original.arw' : 'original.jpg';
     const manifest = {
       format: 'rawcket-project' as const,
       formatVersion: 1 as const,
@@ -69,10 +70,10 @@ export class RawcketProjectBundle implements ProjectExporter, ProjectImporter {
     const sourceBytes = sourceEntry === undefined ? undefined : files[sourceEntry];
     if (sourceEntry === undefined || sourceBytes === undefined) throw new Error('The bundle does not contain the original image.');
     const migrated = this.migrator.migrate(JSON.parse(strFromU8(projectBytes)));
-    const parsed = photoProjectSchema.parse(migrated) as PhotoProjectPrimitives;
+    const parsed = photoProjectSchema.parse(migrated);
     const requestedId = new ProjectId(parsed.id);
     const id = (await this.projects.findById(requestedId)) === null ? requestedId : new ProjectId(crypto.randomUUID());
-    const mimeType = sourceEntry.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const mimeType = sourceEntry.endsWith('.png') ? 'image/png' : sourceEntry.endsWith('.arw') ? 'image/x-sony-arw' : 'image/jpeg';
     const source = new Blob([this.toArrayBuffer(sourceBytes)], { type: mimeType });
     const stored = await this.sourceFiles.save(id, source);
     const importable: PhotoProjectPrimitives = {

@@ -116,7 +116,7 @@ export const photoProjectSchema = z.object({
   name: z.string().min(1).max(120),
   source: z.object({
     fileName: z.string().min(1),
-    mimeType: z.enum(['image/jpeg', 'image/png']),
+    mimeType: z.enum(['image/jpeg', 'image/png', 'image/x-sony-arw']),
     size: z.int().positive(),
     storageKey: z.string().min(1)
   }),

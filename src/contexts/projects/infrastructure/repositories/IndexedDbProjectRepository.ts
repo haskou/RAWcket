@@ -1,5 +1,5 @@
 import { StringValueObject, Timestamp } from '@haskou/value-objects';
-import { PhotoProject, type PhotoProjectPrimitives } from '../../domain/PhotoProject';
+import { PhotoProject } from '../../domain/PhotoProject';
 import { PhotoProjectSummary } from '../../domain/PhotoProjectSummary';
 import type { ProjectRepository } from '../../domain/repositories/ProjectRepository';
 import { ProjectName } from '../../domain/value-objects/ProjectName';
@@ -18,7 +18,7 @@ export class IndexedDbProjectRepository implements ProjectRepository {
     const raw = await (await this.database).get('projects', id.valueOf());
     if (raw === undefined) return null;
     const migrated = this.migrator.migrate(raw);
-    const parsed = photoProjectSchema.parse(migrated) as PhotoProjectPrimitives;
+    const parsed = photoProjectSchema.parse(migrated);
     return PhotoProject.fromPrimitives(parsed);
   }
 

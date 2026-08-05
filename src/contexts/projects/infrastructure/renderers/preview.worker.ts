@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { CpuPixelDeveloper } from './CpuPixelDeveloper';
 import { CpuViewportTransformer } from './CpuViewportTransformer';
+import { ArwEmbeddedPreviewExtractor } from '../codecs/ArwEmbeddedPreviewExtractor';
 import {
   previewWorkerRequestSchema,
   type PreviewWorkerResponse
@@ -9,6 +10,7 @@ import {
 const worker = self as DedicatedWorkerGlobalScope;
 const developer = new CpuPixelDeveloper();
 const viewportTransformer = new CpuViewportTransformer();
+const arw = new ArwEmbeddedPreviewExtractor();
 
 worker.onmessage = (event: MessageEvent<unknown>): void => {
   void render(event.data);
@@ -20,7 +22,10 @@ async function render(input: unknown): Promise<void> {
   const request = parsed.data;
   try {
     progress(request.id, 'queued', 0.05);
-    const bitmap = await createImageBitmap(request.source);
+    const decodableSource = request.sourceMimeType === 'image/x-sony-arw'
+      ? arw.extract(await request.source.arrayBuffer()).preview
+      : request.source;
+    const bitmap = await createImageBitmap(decodableSource);
     progress(request.id, 'decoding', 0.3);
     const scale = request.maximumEdge === null ? 1 : Math.min(1, request.maximumEdge / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));

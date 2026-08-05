@@ -7,6 +7,7 @@ import { DuplicateProject } from '@/contexts/projects/application/duplicate-proj
 import { ExportProjectPhoto } from '@/contexts/projects/application/export-project-photo/ExportProjectPhoto';
 import { FindProject } from '@/contexts/projects/application/find-project/FindProject';
 import { ListProjects } from '@/contexts/projects/application/list-projects/ListProjects';
+import { InspectSourceImage } from '@/contexts/projects/application/inspect-source-image/InspectSourceImage';
 import { SaveProject } from '@/contexts/projects/application/save-project/SaveProject';
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
@@ -14,6 +15,7 @@ import type { ProjectExporter } from '@/contexts/projects/application/ports/Proj
 import type { ProjectImporter } from '@/contexts/projects/application/ports/ProjectImporter';
 import type { SourceFileRepository } from '@/contexts/projects/domain/repositories/SourceFileRepository';
 import { RawcketProjectBundle } from '@/contexts/projects/infrastructure/bundles/RawcketProjectBundle';
+import { BrowserSourceImageInspector } from '@/contexts/projects/infrastructure/codecs/BrowserSourceImageInspector';
 import { ProjectMigrator } from '@/contexts/projects/infrastructure/migrations/ProjectMigrator';
 import { VersionZeroToOneProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionZeroToOneProjectMigration';
 import { VersionOneToTwoProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionOneToTwoProjectMigration';
@@ -45,6 +47,7 @@ export type Application = {
   renderProjectPreview: RenderProjectPreview;
   requestEditingAdvice: RequestEditingAdvice;
   exportProjectPhoto: ExportProjectPhoto;
+  inspectSourceImage: InspectSourceImage;
 };
 
 export function createApplication(databaseName = 'rawcket'): Application {
@@ -75,6 +78,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     persistentStorage: new PersistentStorageRequest(),
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     requestEditingAdvice: new RequestEditingAdvice(new LocalRecipeAdvisor()),
-    exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles))
+    exportProjectPhoto: new ExportProjectPhoto(new WorkerPhotoExporter(sourceFiles)),
+    inspectSourceImage: new InspectSourceImage(new BrowserSourceImageInspector())
   };
 }

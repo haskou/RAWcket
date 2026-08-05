@@ -4,7 +4,7 @@ import { SourceImageReference } from '../../../domain/SourceImageReference';
 import { ProjectId } from '../../../domain/value-objects/ProjectId';
 import { ProjectName } from '../../../domain/value-objects/ProjectName';
 
-const supportedMimeTypes = new Set(['image/jpeg', 'image/png']);
+const supportedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/x-sony-arw']);
 
 export class CreateProjectMessage {
   private readonly projectId = new ProjectId(crypto.randomUUID());
@@ -22,7 +22,7 @@ export class CreateProjectMessage {
     this.projectName = new ProjectName(name);
     this.createdAt = Timestamp.new(now);
     if (!supportedMimeTypes.has(file.type)) {
-      throw new Error('Only JPEG and PNG images can currently be imported.');
+      throw new Error('Only JPEG, PNG, and Sony ARW images can currently be imported.');
     }
   }
 

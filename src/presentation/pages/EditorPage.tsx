@@ -15,6 +15,7 @@ import { ChangeHistoryMessage } from '@/contexts/projects/application/change-his
 import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { ExportProjectPhotoMessage } from '@/contexts/projects/application/export-project-photo/messages/ExportProjectPhotoMessage';
+import { InspectSourceImageMessage } from '@/contexts/projects/application/inspect-source-image/messages/InspectSourceImageMessage';
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
@@ -82,7 +83,7 @@ export function EditorPage(): ReactElement {
   const previewSurface = useRef<HTMLDivElement>(null);
   const exportAbort = useRef<AbortController | null>(null);
   const [project, setProject] = useState<PhotoProject | null>(null);
-  const [source, setSource] = useState<Blob | null>(null);
+  const [beforeSource, setBeforeSource] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<Blob | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [renderProgress, setRenderProgress] = useState('Preparing preview');
@@ -107,7 +108,7 @@ export function EditorPage(): ReactElement {
   const [aiSelection, setAiSelection] = useState<Set<number>>(new Set());
   const [aiGenerating, setAiGenerating] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const sourceUrl = useObjectUrl(showOriginal ? source : preview ?? source);
+  const sourceUrl = useObjectUrl(showOriginal ? beforeSource : preview ?? beforeSource);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
   const autosave = useProjectAutosave(project, revision, save);
 
@@ -120,7 +121,11 @@ export function EditorPage(): ReactElement {
           return;
         }
         setProject(loaded);
-        setSource(await application.sourceFiles.find(loaded.getId()));
+        const original = await application.sourceFiles.find(loaded.getId());
+        if (original !== null && loaded.getSource().getSupportedMimeType() === 'image/x-sony-arw') {
+          const inspection = await application.inspectSourceImage.inspect(new InspectSourceImageMessage(original, loaded.getSource().getFileName().valueOf()));
+          setBeforeSource(inspection.embeddedPreview);
+        } else setBeforeSource(original);
       } catch (error: unknown) {
         setLoadError(error instanceof Error ? error.message : 'The project could not be opened.');
       }

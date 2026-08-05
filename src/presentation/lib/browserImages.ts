@@ -1,10 +1,3 @@
-export async function readImageDimensions(blob: Blob): Promise<{ width: number; height: number }> {
-  const bitmap = await createImageBitmap(blob);
-  const dimensions = { width: bitmap.width, height: bitmap.height };
-  bitmap.close();
-  return dimensions;
-}
-
 export async function createDemoImageBlob(): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = 1600;

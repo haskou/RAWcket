@@ -44,6 +44,7 @@ export class WorkerPhotoExporter implements PhotoExporter {
     const workerRequest: PreviewWorkerRequest = {
       id: crypto.randomUUID(),
       source,
+      sourceMimeType: project.getSource().getSupportedMimeType(),
       maximumEdge: message.getMaximumEdge(),
       output: { mimeType: message.getMimeType(), quality: message.getQuality() },
       development: {

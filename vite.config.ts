@@ -10,7 +10,7 @@ export default defineConfig({
       manifest: {
         name: 'RAWcket',
         short_name: 'RAWcket',
-        description: 'Editor fotografico no destructivo y local-first.',
+        description: 'A non-destructive, local-first photo editor.',
         theme_color: '#10100f',
         background_color: '#10100f',
         display: 'standalone',
