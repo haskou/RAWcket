@@ -171,6 +171,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .adjustment-slider { width: 100%; height: 15px; accent-color: var(--accent); cursor: ew-resize; }
 .curve-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .curve-presets button, .ai-quick-prompts button { min-height: 34px; border: 1px solid #323733; border-radius: 7px; background: #1b1e1c; color: #bdc3be; cursor: pointer; font-size: .65rem; }
+.tone-curve-editor { display: grid; gap: 9px; margin-bottom: 12px; }
+.curve-channel-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.curve-channel-tabs button { min-height: 28px; padding: 0 3px; border: 1px solid #303531; border-radius: 5px; background: #191c1a; color: #858c87; cursor: pointer; font-size: .59rem; }
+.curve-channel-tabs button.active { border-color: #697363; color: var(--text); background: #292d2a; }
+.curve-graph { width: 100%; aspect-ratio: 1; border: 1px solid #394039; border-radius: 7px; background: linear-gradient(145deg, #101211, #090a0a); touch-action: none; cursor: crosshair; }
+.curve-grid { fill: none; stroke: #252a26; stroke-width: .003; vector-effect: non-scaling-stroke; }
+.curve-line { fill: none; stroke: #e1e5df; stroke-width: .009; vector-effect: non-scaling-stroke; }
+.curve-graph.channel-red .curve-line { stroke: #ff7b73; }
+.curve-graph.channel-green .curve-line { stroke: #86d789; }
+.curve-graph.channel-blue .curve-line { stroke: #7ca8ff; }
+.curve-graph circle { fill: #131614; stroke: #e1e5df; stroke-width: .008; vector-effect: non-scaling-stroke; cursor: grab; }
+.curve-graph circle.selected { fill: var(--accent); stroke: #11150d; }
+.curve-point-values { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px; }
+.curve-point-values label { display: flex; align-items: center; gap: 4px; color: #818983; font-size: .62rem; }
+.curve-point-values input { width: 100%; min-width: 0; height: 30px; border: 1px solid #333834; border-radius: 6px; background: #0d0f0e; color: var(--accent); padding: 0 4px; font-size: .65rem; }
+.curve-point-values button, .curve-footer button, .curve-footer select { min-height: 30px; border: 1px solid #333834; border-radius: 6px; background: #1a1d1b; color: #aeb4af; padding: 0 7px; font-size: .61rem; }
+.curve-footer { display: grid; grid-template-columns: 1fr auto; gap: 5px; }
 .geometry-controls { display: grid; gap: 16px; }
 .geometry-grid-heading { margin-bottom: -7px; padding-top: 3px; border-top: 1px solid var(--line-soft); color: #7f8781; font-size: .61rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .geometry-number-control > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; color: #c7ccc8; font-size: .69rem; }

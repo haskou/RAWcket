@@ -46,6 +46,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await page.getByRole('button', { name: /Local Smart Mask/ }).click();
   await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
+  await page.getByLabel('Curve point Y').fill('0.1');
+  await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
   await page.getByRole('button', { name: 'Open night' }).click();
@@ -55,4 +58,6 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'Local Masks', exact: true }).click();
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Smart 2 On/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
+  await expect(page.getByLabel('Curve point Y')).toHaveValue('0.1');
 });

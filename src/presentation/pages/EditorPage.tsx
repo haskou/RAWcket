@@ -30,6 +30,7 @@ import { AdjustmentControls } from '../components/AdjustmentControls';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { GeometryControls } from '../components/GeometryControls';
 import { MaskControls } from '../components/MaskControls';
+import { ToneCurveEditor } from '../components/ToneCurveEditor';
 import {
   adjustmentDefinitions,
   type AdjustmentSection
@@ -248,6 +249,14 @@ export function EditorPage(): ReactElement {
       curve: curvePresets[name],
       groupId: null
     });
+  };
+
+  const changeCurve = (
+    channel: 'rgb' | 'red' | 'green' | 'blue' | 'luminance',
+    curve: ToneCurvePrimitives | null,
+    groupId: string | null
+  ): void => {
+    apply({ kind: EDIT_OPERATION.SET_CURVE, channel, curve, groupId });
   };
 
   const changeViewport = (viewport: ViewportTransformPrimitives, groupId: string | null): void => {
@@ -587,7 +596,8 @@ export function EditorPage(): ReactElement {
             <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} />
           </ToolSection>
           <ToolSection id="curves" title="Tone Curve" active={activePanel === 'curves'} onToggle={setActivePanel} badge="Shortcut 4">
-            <p>Choose a real-time RGB curve preset. Every change is non-destructive and undoable.</p>
+            <p>Edit every channel with draggable or exact numeric points. Double click the graph to add a point.</p>
+            <ToneCurveEditor project={project} onChange={changeCurve} />
             <div className="curve-presets">
               {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
             </div>

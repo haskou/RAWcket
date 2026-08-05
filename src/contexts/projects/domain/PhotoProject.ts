@@ -153,6 +153,11 @@ export class PhotoProject {
     return this.recipe.getMasks();
   }
 
+  public getCurve(channel: CurveChannel): ToneCurve | null {
+    const curve = this.recipe.getCurve(channel);
+    return curve === null ? null : ToneCurve.fromPrimitives(curve.toPrimitives());
+  }
+
   public getInterfaceMode(): InterfaceMode {
     return this.uiState.getMode();
   }
