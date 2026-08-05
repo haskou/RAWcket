@@ -54,6 +54,7 @@ type EditorPanel = AdjustmentSection | 'curves' | 'crop' | 'masks' | 'ai';
 type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
 type BrushGesture = { pointerId: number; maskId: string; groupId: string };
+type AiPointPolarity = 'positive' | 'negative';
 
 const minimumZoom = 0.1;
 const maximumZoom = 8;
@@ -129,6 +130,7 @@ export function EditorPage(): ReactElement {
   const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
   const [brushActive, setBrushActive] = useState(false);
   const [aiPointActive, setAiPointActive] = useState(false);
+  const [aiPointPolarity, setAiPointPolarity] = useState<AiPointPolarity>('positive');
   const [brushSize, setBrushSize] = useState(0.08);
   const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -431,6 +433,48 @@ export function EditorPage(): ReactElement {
     setAiPointActive(false);
   };
 
+  const addLinearMask = (): void => {
+    const id = crypto.randomUUID();
+    apply({
+      kind: EDIT_OPERATION.ADD_MASK,
+      groupId: null,
+      mask: {
+        id,
+        enabled: true,
+        inverted: false,
+        opacity: 1,
+        feather: 0.2,
+        density: 1,
+        localAdjustments: { exposure: 0.5 },
+        shape: { kind: 'linear-gradient', start: { x: 0.5, y: 0.2 }, end: { x: 0.5, y: 0.8 } }
+      }
+    });
+    setSelectedMaskId(id);
+    setBrushActive(false);
+    setAiPointActive(false);
+  };
+
+  const addLuminanceMask = (): void => {
+    const id = crypto.randomUUID();
+    apply({
+      kind: EDIT_OPERATION.ADD_MASK,
+      groupId: null,
+      mask: {
+        id,
+        enabled: true,
+        inverted: false,
+        opacity: 1,
+        feather: 0.2,
+        density: 1,
+        localAdjustments: { exposure: 0.5 },
+        shape: { kind: 'luminance-range', minimum: 0.55, maximum: 1 }
+      }
+    });
+    setSelectedMaskId(id);
+    setBrushActive(false);
+    setAiPointActive(false);
+  };
+
   const addAiMask = (): void => {
     const id = crypto.randomUUID();
     apply({
@@ -553,7 +597,9 @@ export function EditorPage(): ReactElement {
     if (selected?.shape.kind !== 'ai-segmentation' || point === null) return true;
     updateMask({
       ...selected,
-      shape: { ...selected.shape, positivePoints: [...selected.shape.positivePoints, point] }
+      shape: aiPointPolarity === 'positive'
+        ? { ...selected.shape, positivePoints: [...selected.shape.positivePoints, point] }
+        : { ...selected.shape, negativePoints: [...selected.shape.negativePoints, point] }
     }, null);
     return true;
   };
@@ -756,15 +802,19 @@ export function EditorPage(): ReactElement {
               selectedId={selectedMaskId}
               brushActive={brushActive}
               aiPointActive={aiPointActive}
+              aiPointPolarity={aiPointPolarity}
               brushSize={brushSize}
               onSelect={selectMask}
               onAddBrush={addBrushMask}
               onAddRadial={addRadialMask}
+              onAddLinear={addLinearMask}
+              onAddLuminance={addLuminanceMask}
               onAddAi={addAiMask}
               onUpdate={updateMask}
               onRemove={removeMask}
               onBrushActiveChange={(active) => { setBrushActive(active); if (active) setAiPointActive(false); }}
               onAiPointActiveChange={(active) => { setAiPointActive(active); if (active) setBrushActive(false); }}
+              onAiPointPolarityChange={setAiPointPolarity}
               onBrushSizeChange={setBrushSize}
             />
           </ToolSection>
@@ -837,8 +887,15 @@ function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactEle
         if (mask.shape.kind === 'radial') {
           return <ellipse key={mask.id} cx={mask.shape.center.x} cy={mask.shape.center.y} rx={mask.shape.radiusX} ry={mask.shape.radiusY} fill="currentColor" transform={`rotate(${mask.shape.rotationDegrees} ${mask.shape.center.x} ${mask.shape.center.y})`} />;
         }
+        if (mask.shape.kind === 'linear-gradient') {
+          return <g key={mask.id}><defs><linearGradient id={`mask-gradient-${mask.id}`} x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y}><stop offset="0" stopOpacity="0" /><stop offset="1" stopOpacity="1" /></linearGradient></defs><rect width="1" height="1" fill={`url(#mask-gradient-${mask.id})`} /><line className="mask-gradient-axis" x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y} /></g>;
+        }
         if (mask.shape.kind === 'ai-segmentation') {
-          return <g className="smart-mask-points" key={mask.id}>{mask.shape.positivePoints.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="0.012" />)}</g>;
+          return <g className="smart-mask-points" key={mask.id}>
+            {mask.shape.boundingBoxes.map((box, index) => <rect className="smart-mask-box" key={`box-${index}`} x={box.x} y={box.y} width={box.width} height={box.height} />)}
+            {mask.shape.positivePoints.map((point, index) => <circle className="positive" key={`positive-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
+            {mask.shape.negativePoints.map((point, index) => <circle className="negative" key={`negative-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
+          </g>;
         }
         return null;
       })}
