@@ -1,0 +1,15 @@
+@startuml
+skinparam componentStyle rectangle
+component "Presentation / React" as Presentation
+component "Application / use cases" as Application
+component "Domain / PhotoProject" as Domain
+component "Infrastructure / IndexedDB + OPFS" as Persistence
+component "Infrastructure / .rawcket bundles" as Bundles
+component "Infrastructure / Disabled advisor" as Advisor
+
+Presentation --> Application
+Application --> Domain
+Persistence ..> Application : implements ports
+Bundles ..> Application : implements ports
+Advisor ..> Application : implements port
+@enduml
