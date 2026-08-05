@@ -88,6 +88,7 @@ export function EditorPage(): ReactElement {
   const [panning, setPanning] = useState(false);
   const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
   const [brushActive, setBrushActive] = useState(false);
+  const [aiPointActive, setAiPointActive] = useState(false);
   const [brushSize, setBrushSize] = useState(0.08);
   const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -190,7 +191,7 @@ export function EditorPage(): ReactElement {
       else if (event.key.toLowerCase() === 'a') setActivePanel('ai');
       else if (event.key.toLowerCase() === 'b') setShowOriginal((value) => !value);
       else if (event.key.toLowerCase() === 'm') setActivePanel('masks');
-      else if (event.key === 'Escape') setBrushActive(false);
+      else if (event.key === 'Escape') { setBrushActive(false); setAiPointActive(false); }
       else if (event.key === '?') setShortcutsOpen((value) => !value);
       else return;
       event.preventDefault();
@@ -275,6 +276,7 @@ export function EditorPage(): ReactElement {
     });
     setSelectedMaskId(id);
     setBrushActive(true);
+    setAiPointActive(false);
   };
 
   const addRadialMask = (): void => {
@@ -295,6 +297,43 @@ export function EditorPage(): ReactElement {
     });
     setSelectedMaskId(id);
     setBrushActive(false);
+    setAiPointActive(false);
+  };
+
+  const addAiMask = (): void => {
+    const id = crypto.randomUUID();
+    apply({
+      kind: EDIT_OPERATION.ADD_MASK,
+      groupId: null,
+      mask: {
+        id,
+        enabled: true,
+        inverted: false,
+        opacity: 1,
+        feather: 0.25,
+        density: 1,
+        localAdjustments: { exposure: 0.5 },
+        shape: {
+          kind: 'ai-segmentation',
+          prompt: 'Local positive-point smart selection',
+          positivePoints: [],
+          negativePoints: [],
+          boundingBoxes: [],
+          strategy: 'local-spatial-luminance',
+          version: '1',
+          rasterCacheKey: null
+        }
+      }
+    });
+    setSelectedMaskId(id);
+    setBrushActive(false);
+    setAiPointActive(true);
+  };
+
+  const selectMask = (id: string): void => {
+    setSelectedMaskId(id);
+    setBrushActive(false);
+    setAiPointActive(false);
   };
 
   const generateAiProposal = async (): Promise<void> => {
@@ -346,6 +385,7 @@ export function EditorPage(): ReactElement {
     apply({ kind: EDIT_OPERATION.REMOVE_MASK, maskId: id, groupId: null });
     setSelectedMaskId(null);
     setBrushActive(false);
+    setAiPointActive(false);
   };
 
   const pointOnPreview = (event: ReactPointerEvent<HTMLDivElement>): { x: number; y: number } | null => {
@@ -375,6 +415,18 @@ export function EditorPage(): ReactElement {
     return true;
   };
 
+  const addAiPoint = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
+    if (!aiPointActive || selectedMaskId === null) return false;
+    const selected = project?.getMasks().find((mask) => mask.getId().valueOf() === selectedMaskId)?.toPrimitives();
+    const point = pointOnPreview(event);
+    if (selected?.shape.kind !== 'ai-segmentation' || point === null) return true;
+    updateMask({
+      ...selected,
+      shape: { ...selected.shape, positivePoints: [...selected.shape.positivePoints, point] }
+    }, null);
+    return true;
+  };
+
   const continueBrushStroke = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
     const gesture = brushGesture.current;
     if (gesture?.pointerId !== event.pointerId) return false;
@@ -392,6 +444,7 @@ export function EditorPage(): ReactElement {
 
   const startPan = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.button !== 0) return;
+    if (addAiPoint(event)) return;
     if (beginBrushStroke(event)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     panGesture.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, ...pan };
@@ -468,7 +521,7 @@ export function EditorPage(): ReactElement {
             <button className={showOriginal ? 'active' : ''} type="button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? 'Before' : 'After'} · B</button>
           </div>
           <div
-            className={`photo-stage ${panning ? 'panning' : ''} ${brushActive ? 'painting' : ''}`}
+            className={`photo-stage ${panning ? 'panning' : ''} ${brushActive || aiPointActive ? 'painting' : ''}`}
             onPointerDown={startPan}
             onPointerMove={movePan}
             onPointerUp={endPan}
@@ -479,7 +532,7 @@ export function EditorPage(): ReactElement {
             {sourceUrl !== null && (
               <div ref={previewSurface} className="preview-surface" style={{ transform }}>
                 <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} />
-                {!showOriginal && (activePanel === 'masks' || brushActive) && <MaskOverlay masks={project.getMasks().map((mask) => mask.toPrimitives())} />}
+                {!showOriginal && (activePanel === 'masks' || brushActive || aiPointActive) && <MaskOverlay masks={project.getMasks().map((mask) => mask.toPrimitives())} />}
               </div>
             )}
             <div className="truth-badge"><span aria-hidden="true">◇</span><span><strong>Reference CPU preview</strong><small>Full global recipe and curves · {renderProgress}</small></span></div>
@@ -549,13 +602,16 @@ export function EditorPage(): ReactElement {
               project={project}
               selectedId={selectedMaskId}
               brushActive={brushActive}
+              aiPointActive={aiPointActive}
               brushSize={brushSize}
-              onSelect={setSelectedMaskId}
+              onSelect={selectMask}
               onAddBrush={addBrushMask}
               onAddRadial={addRadialMask}
+              onAddAi={addAiMask}
               onUpdate={updateMask}
               onRemove={removeMask}
-              onBrushActiveChange={setBrushActive}
+              onBrushActiveChange={(active) => { setBrushActive(active); if (active) setAiPointActive(false); }}
+              onAiPointActiveChange={(active) => { setAiPointActive(active); if (active) setBrushActive(false); }}
               onBrushSizeChange={setBrushSize}
             />
           </ToolSection>
@@ -617,6 +673,9 @@ function MaskOverlay({ masks }: { masks: MaskDefinitionPrimitives[] }): ReactEle
         }
         if (mask.shape.kind === 'radial') {
           return <ellipse key={mask.id} cx={mask.shape.center.x} cy={mask.shape.center.y} rx={mask.shape.radiusX} ry={mask.shape.radiusY} fill="currentColor" transform={`rotate(${mask.shape.rotationDegrees} ${mask.shape.center.x} ${mask.shape.center.y})`} />;
+        }
+        if (mask.shape.kind === 'ai-segmentation') {
+          return <g className="smart-mask-points" key={mask.id}>{mask.shape.positivePoints.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="0.012" />)}</g>;
         }
         return null;
       })}

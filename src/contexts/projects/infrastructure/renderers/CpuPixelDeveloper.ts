@@ -33,13 +33,21 @@ export class CpuPixelDeveloper {
       blue: ToneCurveLut.create(settings.curves.blue),
       luminance: settings.curves.luminance === null ? null : ToneCurveLut.create(settings.curves.luminance)
     };
+    const maskSeeds = new Map(settings.masks.map((mask) => [mask.id, this.maskSeedLuminances(mask, source, width, height)]));
     for (let index = 0; index < source.length; index += 4) {
       const sourcePixel = { red: (source[index] ?? 0) / 255, green: (source[index + 1] ?? 0) / 255, blue: (source[index + 2] ?? 0) / 255 };
       let developed = this.developPixel(sourcePixel, adjustments);
       const x = (index / 4 % width + 0.5) / width;
       const y = (Math.floor(index / 4 / width) + 0.5) / height;
       for (const mask of settings.masks) {
-        const weight = this.masks.evaluate(mask, { x, y, luminance: this.luminance(sourcePixel) });
+        const seeds = maskSeeds.get(mask.id);
+        const weight = this.masks.evaluate(mask, {
+          x,
+          y,
+          luminance: this.luminance(sourcePixel),
+          positiveLuminances: seeds?.positive,
+          negativeLuminances: seeds?.negative
+        });
         if (weight <= 0) continue;
         const local = { ...this.neutralAdjustments(), ...mask.localAdjustments };
         const locallyDeveloped = this.developPixel(developed, local);
@@ -79,6 +87,30 @@ export class CpuPixelDeveloper {
       sharpness: 0,
       noiseReduction: 0
     };
+  }
+
+  private maskSeedLuminances(
+    mask: MaskDefinitionPrimitives,
+    source: Uint8ClampedArray,
+    width: number,
+    height: number
+  ): { positive: number[]; negative: number[] } {
+    if (mask.shape.kind !== 'ai-segmentation') return { positive: [], negative: [] };
+    return {
+      positive: mask.shape.positivePoints.map((point) => this.sourceLuminanceAt(source, width, height, point.x, point.y)),
+      negative: mask.shape.negativePoints.map((point) => this.sourceLuminanceAt(source, width, height, point.x, point.y))
+    };
+  }
+
+  private sourceLuminanceAt(source: Uint8ClampedArray, width: number, height: number, x: number, y: number): number {
+    const pixelX = Math.min(width - 1, Math.max(0, Math.floor(x * width)));
+    const pixelY = Math.min(height - 1, Math.max(0, Math.floor(y * height)));
+    const index = (pixelY * width + pixelX) * 4;
+    return this.luminance({
+      red: (source[index] ?? 0) / 255,
+      green: (source[index + 1] ?? 0) / 255,
+      blue: (source[index + 2] ?? 0) / 255
+    });
   }
 
   private developPixel(rgb: Rgb, adjustment: GlobalAdjustmentsPrimitives): Rgb {

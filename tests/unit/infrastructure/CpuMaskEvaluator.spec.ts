@@ -31,4 +31,23 @@ describe('CpuMaskEvaluator', () => {
     expect(evaluator.evaluate(mask, { x: 0, y: 0, luminance: 0.5 })).toBe(0.25);
     expect(evaluator.evaluate(mask, { x: 0.5, y: 0.5, luminance: 0.5 })).toBe(0);
   });
+
+  it('expands local smart points only across nearby, luminance-similar pixels', () => {
+    const evaluator = new CpuMaskEvaluator();
+    const mask = brushMask({
+      shape: {
+        kind: 'ai-segmentation',
+        prompt: 'subject',
+        positivePoints: [{ x: 0.5, y: 0.5 }],
+        negativePoints: [],
+        boundingBoxes: [],
+        strategy: 'local-spatial-luminance',
+        version: '1',
+        rasterCacheKey: null
+      }
+    });
+
+    expect(evaluator.evaluate(mask, { x: 0.6, y: 0.5, luminance: 0.52, positiveLuminances: [0.5] })).toBe(1);
+    expect(evaluator.evaluate(mask, { x: 0.6, y: 0.5, luminance: 0.9, positiveLuminances: [0.5] })).toBe(0);
+  });
 });

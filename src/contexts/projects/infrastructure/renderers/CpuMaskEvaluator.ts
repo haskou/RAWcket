@@ -1,6 +1,12 @@
 import type { MaskDefinitionPrimitives, MaskShape } from '../../domain/MaskDefinition';
 
-type MaskSample = { x: number; y: number; luminance: number };
+type MaskSample = {
+  x: number;
+  y: number;
+  luminance: number;
+  positiveLuminances?: number[];
+  negativeLuminances?: number[];
+};
 
 export class CpuMaskEvaluator {
   public evaluate(mask: MaskDefinitionPrimitives, sample: MaskSample): number {
@@ -57,7 +63,11 @@ export class CpuMaskEvaluator {
       const insideBox = shape.boundingBoxes.some((box) => sample.x >= box.x && sample.x <= box.x + box.width && sample.y >= box.y && sample.y <= box.y + box.height);
       const positiveDistance = Math.min(...shape.positivePoints.map((point) => Math.hypot(sample.x - point.x, sample.y - point.y)), Number.POSITIVE_INFINITY);
       const negativeDistance = Math.min(...shape.negativePoints.map((point) => Math.hypot(sample.x - point.x, sample.y - point.y)), Number.POSITIVE_INFINITY);
-      return (insideBox || positiveDistance < 0.12) && negativeDistance >= 0.08 ? 1 : 0;
+      const positiveLuminanceDistance = Math.min(...(sample.positiveLuminances ?? []).map((value) => Math.abs(sample.luminance - value)), Number.POSITIVE_INFINITY);
+      const negativeLuminanceDistance = Math.min(...(sample.negativeLuminances ?? []).map((value) => Math.abs(sample.luminance - value)), Number.POSITIVE_INFINITY);
+      const matchesPositive = positiveLuminanceDistance < 0.16 && positiveDistance < 0.45;
+      const matchesNegative = negativeLuminanceDistance < 0.1 && negativeDistance < 0.3;
+      return (insideBox || matchesPositive) && !matchesNegative ? 1 : 0;
     }
     const childWeights = shape.children.map((child) => this.evaluate(child, sample));
     if (shape.operation === 'add') return Math.max(...childWeights);

@@ -8,25 +8,31 @@ export function MaskControls({
   project,
   selectedId,
   brushActive,
+  aiPointActive,
   brushSize,
   onSelect,
   onAddBrush,
   onAddRadial,
+  onAddAi,
   onUpdate,
   onRemove,
   onBrushActiveChange,
+  onAiPointActiveChange,
   onBrushSizeChange
 }: {
   project: PhotoProject;
   selectedId: string | null;
   brushActive: boolean;
+  aiPointActive: boolean;
   brushSize: number;
   onSelect: (id: string) => void;
   onAddBrush: () => void;
   onAddRadial: () => void;
+  onAddAi: () => void;
   onUpdate: (mask: MaskDefinitionPrimitives, groupId: string | null) => void;
   onRemove: (id: string) => void;
   onBrushActiveChange: (active: boolean) => void;
+  onAiPointActiveChange: (active: boolean) => void;
   onBrushSizeChange: (size: number) => void;
 }): ReactElement {
   const groups = useRef(new Map<string, string>());
@@ -60,17 +66,23 @@ export function MaskControls({
     if (field === 'rotationDegrees') onUpdate({ ...selected, shape: { ...shape, rotationDegrees: Math.min(180, Math.max(-180, value)) } }, groupId);
   };
 
+  const clearAiPoints = (): void => {
+    if (selected?.shape.kind !== 'ai-segmentation') return;
+    onUpdate({ ...selected, shape: { ...selected.shape, positivePoints: [], negativePoints: [] } }, null);
+  };
+
   return (
     <div className="mask-controls">
       <div className="mask-create-actions">
         <button type="button" onClick={onAddBrush}>+ Brush mask</button>
         <button type="button" onClick={onAddRadial}>+ Radial mask</button>
+        <button type="button" onClick={onAddAi}>✦ Local Smart Mask</button>
       </div>
       {masks.length === 0 && <p className="mask-empty">Create a local mask, then paint or position it directly over the photograph.</p>}
       <div className="mask-list">
         {masks.map((mask, index) => (
           <button className={mask.id === selectedId ? 'active' : ''} type="button" key={mask.id} onClick={() => onSelect(mask.id)}>
-            <span>{mask.shape.kind === 'brush' ? 'Brush' : mask.shape.kind === 'radial' ? 'Radial' : 'Mask'} {index + 1}</span>
+            <span>{mask.shape.kind === 'brush' ? 'Brush' : mask.shape.kind === 'radial' ? 'Radial' : mask.shape.kind === 'ai-segmentation' ? 'Smart' : 'Mask'} {index + 1}</span>
             <small>{mask.enabled ? 'On' : 'Off'}</small>
           </button>
         ))}
@@ -95,6 +107,13 @@ export function MaskControls({
               <MaskNumberControl label="Radius X" value={selected.shape.radiusX} minimum={0.01} maximum={1} step={0.001} groupKey="radial-radius-x" groups={groups.current} onChange={(value, groupId) => updateRadial('radiusX', value, groupId)} />
               <MaskNumberControl label="Radius Y" value={selected.shape.radiusY} minimum={0.01} maximum={1} step={0.001} groupKey="radial-radius-y" groups={groups.current} onChange={(value, groupId) => updateRadial('radiusY', value, groupId)} />
               <MaskNumberControl label="Mask rotation" value={selected.shape.rotationDegrees} minimum={-180} maximum={180} step={0.1} groupKey="radial-rotation" groups={groups.current} onChange={(value, groupId) => updateRadial('rotationDegrees', value, groupId)} />
+            </>
+          )}
+          {selected.shape.kind === 'ai-segmentation' && (
+            <>
+              <p className="local-ai-note"><strong>Local Smart Mask</strong> expands positive clicks by spatial and luminance similarity. It is deterministic, offline, and never uploads pixels.</p>
+              <button className={`button ${aiPointActive ? 'ai-primary' : 'ghost'} full`} type="button" onClick={() => onAiPointActiveChange(!aiPointActive)}>{aiPointActive ? 'Adding points · press Escape to stop' : 'Add positive points on photograph'}</button>
+              <button className="button ghost full" type="button" disabled={selected.shape.positivePoints.length === 0} onClick={clearAiPoints}>Clear smart points</button>
             </>
           )}
           <MaskNumberControl label="Local exposure" value={selected.localAdjustments.exposure ?? 0} minimum={-5} maximum={5} step={0.05} groupKey="mask-exposure" groups={groups.current} onChange={updateExposure} />
