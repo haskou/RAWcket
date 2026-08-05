@@ -13,4 +13,4 @@ LibRaw/WASM, WebGPU, WebGL2, and CPU rendering have different lifecycles, capabi
 
 ## Consequences
 
-The domain remains independent and the renderer is replaceable. Mask rasters remain caches rather than recipe state. New implementations must match the documented progress/cancellation contract and deterministic golden-image tolerances before becoming the default. The first accelerated masked-spatial fixture permits a maximum per-channel delta of eight from the CPU reference; the corpus must expand before that tolerance is considered comprehensive.
+The domain remains independent and the renderer is replaceable. Mask rasters remain caches rather than recipe state. New implementations must match the documented progress/cancellation contract and deterministic golden-image tolerances before becoming the default. SHA-256 fixtures lock neutral, tonal/channel, and masked-spatial CPU output. The accelerated masked-spatial fixture permits a maximum per-channel delta of eight from that reference; a real-camera/color-target corpus must still expand this evidence.

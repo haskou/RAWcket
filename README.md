@@ -32,11 +32,12 @@ Implemented:
 - Persistent favorites with instant filtering and a visual editor history derived from real undo/redo operations.
 - Optional, browser-gated PWA installation from the library header, an offline app shell after first load, and user-controlled update activation.
 - Unit, integration, and Chromium E2E coverage; CI for lint, typecheck, tests, build, and E2E.
+- Versioned SHA-256 CPU golden fixtures for neutral, tonal/channel, and masked-spatial recipes, plus live WebGL2/WebGPU parity against the CPU reference.
 
 Not implemented yet:
 
 - A legally redistributable Sony A6600 fixture and trusted-reference color/matrix golden corpus. The current external verification fixture is a locally downloaded Sony FX30 ARW and is intentionally not committed because its image license is unclear.
-- Native GPU vector-mask rasterization and a broader GPU/CPU golden-image parity corpus. Masked local development and spatial filters now run on both accelerated paths from deterministic disposable weight rasters, and WebGPU device loss falls back cleanly.
+- Native GPU vector-mask rasterization and a real-camera/color-target GPU parity corpus. Synthetic CPU goldens and masked-spatial accelerated parity are enforced already; masked local development and spatial filters run on both accelerated paths from deterministic disposable weight rasters, and WebGPU device loss falls back cleanly.
 - Larger promptable segmentation models. The first pinned local semantic model is available on demand; it is never downloaded automatically.
 - Lens profiles, chromatic-aberration/distortion correction, perspective controls, and production-grade denoise/sharpen algorithms.
 - 16-bit TIFF, ICC profiles, metadata selection, output sharpening, and watermarking. RAW sensor development is already high-depth, but current file encoders quantize their output to 8-bit.
