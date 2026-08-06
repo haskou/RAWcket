@@ -50,6 +50,7 @@ export type BrowserSemanticModelRuntime = {
 const modelId = 'Xenova/segformer-b0-finetuned-ade-512-512';
 const modelVersion = 'd3e5499fa8701ff0453ca940a8dfeae39b2f1504';
 const cacheName = 'rawcket-semantic-segformer-b0-v1';
+const semanticTargetSize: [number, number] = [512, 512];
 const resources: ModelResource[] = [
   { path: 'config.json', bytes: 6_957, sha256: '435799652b2b64c3e422dea20fed4c59651dae9f0e291fd885e9e067fee0ce2a' },
   { path: 'preprocessor_config.json', bytes: 373, sha256: 'dbabd93c735c8a5c39ef207c6c4459bf2d261a5dcc55e1ba1c1b982e5947f518' },
@@ -184,7 +185,7 @@ export class BrowserSemanticSegmentationModel implements SemanticSegmentationMod
     };
     options.signal.addEventListener('abort', cancelInference, { once: true });
     try {
-      const output = await pipeline(image, { subtask: 'semantic' });
+      const output = await pipeline(image, { target_sizes: [semanticTargetSize] });
       this.throwIfAborted(options.signal);
       options.onProgress?.(0.9);
       return output;

@@ -90,7 +90,7 @@ describe('BrowserSemanticSegmentationModel', () => {
     );
 
     expect(tags.map((tag) => tag.tag)).toEqual(['sky', 'people', 'furniture']);
-    expect(pipeline).toHaveBeenCalledTimes(1);
+    expect(pipeline).toHaveBeenCalledWith(expect.any(Blob), { target_sizes: [[512, 512]] });
   });
 
   it('adds broad searchable tags beyond the five mask categories', async () => {
