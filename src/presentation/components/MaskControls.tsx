@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { MaskCompositionOperationPrimitive } from '@/contexts/projects/domain/value-objects/MaskCompositionOperation';
+import { maskKindLabel, projectMaskRow } from '../editor/MaskRowProjector';
 
 type UnitField = 'opacity' | 'feather' | 'density';
 
@@ -66,7 +67,6 @@ export function MaskControls({
   const masks = project.getMasks().map((mask) => mask.toPrimitives());
   const maskIdsKey = masks.map((mask) => mask.id).join(':');
   const selected = masks.find((mask) => mask.id === selectedId) ?? null;
-  const selectedAiBoundingBox = selected?.shape.kind === 'ai-segmentation' ? selected.shape.boundingBoxes[0] : undefined;
   const selectedColorSamples = selected?.shape.kind === 'color-range' ? selected.shape.samples : [];
 
   useEffect(() => {
@@ -157,23 +157,54 @@ export function MaskControls({
 
   const addAiBoundingBox = (): void => {
     if (selected?.shape.kind !== 'ai-segmentation') return;
-    onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes: [{ x: 0.2, y: 0.2, width: 0.6, height: 0.6 }] } }, null);
+    const offset = Math.min(0.35, 0.05 * selected.shape.boundingBoxes.length);
+    onUpdate({
+      ...selected,
+      shape: {
+        ...selected.shape,
+        boundingBoxes: [...selected.shape.boundingBoxes, { x: 0.2 + offset, y: 0.2 + offset, width: 0.5, height: 0.5 }]
+      }
+    }, null);
   };
 
-  const removeAiBoundingBox = (): void => {
+  const removeAiBoundingBox = (index: number): void => {
     if (selected?.shape.kind !== 'ai-segmentation') return;
-    onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes: [] } }, null);
+    onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes: selected.shape.boundingBoxes.filter((_, boxIndex) => boxIndex !== index) } }, null);
   };
 
-  const updateAiBoundingBox = (field: 'x' | 'y' | 'width' | 'height', value: number, groupId: string | null): void => {
+  const updateAiBoundingBox = (index: number, field: 'x' | 'y' | 'width' | 'height', value: number, groupId: string | null): void => {
     if (selected?.shape.kind !== 'ai-segmentation' || !Number.isFinite(value)) return;
-    const current = selected.shape.boundingBoxes[0];
+    const current = selected.shape.boundingBoxes[index];
     if (current === undefined) return;
     const bounded = Math.min(1, Math.max(0, value));
     const candidate = { ...current, [field]: bounded };
     candidate.width = Math.min(candidate.width, 1 - candidate.x);
     candidate.height = Math.min(candidate.height, 1 - candidate.y);
-    onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes: [candidate] } }, groupId);
+    const boundingBoxes = [...selected.shape.boundingBoxes];
+    boundingBoxes[index] = candidate;
+    onUpdate({ ...selected, shape: { ...selected.shape, boundingBoxes } }, groupId);
+  };
+
+  const updateAiPoint = (
+    polarity: 'positive' | 'negative',
+    index: number,
+    axis: 'x' | 'y',
+    value: number,
+    groupId: string | null
+  ): void => {
+    if (selected?.shape.kind !== 'ai-segmentation' || !Number.isFinite(value)) return;
+    const key = polarity === 'positive' ? 'positivePoints' : 'negativePoints';
+    const current = selected.shape[key][index];
+    if (current === undefined) return;
+    const points = [...selected.shape[key]];
+    points[index] = { ...current, [axis]: Math.min(1, Math.max(0, value)) };
+    onUpdate({ ...selected, shape: { ...selected.shape, [key]: points } }, groupId);
+  };
+
+  const removeAiPoint = (polarity: 'positive' | 'negative', index: number): void => {
+    if (selected?.shape.kind !== 'ai-segmentation') return;
+    const key = polarity === 'positive' ? 'positivePoints' : 'negativePoints';
+    onUpdate({ ...selected, shape: { ...selected.shape, [key]: selected.shape[key].filter((_, pointIndex) => pointIndex !== index) } }, null);
   };
 
   const clearAiPoints = (): void => {
@@ -203,12 +234,13 @@ export function MaskControls({
       </div>
       {masks.length === 0 && <p className="mask-empty">Create a local mask, then paint or position it directly over the photograph.</p>}
       <div className="mask-list">
-        {masks.map((mask, index) => (
-          <button className={mask.id === selectedId ? 'active' : ''} type="button" key={mask.id} onClick={() => onSelect(mask.id)}>
-            <span>{maskKindLabel(mask.shape.kind)} {index + 1}</span>
-            <small>{mask.enabled ? `On · ${maskVisualizationStatus(mask.shape.kind)}` : 'Off'}</small>
-          </button>
-        ))}
+        {masks.map((mask, index) => {
+          const row = projectMaskRow(mask, index);
+          return <button className={mask.id === selectedId ? 'active' : ''} type="button" key={mask.id} onClick={() => onSelect(mask.id)}>
+            <span className="mask-row-identity"><strong>{row.title}</strong>{row.provenance !== null && <small>{row.provenance}</small>}</span>
+            <small className="mask-row-status">{row.status}</small>
+          </button>;
+        })}
       </div>
       {masks.length >= 2 && <fieldset className="mask-composition-builder">
         <legend>Combine masks</legend>
@@ -302,15 +334,14 @@ export function MaskControls({
               </div>
               <button className={`button ${aiPointActive ? 'ai-primary' : 'ghost'} full`} type="button" onClick={() => onAiPointActiveChange(!aiPointActive)}>{aiPointActive ? `Adding ${aiPointPolarity} points · press Escape to stop` : `Add ${aiPointPolarity} points on photograph`}</button>
               <button className="button ghost full" type="button" disabled={selected.shape.positivePoints.length + selected.shape.negativePoints.length === 0} onClick={clearAiPoints}>Clear smart points</button>
-              {selected.shape.boundingBoxes.length === 0 ? (
-                <button className="button ghost full" type="button" onClick={addAiBoundingBox}>Add editable constraint box</button>
-              ) : (
-                <>
-                  <div className="geometry-grid-heading">Constraint box</div>
-                  {(['x', 'y', 'width', 'height'] as const).map((field) => <MaskNumberControl key={field} label={boxFieldLabel(field)} value={selectedAiBoundingBox?.[field] ?? 0} minimum={0} maximum={1} step={0.001} groupKey={`ai-box-${field}`} groups={groups.current} onChange={(value, groupId) => updateAiBoundingBox(field, value, groupId)} />)}
-                  <button className="button ghost full" type="button" onClick={removeAiBoundingBox}>Remove constraint box</button>
-                </>
-              )}
+              {selected.shape.positivePoints.map((point, index) => <AiPointFields key={`positive-${index}`} label="Include" point={point} index={index} groups={groups.current} onChange={(axis, value, groupId) => updateAiPoint('positive', index, axis, value, groupId)} onRemove={() => removeAiPoint('positive', index)} />)}
+              {selected.shape.negativePoints.map((point, index) => <AiPointFields key={`negative-${index}`} label="Exclude" point={point} index={index} groups={groups.current} onChange={(axis, value, groupId) => updateAiPoint('negative', index, axis, value, groupId)} onRemove={() => removeAiPoint('negative', index)} />)}
+              {selected.shape.boundingBoxes.map((box, index) => <fieldset className="mask-sample-fields" key={index}>
+                <legend>Constraint box {index + 1}</legend>
+                {(['x', 'y', 'width', 'height'] as const).map((field) => <MaskNumberControl key={field} label={`Box ${index + 1} ${boxFieldLabel(field)}`} value={box[field]} minimum={0} maximum={1} step={0.001} groupKey={`ai-box-${index}-${field}`} groups={groups.current} onChange={(value, groupId) => updateAiBoundingBox(index, field, value, groupId)} />)}
+                <button className="button ghost full" type="button" onClick={() => removeAiBoundingBox(index)}>Remove constraint box {index + 1}</button>
+              </fieldset>)}
+              <button className="button ghost full" type="button" onClick={addAiBoundingBox}>{selected.shape.boundingBoxes.length === 0 ? 'Add editable constraint box' : 'Add another constraint box'}</button>
             </>
           )}
           {selected.shape.kind === 'composite' && (
@@ -350,16 +381,6 @@ function boxFieldLabel(field: 'x' | 'y' | 'width' | 'height'): string {
   return field === 'width' ? 'Width' : 'Height';
 }
 
-function maskKindLabel(kind: MaskDefinitionPrimitives['shape']['kind']): string {
-  if (kind === 'brush') return 'Brush';
-  if (kind === 'radial') return 'Radial';
-  if (kind === 'linear-gradient') return 'Linear gradient';
-  if (kind === 'luminance-range') return 'Luminance range';
-  if (kind === 'ai-segmentation') return 'Smart';
-  if (kind === 'color-range') return 'Color range';
-  return 'Composite';
-}
-
 function maskKindExplanation(kind: MaskDefinitionPrimitives['shape']['kind']): string {
   if (kind === 'brush') return 'Activate painting, then drag directly on the photograph.';
   if (kind === 'radial') return 'The ellipse defines the affected region; edit its center, radii, and rotation.';
@@ -370,12 +391,21 @@ function maskKindExplanation(kind: MaskDefinitionPrimitives['shape']['kind']): s
   return 'Child masks are combined non-destructively.';
 }
 
-function maskVisualizationStatus(kind: MaskDefinitionPrimitives['shape']['kind']): string {
-  if (kind === 'luminance-range') return 'effect only';
-  if (kind === 'color-range') return 'source samples';
-  if (kind === 'ai-segmentation') return 'points + box';
-  if (kind === 'composite') return 'combined';
-  return 'overlay';
+function AiPointFields({ label, point, index, groups, onChange, onRemove }: {
+  label: 'Include' | 'Exclude';
+  point: { x: number; y: number };
+  index: number;
+  groups: Map<string, string>;
+  onChange: (axis: 'x' | 'y', value: number, groupId: string | null) => void;
+  onRemove: () => void;
+}): ReactElement {
+  const number = index + 1;
+  return <fieldset className="mask-sample-fields">
+    <legend>{label} point {number}</legend>
+    <MaskNumberControl label={`${label} point ${number} X`} value={point.x} minimum={0} maximum={1} step={0.001} groupKey={`ai-${label.toLowerCase()}-${index}-x`} groups={groups} onChange={(value, groupId) => onChange('x', value, groupId)} />
+    <MaskNumberControl label={`${label} point ${number} Y`} value={point.y} minimum={0} maximum={1} step={0.001} groupKey={`ai-${label.toLowerCase()}-${index}-y`} groups={groups} onChange={(value, groupId) => onChange('y', value, groupId)} />
+    <button className="button ghost full" type="button" onClick={onRemove}>Remove {label.toLowerCase()} point {number}</button>
+  </fieldset>;
 }
 
 function MaskNumberControl({ label, value, minimum, maximum, step, groupKey, groups, onChange }: {

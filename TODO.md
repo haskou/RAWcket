@@ -151,9 +151,9 @@ This document tracks product capabilities that are still incomplete. Tooling, th
 
 **Goal.** Create local masks for common photographic categories.
 
-**Implemented.** The pinned local model exposes sky, water, vegetation, people, and buildings. Results persist category, model identifier, immutable revision, confidence, points, and bounding boxes as editable AI-mask recipe data. The same single-pass inference can suggest these categories as normalized, editable project tags during import when the photographer has already installed and enabled the model. Missing or low-confidence regions produce no fabricated mask or tag.
+**Implemented.** The pinned local model exposes sky, water, vegetation, people, and buildings. Results persist category, model identifier, immutable revision, confidence, points, and bounding boxes as editable AI-mask recipe data. Each semantic mask row exposes its category and rounded confidence directly; a semantic result without a confidence value is labeled unavailable instead of implying certainty. Every include/exclude point exposes exact editable X/Y fields and individual removal, while any number of constraint boxes can be added, edited numerically, and removed. The same single-pass inference can suggest these categories as normalized, editable project tags during import when the photographer has already installed and enabled the model. Missing or low-confidence regions produce no fabricated mask or tag.
 
-**Remaining.** Subject/background, skin, hair, and clothing categories; direct confidence presentation on the mask row; and deeper vector refinement controls. Semantic masks already use the generic Add/Subtract/Intersect composition workflow.
+**Remaining.** Subject/background, skin, hair, and clothing categories. Semantic masks already use the generic Add/Subtract/Intersect composition workflow.
 
 **Acceptance.** Available categories are explicitly tied to a model/version; confidence is visible; all results remain refinable and composable; missing categories are not presented as certainty.
 
