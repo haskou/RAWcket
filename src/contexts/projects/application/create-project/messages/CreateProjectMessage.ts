@@ -1,6 +1,7 @@
 import { StringValueObject, Timestamp } from '@haskou/value-objects';
 import { CaptureMetadata, type CaptureMetadataPrimitives } from '../../../domain/CaptureMetadata';
 import { ProjectMetadata } from '../../../domain/ProjectMetadata';
+import { RawDisplayProfile, type RawDisplayProfilePrimitives } from '../../../domain/RawDisplayProfile';
 import { SourceImageReference } from '../../../domain/SourceImageReference';
 import { ProjectId } from '../../../domain/value-objects/ProjectId';
 import { ProjectName } from '../../../domain/value-objects/ProjectName';
@@ -19,6 +20,7 @@ export class CreateProjectMessage {
     private readonly width: number,
     private readonly height: number,
     private readonly captureMetadata: CaptureMetadataPrimitives,
+    private readonly displayProfile: RawDisplayProfilePrimitives = RawDisplayProfile.neutral().toPrimitives(),
     now = Date.now()
   ) {
     this.projectName = new ProjectName(name);
@@ -42,7 +44,8 @@ export class CreateProjectMessage {
       new StringValueObject(this.fileName),
       new StringValueObject(this.file.type),
       this.file.size,
-      storageKey
+      storageKey,
+      RawDisplayProfile.fromPrimitives(this.displayProfile)
     );
   }
   public createMetadata(): ProjectMetadata {

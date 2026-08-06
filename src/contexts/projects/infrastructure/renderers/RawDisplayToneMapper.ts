@@ -1,10 +1,12 @@
-export type DisplayRgb = { red: number; green: number; blue: number };
+import { RawDisplayProfile, type DisplayRgb } from '../../domain/RawDisplayProfile';
+
+export type { DisplayRgb } from '../../domain/RawDisplayProfile';
 
 export class RawDisplayToneMapper {
   private static readonly DEFAULT_CHROMA_FACTOR = 1.25;
   private static readonly MINIMUM_LUMINANCE = 0.000_001;
 
-  public map(linearRgb: DisplayRgb): DisplayRgb {
+  public map(linearRgb: DisplayRgb, profile: RawDisplayProfile = RawDisplayProfile.neutral()): DisplayRgb {
     const encoded = {
       red: this.linearToSrgb(linearRgb.red),
       green: this.linearToSrgb(linearRgb.green),
@@ -19,11 +21,11 @@ export class RawDisplayToneMapper {
     const mappedLuminance = this.photographicContrast(luminance);
     const ratio = mappedLuminance / luminance;
     const chroma = this.enrichChroma(encoded, luminance);
-    return {
+    return profile.render({
       red: this.clamp(chroma.red * ratio),
       green: this.clamp(chroma.green * ratio),
       blue: this.clamp(chroma.blue * ratio)
-    };
+    });
   }
 
   private photographicContrast(luminance: number): number {

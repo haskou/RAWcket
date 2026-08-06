@@ -42,7 +42,13 @@ async function render(input: unknown): Promise<void> {
       developed = {
         width: request.source.width,
         height: request.source.height,
-        pixels: developer.developHighDepthLinear(request.source.pixels, request.source.width, request.source.height, request.development),
+        pixels: developer.developHighDepthLinear(
+          request.source.pixels,
+          request.source.width,
+          request.source.height,
+          request.development,
+          request.source.displayProfile
+        ),
         backend: 'cpu',
         sourcePrecision: 'raw-linear-16-bit',
         rawFallbackReason: null

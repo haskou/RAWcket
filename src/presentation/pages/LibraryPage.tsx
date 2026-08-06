@@ -4,6 +4,7 @@ import { Queue, QueueOptions } from '@haskou/flow';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
 import { AssessImportCapacityMessage } from '@/contexts/projects/application/assess-import-capacity/messages/AssessImportCapacityMessage';
 import type { ImportCapacityAssessment } from '@/contexts/projects/application/assess-import-capacity/AssessImportCapacity';
+import { CalibrateRawDisplayMessage } from '@/contexts/projects/application/calibrate-raw-display/messages/CalibrateRawDisplayMessage';
 import { CreateProjectMessage } from '@/contexts/projects/application/create-project/messages/CreateProjectMessage';
 import { DeleteProjectMessage } from '@/contexts/projects/application/delete-project/messages/DeleteProjectMessage';
 import { DuplicateProjectMessage } from '@/contexts/projects/application/duplicate-project/messages/DuplicateProjectMessage';
@@ -17,6 +18,7 @@ import type { SourceImageInspection } from '@/contexts/projects/application/port
 import type { SemanticModelStatus } from '@/contexts/projects/application/ports/SemanticSegmentationModel';
 import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import type { PhotoProjectSummary } from '@/contexts/projects/domain/PhotoProjectSummary';
+import { RawDisplayProfile } from '@/contexts/projects/domain/RawDisplayProfile';
 import { useApplication } from '../ApplicationContext';
 import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { CloudStorageDialog } from '../components/CloudStorageDialog';
@@ -26,6 +28,17 @@ import { ImportSelectionDialog } from '../components/ImportSelectionDialog';
 import { ImportPhotosDialog } from '../components/ImportPhotosDialog';
 import { PwaInstallButton } from '../components/PwaInstallButton';
 import { createDemoImageBlob, downloadBlob } from '../lib/browserImages';
+
+type RawJpegPair = { raw: File; cameraReference: File };
+
+function findRawJpegPair(files: File[]): RawJpegPair | null {
+  if (files.length !== 2) return null;
+  const raw = files.find((file) => /\.arw$/i.test(file.name));
+  const cameraReference = files.find((file) => /\.jpe?g$/i.test(file.name));
+  if (raw === undefined || cameraReference === undefined) return null;
+  const stem = (name: string): string => name.replace(/\.[^.]+$/, '').normalize('NFC').toLocaleLowerCase();
+  return stem(raw.name) === stem(cameraReference.name) ? { raw, cameraReference } : null;
+}
 
 export function LibraryPage(): ReactElement {
   const application = useApplication();
@@ -119,7 +132,11 @@ export function LibraryPage(): ReactElement {
     };
   }, [prepareTagModel]);
 
-  const persistImportedFile = useCallback(async (file: File, inspection: SourceImageInspection): Promise<void> => {
+  const persistImportedFile = useCallback(async (
+    file: File,
+    inspection: SourceImageInspection,
+    cameraReference: File | null = null
+  ): Promise<void> => {
       const capacity = await application.assessImportCapacity.assess(new AssessImportCapacityMessage(file.size));
       setStorageCapacity(capacity);
       if (!capacity.canImport) {
@@ -141,8 +158,25 @@ export function LibraryPage(): ReactElement {
         }
       }
       const name = file.name.replace(/\.(jpe?g|png|arw)$/i, '') || 'Untitled project';
+      let displayProfile = RawDisplayProfile.neutral().toPrimitives();
+      if (inspection.mimeType === 'image/x-sony-arw' && cameraReference !== null) {
+        setTagModelMessage('Matching RAW color and tone to the camera JPEG…');
+        const normalizedReference = new File([cameraReference], cameraReference.name, { type: 'image/jpeg' });
+        displayProfile = await application.calibrateRawDisplay.calibrate(
+          new CalibrateRawDisplayMessage(normalizedFile, normalizedReference)
+        );
+        setTagModelMessage('Camera JPEG matched. The RAW remains the editable original.');
+      }
       const project = await application.createProject.create(
-        new CreateProjectMessage(name, normalizedFile, file.name, inspection.width, inspection.height, inspection.captureMetadata)
+        new CreateProjectMessage(
+          name,
+          normalizedFile,
+          file.name,
+          inspection.width,
+          inspection.height,
+          inspection.captureMetadata,
+          displayProfile
+        )
       );
       if (suggestedTags.length > 0) {
         application.applyEditOperation.apply(project, new ApplyEditOperationMessage(project.getId().valueOf(), {
@@ -157,11 +191,19 @@ export function LibraryPage(): ReactElement {
       void navigate(`/editor/${project.getId().valueOf()}`);
   }, [application, automaticTags, navigate, refresh]);
 
-  const createFromFile = useCallback(async (file: File, inspection?: SourceImageInspection): Promise<void> => {
+  const createFromFile = useCallback(async (
+    file: File,
+    inspection?: SourceImageInspection,
+    cameraReference: File | null = null
+  ): Promise<void> => {
     setBusy(true);
     setError(null);
     try {
-      await persistImportedFile(file, inspection ?? await application.inspectSourceImage.inspect(new InspectSourceImageMessage(file, file.name)));
+      await persistImportedFile(
+        file,
+        inspection ?? await application.inspectSourceImage.inspect(new InspectSourceImageMessage(file, file.name)),
+        cameraReference
+      );
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : 'The image could not be imported.');
     } finally {
@@ -184,6 +226,11 @@ export function LibraryPage(): ReactElement {
       return;
     }
     setImportDialogOpen(false);
+    const pair = findRawJpegPair(files);
+    if (pair !== null) {
+      void createFromFile(pair.raw, undefined, pair.cameraReference);
+      return;
+    }
     if (files.length === 1 && files[0] !== undefined) void createFromFile(files[0]);
     if (files.length > 1) void reviewImportCandidates(files);
   };
@@ -248,8 +295,10 @@ export function LibraryPage(): ReactElement {
     const files = pendingLocalModelImportFiles;
     setPendingLocalModelImportFiles(null);
     setImportDialogOpen(false);
-    if (files.length === 1 && files[0] !== undefined) void createFromFile(files[0]);
-    if (files.length > 1) void reviewImportCandidates(files);
+    const pair = findRawJpegPair(files);
+    if (pair !== null) void createFromFile(pair.raw, undefined, pair.cameraReference);
+    else if (files.length === 1 && files[0] !== undefined) void createFromFile(files[0]);
+    else if (files.length > 1) void reviewImportCandidates(files);
   }, [createFromFile, localModelPreparing, pendingLocalModelImportFiles, reviewImportCandidates]);
 
   const continuePendingImport = (): void => {

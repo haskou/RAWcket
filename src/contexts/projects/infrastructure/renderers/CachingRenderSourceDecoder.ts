@@ -1,6 +1,7 @@
 import type { ProjectId } from '../../domain/value-objects/ProjectId';
 import type { SourceImageMimeType } from '../../domain/SourceImageReference';
 import type { DecodedRenderSource, RenderSourceDecoder } from './RenderSourceDecoder';
+import type { RawDisplayProfilePrimitives } from '../../domain/RawDisplayProfile';
 
 type Decoder = Pick<RenderSourceDecoder, 'decode'>;
 type DecodeStatus = 'decoding' | 'ready';
@@ -26,9 +27,10 @@ export class CachingRenderSourceDecoder {
     mimeType: SourceImageMimeType,
     maximumEdge: number | null,
     allowEmbeddedRawFallback: boolean,
+    displayProfile: RawDisplayProfilePrimitives,
     onStatus: (status: DecodeStatus) => void
   ): Promise<DecodedRenderSource> {
-    const key = this.keyFor(projectId, mimeType, maximumEdge, allowEmbeddedRawFallback);
+    const key = this.keyFor(projectId, mimeType, maximumEdge, allowEmbeddedRawFallback, displayProfile);
     const cached = this.entries.get(key);
     if (cached?.status === 'ready') {
       if (cached.source.kind === 'raw-linear-16-bit' && cached.source.pixels.buffer.byteLength === 0) {
@@ -45,7 +47,7 @@ export class CachingRenderSourceDecoder {
     }
 
     onStatus('decoding');
-    const decoding = this.decoder.decode(source, mimeType, maximumEdge, allowEmbeddedRawFallback);
+    const decoding = this.decoder.decode(source, mimeType, maximumEdge, allowEmbeddedRawFallback, displayProfile);
     const pending: PendingEntry = { status: 'decoding', source: decoding };
     this.entries.set(key, pending);
     try {
@@ -68,9 +70,10 @@ export class CachingRenderSourceDecoder {
     projectId: ProjectId,
     mimeType: SourceImageMimeType,
     maximumEdge: number | null,
-    allowEmbeddedRawFallback: boolean
+    allowEmbeddedRawFallback: boolean,
+    displayProfile: RawDisplayProfilePrimitives
   ): string {
-    return `${projectId.valueOf()}:${mimeType}:${maximumEdge ?? 'full'}:${allowEmbeddedRawFallback ? 'fallback' : 'strict'}`;
+    return `${projectId.valueOf()}:${mimeType}:${maximumEdge ?? 'full'}:${allowEmbeddedRawFallback ? 'fallback' : 'strict'}:${JSON.stringify(displayProfile)}`;
   }
 
   private clone(source: DecodedRenderSource): DecodedRenderSource {

@@ -45,7 +45,8 @@ describe('OpenAiEditingAdvisor', () => {
     expect(proposal.operations[2]).toMatchObject({ viewport: { horizontalPerspective: 6, verticalPerspective: -4 } });
     expect(reason.mock.calls[0]?.[0].instructions).toContain('radial masks');
     expect(reason.mock.calls[0]?.[0].instructions).toContain('Never omit a beneficial crop');
-    expect(reason.mock.calls[0]?.[0].instructions).toContain('color-managed photographic baseline');
+    expect(reason.mock.calls[0]?.[0].instructions).toContain('matching camera JPEG');
+    expect(reason.mock.calls[0]?.[0].instructions).toContain('judge only what is visibly present');
     expect(reason.mock.calls[0]?.[0].instructions).toContain('restrained RGB or luminance tone curve');
     expect(proposal.operations[4]).toMatchObject({ mask: { shape: { kind: 'ai-segmentation', prompt: 'face' } } });
   });

@@ -11,6 +11,7 @@ import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrast
 import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
 import { VersionNineToTenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionNineToTenProjectMigration';
 import { VersionTenToElevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTenToElevenProjectMigration';
+import { VersionElevenToTwelveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionElevenToTwelveProjectMigration';
 import { photoProjectSchema } from '@/contexts/projects/infrastructure/serialization/ProjectSchemas';
 
 describe('ProjectMigrator', () => {
@@ -25,7 +26,8 @@ describe('ProjectMigrator', () => {
     new VersionSevenToEightProjectMigration(),
     new VersionEightToNineProjectMigration(),
     new VersionNineToTenProjectMigration(),
-    new VersionTenToElevenProjectMigration()
+    new VersionTenToElevenProjectMigration(),
+    new VersionElevenToTwelveProjectMigration()
   ]);
 
   it('migrates a demo project from schema 0 to the current schema', () => {
@@ -33,7 +35,7 @@ describe('ProjectMigrator', () => {
     const legacy = { ...current, schemaVersion: 0 };
     delete (legacy as Partial<typeof legacy>).uiState;
     const migrated = photoProjectSchema.parse(migrator.migrate(legacy));
-    expect(migrated.schemaVersion).toBe(11);
+    expect(migrated.schemaVersion).toBe(12);
     expect(migrated.uiState.mode).toBe('simple');
     expect(migrated.recipe.disabledGlobalAdjustments).toEqual([]);
     expect(migrated.recipe.globalAdjustments.texture).toBe(0);
@@ -42,6 +44,10 @@ describe('ProjectMigrator', () => {
     expect(migrated.recipe.viewport).toMatchObject({ horizontalPerspective: 0, verticalPerspective: 0 });
     expect(Object.values(migrated.captureMetadata)).toEqual(Array(14).fill(null));
     expect(migrated.aiDevelopment).toEqual({ advice: [] });
+    expect(migrated.source.displayProfile).toEqual({
+      redGain: 1, greenGain: 1, blueGain: 1,
+      sourceMedian: 0, targetMedian: 0, shadowContrast: 1, highlightContrast: 1, chroma: 1
+    });
   });
 
   it('rejects future versions', () => {
@@ -138,5 +144,23 @@ describe('ProjectMigrator', () => {
     expect(migratedMask.shape.children.every((child) => child.localCurves?.luminance === null)).toBe(true);
     expect(migrated.history.undo[0]?.operation).toMatchObject({ kind: 'add-mask', mask: { localCurves: { luminance: null } } });
     expect(migrated.aiDevelopment.advice[0]?.operations[0]).toMatchObject({ kind: 'add-mask', mask: { localCurves: { luminance: null } } });
+  });
+
+  it('adds a neutral RAW display profile to schema 11 projects', () => {
+    const current = PhotoProjectMother.create().toPrimitives();
+    const source = { ...current.source };
+    delete (source as Partial<typeof source>).displayProfile;
+
+    const migrated = photoProjectSchema.parse(new VersionElevenToTwelveProjectMigration().migrate({
+      ...current,
+      schemaVersion: 11,
+      source
+    }));
+
+    expect(migrated.schemaVersion).toBe(12);
+    expect(migrated.source.displayProfile).toEqual({
+      redGain: 1, greenGain: 1, blueGain: 1,
+      sourceMedian: 0, targetMedian: 0, shadowContrast: 1, highlightContrast: 1, chroma: 1
+    });
   });
 });

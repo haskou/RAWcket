@@ -56,6 +56,7 @@ export class WorkerPreviewRenderer implements PreviewRenderer {
       project.source.mimeType,
       request.getSize().valueOf(),
       true,
+      project.source.displayProfile,
       (status) => control.onProgress?.({
         stage: status === 'ready' ? 'developing' : 'decoding',
         completed: status === 'ready' ? 0.3 : 0.1

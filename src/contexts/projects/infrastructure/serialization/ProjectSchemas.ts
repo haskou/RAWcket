@@ -179,6 +179,17 @@ const aiDevelopmentAdviceSchema = z.object({
   status: z.enum(['proposed', 'applied', 'rejected'])
 });
 
+export const rawDisplayProfileSchema = z.object({
+  redGain: z.number().min(0.85).max(1.15),
+  greenGain: z.number().min(0.85).max(1.15),
+  blueGain: z.number().min(0.85).max(1.15),
+  sourceMedian: z.number().min(0).max(1),
+  targetMedian: z.number().min(0).max(1),
+  shadowContrast: z.number().min(0.75).max(1.35),
+  highlightContrast: z.number().min(0.75).max(1.35),
+  chroma: z.number().min(0.8).max(1.5)
+});
+
 export const photoProjectSchema = z.object({
   schemaVersion: z.int().nonnegative(),
   id: z.uuid(),
@@ -187,7 +198,8 @@ export const photoProjectSchema = z.object({
     fileName: z.string().min(1),
     mimeType: z.enum(['image/jpeg', 'image/png', 'image/x-sony-arw']),
     size: z.int().positive(),
-    storageKey: z.string().min(1)
+    storageKey: z.string().min(1),
+    displayProfile: rawDisplayProfileSchema
   }),
   metadata: z.object({
     createdAt: z.number().finite(),

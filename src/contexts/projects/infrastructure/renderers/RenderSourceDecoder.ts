@@ -1,6 +1,7 @@
 import type { SourceImageMimeType } from '../../domain/SourceImageReference';
 import type { ArwEmbeddedPreviewExtractor } from '../codecs/ArwEmbeddedPreviewExtractor';
 import type { LibRawImageDecoder } from '../codecs/LibRawImageDecoder';
+import { RawDisplayProfile, type RawDisplayProfilePrimitives } from '../../domain/RawDisplayProfile';
 
 type HighDepthRawDecoder = Pick<LibRawImageDecoder, 'decode'>;
 type EmbeddedRawPreviewExtractor = Pick<ArwEmbeddedPreviewExtractor, 'extract'>;
@@ -17,6 +18,7 @@ export type DecodedRenderSource =
     width: number;
     height: number;
     pixels: Uint16Array<ArrayBuffer>;
+    displayProfile: RawDisplayProfilePrimitives;
   };
 
 export class RenderSourceDecoder {
@@ -29,13 +31,15 @@ export class RenderSourceDecoder {
     source: Blob,
     mimeType: SourceImageMimeType,
     maximumEdge: number | null,
-    allowEmbeddedRawFallback: boolean
+    allowEmbeddedRawFallback: boolean,
+    displayProfile: RawDisplayProfilePrimitives = RawDisplayProfile.neutral().toPrimitives()
   ): Promise<DecodedRenderSource> {
     if (mimeType !== 'image/x-sony-arw') {
       return { kind: 'bitmap', image: source, sourcePrecision: 'standard-8-bit', rawFallbackReason: null };
     }
 
     const sourceBuffer = await source.arrayBuffer();
+    const cameraPreview = this.extractCameraPreview(sourceBuffer);
     try {
       if (sourceBuffer.byteLength < 64 * 1024) {
         throw new Error('The ARW container is too small to contain a complete sensor mosaic.');
@@ -45,16 +49,27 @@ export class RenderSourceDecoder {
         kind: 'raw-linear-16-bit',
         width: decoded.width,
         height: decoded.height,
-        pixels: decoded.data
+        pixels: decoded.data,
+        displayProfile: RawDisplayProfile.fromPrimitives(displayProfile).toPrimitives()
       };
     } catch (error: unknown) {
       if (!allowEmbeddedRawFallback) throw error;
+      if (cameraPreview === null) throw error;
       return {
         kind: 'bitmap',
-        image: this.embeddedPreview.extract(sourceBuffer).preview,
+        image: cameraPreview,
         sourcePrecision: 'embedded-preview-8-bit',
         rawFallbackReason: error instanceof Error ? error.message : 'LibRaw returned an unknown error.'
       };
     }
   }
+
+  private extractCameraPreview(sourceBuffer: ArrayBuffer): Blob | null {
+    try {
+      return this.embeddedPreview.extract(sourceBuffer).preview;
+    } catch {
+      return null;
+    }
+  }
+
 }

@@ -55,7 +55,8 @@ export class WorkerPhotoExporter implements PhotoExporter {
       source,
       project.getSource().getSupportedMimeType(),
       message.getMaximumEdge(),
-      false
+      false,
+      project.getSource().getDisplayProfile().toPrimitives()
     );
     control.onProgress?.({ stage: 'decoding', completed: 0.3 });
     const workerRequest: PreviewWorkerRequest = {

@@ -14,6 +14,7 @@ import { ApplyEditOperation } from '@/contexts/projects/application/apply-edit-o
 import { ApplyProjectSidecar } from '@/contexts/projects/application/apply-project-sidecar/ApplyProjectSidecar';
 import { AssessImportCapacity } from '@/contexts/projects/application/assess-import-capacity/AssessImportCapacity';
 import { ChangeHistory } from '@/contexts/projects/application/change-history/ChangeHistory';
+import { CalibrateRawDisplay } from '@/contexts/projects/application/calibrate-raw-display/CalibrateRawDisplay';
 import { ChooseInterfaceMode } from '@/contexts/projects/application/choose-interface-mode/ChooseInterfaceMode';
 import { CopyDevelopmentSettings } from '@/contexts/projects/application/copy-development-settings/CopyDevelopmentSettings';
 import { CreateProject } from '@/contexts/projects/application/create-project/CreateProject';
@@ -61,6 +62,7 @@ import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrast
 import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
 import { VersionNineToTenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionNineToTenProjectMigration';
 import { VersionTenToElevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTenToElevenProjectMigration';
+import { VersionElevenToTwelveProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionElevenToTwelveProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { IndexedDbRecipePresetRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbRecipePresetRepository';
@@ -71,6 +73,10 @@ import { CachingPreviewRenderer } from '@/contexts/projects/infrastructure/rende
 import { WorkerPhotoExporter } from '@/contexts/projects/infrastructure/renderers/WorkerPhotoExporter';
 import { RenderSourceDecoder } from '@/contexts/projects/infrastructure/renderers/RenderSourceDecoder';
 import { CachingRenderSourceDecoder } from '@/contexts/projects/infrastructure/renderers/CachingRenderSourceDecoder';
+import { BrowserImagePixelReader } from '@/contexts/projects/infrastructure/renderers/BrowserImagePixelReader';
+import { ReferenceRawDisplayCalibrator } from '@/contexts/projects/infrastructure/renderers/ReferenceRawDisplayCalibrator';
+import { RawDisplayStatisticsAnalyzer } from '@/contexts/projects/infrastructure/renderers/RawDisplayStatisticsAnalyzer';
+import { RawDisplayToneMapper } from '@/contexts/projects/infrastructure/renderers/RawDisplayToneMapper';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
 import { OpenAiEditingAdvisor } from '@/contexts/projects/infrastructure/advisors/OpenAiEditingAdvisor';
 import { OpenAiEditProposalMapper } from '@/contexts/projects/infrastructure/advisors/OpenAiEditProposalMapper';
@@ -86,6 +92,7 @@ import { PersistentStorageRequest } from '@/shared/infrastructure/storage/Persis
 import { BrowserLocalStorageInspector } from '@/shared/infrastructure/storage/BrowserLocalStorageInspector';
 
 export type Application = {
+  calibrateRawDisplay: CalibrateRawDisplay;
   createProject: CreateProject;
   createSemanticMask: CreateSemanticMask;
   assessImportCapacity: AssessImportCapacity;
@@ -144,7 +151,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
     new VersionSevenToEightProjectMigration(),
     new VersionEightToNineProjectMigration(),
     new VersionNineToTenProjectMigration(),
-    new VersionTenToElevenProjectMigration()
+    new VersionTenToElevenProjectMigration(),
+    new VersionElevenToTwelveProjectMigration()
   ]);
   const projects = new IndexedDbProjectRepository(database, migrator);
   const recipePresets = new IndexedDbRecipePresetRepository(database);
@@ -153,6 +161,12 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const projectAssetQueue = new Queue(QueueOptions.withConcurrency(1));
   const bundle = new RawcketProjectBundle(projects, sourceFiles, migrator, projectAssetJournal, projectAssetQueue);
   const settings = new RawcketSettingsRepository(database);
+  const rawCalibrator = new ReferenceRawDisplayCalibrator(
+    new LibRawImageDecoder(undefined, undefined, 90_000),
+    new BrowserImagePixelReader(),
+    new RawDisplayStatisticsAnalyzer(),
+    new RawDisplayToneMapper()
+  );
   const previewSourceDecoder = new RenderSourceDecoder(
     new LibRawImageDecoder(undefined, undefined, 90_000),
     new ArwEmbeddedPreviewExtractor()
@@ -173,6 +187,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
   const googleDrive = new BrowserGoogleDriveGateway(settings, import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '');
   const openAi = new OpenAiResponsesClient(aiCredentialVault, new BrowserAiImageEncoder());
   return {
+    calibrateRawDisplay: new CalibrateRawDisplay(rawCalibrator),
     createProject: new CreateProject(projects, sourceFiles, projectAssetJournal, projectAssetQueue),
     createSemanticMask: new CreateSemanticMask(semanticSegmentationModel),
     assessImportCapacity: new AssessImportCapacity(new BrowserLocalStorageInspector()),

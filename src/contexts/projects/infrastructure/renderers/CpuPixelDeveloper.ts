@@ -3,6 +3,7 @@ import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments
 import type { AdjustmentKeyPrimitive } from '../../domain/value-objects/AdjustmentKey';
 import type { MaskDefinitionPrimitives } from '../../domain/MaskDefinition';
 import { CpuMaskEvaluator } from './CpuMaskEvaluator';
+import { RawDisplayProfile, type RawDisplayProfilePrimitives } from '../../domain/RawDisplayProfile';
 import { RawDisplayToneMapper } from './RawDisplayToneMapper';
 import { ToneCurveLut } from './ToneCurveLut';
 
@@ -52,7 +53,8 @@ export class CpuPixelDeveloper {
     source: Uint16Array,
     width: number,
     height: number,
-    settings: CpuDevelopmentSettings
+    settings: CpuDevelopmentSettings,
+    displayProfile: RawDisplayProfilePrimitives = RawDisplayProfile.neutral().toPrimitives()
   ): Uint8ClampedArray<ArrayBuffer> {
     if (source.length !== width * height * 3) throw new Error('High-depth image dimensions do not match the RGB pixel buffer.');
     return this.developPixels(
@@ -64,7 +66,8 @@ export class CpuPixelDeveloper {
         return { red: (source[index] ?? 0) / 65_535, green: (source[index + 1] ?? 0) / 65_535, blue: (source[index + 2] ?? 0) / 65_535 };
       },
       () => 1,
-      true
+      true,
+      RawDisplayProfile.fromPrimitives(displayProfile)
     );
   }
 
@@ -74,7 +77,8 @@ export class CpuPixelDeveloper {
     settings: CpuDevelopmentSettings,
     sourceAt: PixelReader,
     alphaAt: AlphaReader,
-    sourceIsLinear: boolean
+    sourceIsLinear: boolean,
+    displayProfile: RawDisplayProfile = RawDisplayProfile.neutral()
   ): Uint8ClampedArray<ArrayBuffer> {
     const working = new Float32Array(width * height * 4);
     const adjustments = this.activeAdjustments(settings);
@@ -83,10 +87,10 @@ export class CpuPixelDeveloper {
     const sourceSamples = new Map<string, Rgb>();
     settings.masks.flatMap((mask) => this.maskSourcePoints(mask)).forEach((point) => {
       const key = this.pointKey(point);
-      if (!sourceSamples.has(key)) sourceSamples.set(key, this.sourceAtPoint(sourceAt, width, height, point.x, point.y, sourceIsLinear));
+      if (!sourceSamples.has(key)) sourceSamples.set(key, this.sourceAtPoint(sourceAt, width, height, point.x, point.y, sourceIsLinear, displayProfile));
     });
     const sourcePerceptualAt = (point: { x: number; y: number }): Rgb => sourceSamples.get(this.pointKey(point))
-      ?? this.sourceAtPoint(sourceAt, width, height, point.x, point.y, sourceIsLinear);
+      ?? this.sourceAtPoint(sourceAt, width, height, point.x, point.y, sourceIsLinear, displayProfile);
     const sourceColorAt = (point: { x: number; y: number }): readonly [number, number, number] => {
       const source = sourcePerceptualAt(point);
       return [source.red, source.green, source.blue];
@@ -95,8 +99,8 @@ export class CpuPixelDeveloper {
     for (let pixel = 0; pixel < width * height; pixel += 1) {
       const index = pixel * 4;
       const sourcePixel = sourceAt(pixel);
-      const perceptualSourcePixel = sourceIsLinear ? this.rawDisplayToneMapper.map(sourcePixel) : sourcePixel;
-      let developed = this.developPixel(sourcePixel, adjustments, sourceIsLinear);
+      const perceptualSourcePixel = sourceIsLinear ? this.rawDisplayToneMapper.map(sourcePixel, displayProfile) : sourcePixel;
+      let developed = this.developPixel(sourcePixel, adjustments, sourceIsLinear, displayProfile);
       const x = (pixel % width + 0.5) / width;
       const y = (Math.floor(pixel / width) + 0.5) / height;
       for (const [maskIndex, mask] of settings.masks.entries()) {
@@ -110,7 +114,7 @@ export class CpuPixelDeveloper {
         });
         if (weight <= 0) continue;
         const local = { ...this.neutralAdjustments(), ...mask.localAdjustments };
-        const locallyAdjusted = this.developPixel(developed, local, false);
+        const locallyAdjusted = this.developPixel(developed, local, false, displayProfile);
         const maskCurves = localLuts[maskIndex];
         if (maskCurves === undefined) throw new Error('The local curve pipeline is inconsistent with the mask recipe.');
         const locallyDeveloped = this.applyCurves(locallyAdjusted, maskCurves);
@@ -156,11 +160,19 @@ export class CpuPixelDeveloper {
     };
   }
 
-  private sourceAtPoint(sourceAt: PixelReader, width: number, height: number, x: number, y: number, sourceIsLinear: boolean): Rgb {
+  private sourceAtPoint(
+    sourceAt: PixelReader,
+    width: number,
+    height: number,
+    x: number,
+    y: number,
+    sourceIsLinear: boolean,
+    displayProfile: RawDisplayProfile
+  ): Rgb {
     const pixelX = Math.min(width - 1, Math.max(0, Math.floor(x * width)));
     const pixelY = Math.min(height - 1, Math.max(0, Math.floor(y * height)));
     const source = sourceAt(pixelY * width + pixelX);
-    return sourceIsLinear ? this.rawDisplayToneMapper.map(source) : source;
+    return sourceIsLinear ? this.rawDisplayToneMapper.map(source, displayProfile) : source;
   }
 
   private maskSourcePoints(mask: MaskDefinitionPrimitives): Array<{ x: number; y: number }> {
@@ -174,9 +186,16 @@ export class CpuPixelDeveloper {
     return `${point.x}:${point.y}`;
   }
 
-  private developPixel(rgb: Rgb, adjustment: GlobalAdjustmentsPrimitives, sourceIsLinear: boolean): Rgb {
+  private developPixel(
+    rgb: Rgb,
+    adjustment: GlobalAdjustmentsPrimitives,
+    sourceIsLinear: boolean,
+    displayProfile: RawDisplayProfile
+  ): Rgb {
     const exposure = 2 ** adjustment.exposure;
-    const displayRgb = sourceIsLinear ? this.rawDisplayToneMapper.map({ red: rgb.red * exposure, green: rgb.green * exposure, blue: rgb.blue * exposure }) : { red: rgb.red * exposure, green: rgb.green * exposure, blue: rgb.blue * exposure };
+    const displayRgb = sourceIsLinear
+      ? this.rawDisplayToneMapper.map({ red: rgb.red * exposure, green: rgb.green * exposure, blue: rgb.blue * exposure }, displayProfile)
+      : { red: rgb.red * exposure, green: rgb.green * exposure, blue: rgb.blue * exposure };
     let { red, green, blue } = displayRgb;
     const temperature = adjustment.temperature / 100;
     const tint = adjustment.tint / 100;

@@ -1,4 +1,5 @@
 import type { StringValueObject } from '@haskou/value-objects';
+import { RawDisplayProfile } from './RawDisplayProfile';
 
 export type SourceImageMimeType = 'image/jpeg' | 'image/png' | 'image/x-sony-arw';
 
@@ -7,7 +8,8 @@ export class SourceImageReference {
     private readonly fileName: StringValueObject,
     private readonly mimeType: StringValueObject,
     private readonly size: number,
-    private readonly storageKey: StringValueObject
+    private readonly storageKey: StringValueObject,
+    private readonly displayProfile: RawDisplayProfile
   ) {
     if (!Number.isSafeInteger(size) || size <= 0) {
       throw new Error('The original image must have a valid size.');
@@ -35,5 +37,9 @@ export class SourceImageReference {
 
   public getStorageKey(): StringValueObject {
     return this.storageKey;
+  }
+
+  public getDisplayProfile(): RawDisplayProfile {
+    return RawDisplayProfile.fromPrimitives(this.displayProfile.toPrimitives());
   }
 }

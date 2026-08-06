@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createApplication } from '@/app/Application';
 import { ListProjectsMessage } from '@/contexts/projects/application/list-projects/messages/ListProjectsMessage';
+import { CaptureMetadata } from '@/contexts/projects/domain/CaptureMetadata';
+import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
 import { ApplicationProvider } from '@/presentation/ApplicationContext';
 import { LibraryPage } from '@/presentation/pages/LibraryPage';
 
@@ -125,5 +127,52 @@ describe('LibraryPage', () => {
       const matching = await application.listProjects.list(new ListProjectsMessage('sky', 0));
       expect(matching).toHaveLength(1);
     });
+  });
+
+  it('imports a same-name RAW and JPEG as one calibrated RAW project', async () => {
+    const application = createApplication(`rawcket-paired-import-${crypto.randomUUID()}`);
+    vi.spyOn(application.manageSemanticSegmentationModel, 'inspect').mockResolvedValue('installed');
+    vi.spyOn(application.suggestPhotoTags, 'suggest').mockResolvedValue([]);
+    vi.spyOn(application.inspectSourceImage, 'inspect').mockResolvedValue({
+      width: 6_000,
+      height: 4_000,
+      mimeType: 'image/x-sony-arw',
+      embeddedPreview: null,
+      captureMetadata: CaptureMetadata.empty().toPrimitives()
+    });
+    const calibratedProfile = {
+      redGain: 1.03, greenGain: 1, blueGain: 0.96,
+      sourceMedian: 0.48, targetMedian: 0.5,
+      shadowContrast: 1.02, highlightContrast: 1.08, chroma: 1.28
+    };
+    const calibrate = vi.spyOn(application.calibrateRawDisplay, 'calibrate').mockResolvedValue(calibratedProfile);
+    const review = vi.spyOn(application.reviewImportCandidates, 'review');
+    const user = userEvent.setup();
+    render(
+      <ApplicationProvider application={application}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<LibraryPage />} />
+            <Route path="/editor/:projectId" element={<p>Editor open</p>} />
+          </Routes>
+        </MemoryRouter>
+      </ApplicationProvider>
+    );
+
+    await user.upload(
+      await screen.findByLabelText('Select one or more JPEG, PNG, or Sony ARW images'),
+      [
+        new File(['raw'], 'DSC08545.ARW', { type: 'image/x-sony-arw' }),
+        new File(['jpeg'], 'DSC08545.JPG', { type: 'image/jpeg' })
+      ]
+    );
+
+    expect(await screen.findByText('Editor open')).toBeInTheDocument();
+    expect(calibrate).toHaveBeenCalledTimes(1);
+    expect(review).not.toHaveBeenCalled();
+    const projects = await application.listProjects.list(new ListProjectsMessage('', 0));
+    expect(projects).toHaveLength(1);
+    const project = await application.findProject.find(new FindProjectMessage(projects[0]?.getId().valueOf() ?? ''));
+    expect(project?.getSource().getDisplayProfile().toPrimitives()).toEqual(calibratedProfile);
   });
 });

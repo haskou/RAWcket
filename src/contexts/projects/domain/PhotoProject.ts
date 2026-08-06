@@ -12,6 +12,7 @@ import { EDIT_OPERATION, type EditOperation } from './EditOperation';
 import { EditHistory, type EditHistoryPrimitives } from './EditHistory';
 import { MaskDefinition } from './MaskDefinition';
 import { ProjectMetadata } from './ProjectMetadata';
+import { RawDisplayProfile, type RawDisplayProfilePrimitives } from './RawDisplayProfile';
 import { ProjectOrganization } from './ProjectOrganization';
 import { type ProjectDomainEvent } from './ProjectDomainEvent';
 import { ProjectSchemaVersion } from './ProjectSchemaVersion';
@@ -33,7 +34,13 @@ export type PhotoProjectPrimitives = {
   schemaVersion: number;
   id: string;
   name: string;
-  source: { fileName: string; mimeType: SourceImageMimeType; size: number; storageKey: string };
+  source: {
+    fileName: string;
+    mimeType: SourceImageMimeType;
+    size: number;
+    storageKey: string;
+    displayProfile: RawDisplayProfilePrimitives;
+  };
   metadata: { createdAt: number; updatedAt: number; width: number; height: number };
   captureMetadata: CaptureMetadataPrimitives;
   organization: { rating: number; tags: string[]; favorite: boolean };
@@ -94,7 +101,8 @@ export class PhotoProject {
         new StringValueObject(input.source.fileName),
         new StringValueObject(input.source.mimeType),
         input.source.size,
-        new StringValueObject(input.source.storageKey)
+        new StringValueObject(input.source.storageKey),
+        RawDisplayProfile.fromPrimitives(input.source.displayProfile)
       ),
       new ProjectMetadata(
         Timestamp.new(input.metadata.createdAt),
@@ -296,7 +304,8 @@ export class PhotoProject {
         fileName: this.source.getFileName().valueOf(),
         mimeType: this.source.getSupportedMimeType(),
         size: this.source.getSize(),
-        storageKey: this.source.getStorageKey().valueOf()
+        storageKey: this.source.getStorageKey().valueOf(),
+        displayProfile: this.source.getDisplayProfile().toPrimitives()
       },
       metadata: {
         createdAt: this.metadata.getCreatedAt().toMilliseconds(),

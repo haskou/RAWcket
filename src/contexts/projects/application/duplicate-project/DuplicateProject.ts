@@ -35,7 +35,8 @@ export class DuplicateProject {
             original.getSource().getFileName(),
             original.getSource().getMimeType(),
             stored.getSize(),
-            stored.getStorageKey()
+            stored.getStorageKey(),
+            original.getSource().getDisplayProfile()
           ),
           new ProjectMetadata(now, now, primitives.metadata.width, primitives.metadata.height)
         );

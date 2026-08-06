@@ -1,8 +1,7 @@
 import { z } from 'zod';
-import { photoProjectSchema } from '../serialization/ProjectSchemas';
+import { photoProjectSchema, rawDisplayProfileSchema } from '../serialization/ProjectSchemas';
 
 const recipeSchema = photoProjectSchema.shape.recipe;
-
 export const previewWorkerRequestSchema = z.object({
   id: z.uuid(),
   source: z.discriminatedUnion('kind', [
@@ -16,7 +15,8 @@ export const previewWorkerRequestSchema = z.object({
       kind: z.literal('raw-linear-16-bit'),
       width: z.int().positive(),
       height: z.int().positive(),
-      pixels: z.instanceof(Uint16Array)
+      pixels: z.instanceof(Uint16Array),
+      displayProfile: rawDisplayProfileSchema
     })
   ]),
   maximumEdge: z.int().min(64).max(32_768).nullable(),
