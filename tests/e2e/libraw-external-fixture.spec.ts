@@ -26,7 +26,7 @@ test('develops an external camera RAW through the 16-bit LibRaw/WASM path', asyn
 
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => crossOriginIsolated)).toBe(true);
-  await page.getByRole('button', { name: 'Import image' }).click();
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   const importDialog = page.getByRole('dialog', { name: 'Import photographs' });
   await expect(importDialog.getByRole('button', { name: 'Choose photographs' })).toBeEnabled({ timeout: 60_000 });
   await importDialog.getByRole('button', { name: 'Close import' }).click();
@@ -35,8 +35,8 @@ test('develops an external camera RAW through the 16-bit LibRaw/WASM path', asyn
   await expect(page.getByLabel('Project name')).toBeVisible();
   await expect(page.getByText(/Preview up to date/)).toBeVisible({ timeout: 60_000 });
   const neutralDevelopedSignature = await previewSignature(page);
-  await expect(page.getByRole('button', { name: 'No edits · B' })).toBeDisabled();
-  await page.getByRole('tab', { name: 'Manual' }).click();
+  await expect(page.getByRole('button', { name: 'After B' })).toBeDisabled();
+  await page.getByRole('tab', { name: 'Edit' }).click();
   await page.evaluate(() => {
     document.documentElement.dataset.rawcketSawRepeatedDecode = 'false';
     document.documentElement.dataset.rawcketSawPreviewUpdate = 'false';
@@ -58,21 +58,29 @@ test('develops an external camera RAW through the 16-bit LibRaw/WASM path', asyn
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.rawcketCompletedPreviewUpdate), { timeout: 30_000 }).toBe('true');
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.rawcketSawRepeatedDecode)).toBe('false');
   const adjustedSignature = await previewSignature(page);
-  await page.getByRole('button', { name: 'After · B' }).click();
+  await page.getByRole('button', { name: 'After B' }).click();
   await expect(page.getByText('Neutral developed RAW · Before')).toBeVisible();
   await expect.poll(() => previewSignature(page)).toBe(neutralDevelopedSignature);
   expect(adjustedSignature).not.toBe(neutralDevelopedSignature);
-  await page.getByRole('button', { name: 'Before · B' }).click();
+  await page.getByRole('button', { name: 'Before B' }).click();
+  await page.getByRole('tab', { name: 'History' }).click();
   await page.getByRole('button', { name: 'Natural' }).click();
-  for (const label of ['Highlights', 'Shadows', 'Vibrance', 'Clarity', 'Texture', 'Sharpness']) {
-    await page.getByLabel(`${label} enabled`).uncheck();
-  }
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await page.getByRole('button', { name: 'Disable Highlights' }).click();
+  await page.getByRole('button', { name: 'Disable Shadows' }).click();
+  await page.getByRole('button', { name: 'Color', exact: true }).click();
+  await page.getByRole('button', { name: 'Disable Vibrance' }).click();
+  await page.getByRole('button', { name: 'Detail', exact: true }).click();
+  await page.getByRole('button', { name: 'Disable Clarity' }).click();
+  await page.getByRole('button', { name: 'Disable Texture' }).click();
+  await page.getByRole('button', { name: 'Disable Sharpness' }).click();
   await expect(page.getByText('Saving…')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText('Saved locally')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/Preview up to date/)).toBeVisible({ timeout: 30_000 });
   await page.reload();
   await expect(page.getByText(/Preview up to date/)).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole('button', { name: 'No edits · B' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'After B' })).toBeDisabled();
+  await page.getByRole('tab', { name: 'History' }).click();
   await page.evaluate(() => {
     const arm = (): void => {
       document.documentElement.dataset.rawcketReloadedUpdateStarted = 'false';
@@ -96,14 +104,15 @@ test('develops an external camera RAW through the 16-bit LibRaw/WASM path', asyn
     document.documentElement.dataset.rawcketReloadedUpdateStarted = 'false';
     document.documentElement.dataset.rawcketReloadedUpdateCompleted = 'false';
   });
-  await page.getByLabel('Texture enabled').check();
+  await page.getByRole('button', { name: 'Enable Texture' }).click();
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.rawcketReloadedUpdateCompleted), { timeout: 30_000 }).toBe('true');
   await expect(page.getByText('Updating preview')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'After · B' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'After B' })).toBeEnabled();
   const restoredAdjustedSignature = await previewSignature(page);
-  await page.getByRole('button', { name: 'After · B' }).click();
+  await page.getByRole('button', { name: 'After B' }).click();
   await expect(page.getByText('Neutral developed RAW · Before')).toBeVisible();
   await expect.poll(() => previewSignature(page)).not.toBe(restoredAdjustedSignature);
+  await page.locator('summary[aria-label="Editor menu"]').click();
   await page.getByRole('button', { name: 'Photo information' }).click();
   const information = page.getByRole('dialog', { name: 'Photo information' });
   await expect(information, browserErrors.join('\n')).toContainText('LibRaw/WASM · linear RGB · 16-bit');

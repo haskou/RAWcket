@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 test('imports, edits, saves, closes, and reopens a local project', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Your photographs. Your browser.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
 
   const pngBase64 = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -30,7 +30,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
     return canvas.toDataURL('image/png').split(',')[1] ?? '';
   });
   const png = Buffer.from(pngBase64, 'base64');
-  await page.getByRole('button', { name: 'Import image' }).click();
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   const importDialog = page.getByRole('dialog', { name: 'Import photographs' });
   await expect(importDialog).toBeVisible();
   await expect(importDialog.getByText(/JPEG, PNG, or Sony ARW/)).toBeVisible();
@@ -44,13 +44,14 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   });
 
   await expect(page.getByLabel('Project name')).toHaveValue('night');
+  await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByText('No active edits')).toBeVisible();
   await expect(page.getByLabel('Active Recipe').getByRole('button', { name: /^Exposure / })).toHaveCount(0);
   const webGpuAvailable = await page.evaluate(async () => {
     if (!Reflect.has(navigator, 'gpu')) return false;
     return (await navigator.gpu.requestAdapter()) !== null;
   });
-  await expect(page.getByText(webGpuAvailable ? 'WebGPU accelerated preview' : 'WebGL2 accelerated preview')).toBeVisible();
+  await expect(page.getByText(new RegExp(webGpuAvailable ? 'WebGPU' : 'WebGL2'))).toBeVisible();
   const acceleratedPixel = await page.getByRole('img', { name: 'Preview of night' }).evaluate(async (element) => {
     if (!(element instanceof HTMLImageElement)) throw new Error('The accelerated preview is not an image.');
     await element.decode();
@@ -64,19 +65,15 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   });
   expect(acceleratedPixel[0]).toBeGreaterThan(150);
   expect(acceleratedPixel[1]).toBeGreaterThan(180);
-  await page.getByRole('tab', { name: 'Manual' }).click();
+  await page.getByRole('tab', { name: 'Edit' }).click();
   await expect(page.getByLabel('Rendered frame histogram')).toBeVisible();
-  await expect(page.getByText('Essential light and color controls.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Detail Shortcut 3' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Advanced', exact: true }).click();
-  await expect(page.getByText('Full technical control, curves, geometry, and masks.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Detail Shortcut 3' })).toBeVisible();
-  await page.getByRole('button', { name: 'Masks AI ready' }).click();
+  await expect(page.getByRole('button', { name: 'Detail', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Masks' }).click();
   await expect(page.getByRole('region', { name: 'Local semantic masks' })).toBeVisible();
   await expect(page.getByText(/prepared automatically/)).toBeVisible();
-  await page.getByRole('tab', { name: '✦ AI Companion' }).click();
+  await page.getByRole('tab', { name: 'AI' }).click();
   await expect(page.getByRole('region', { name: 'Local semantic masks' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Ask AI Companion for an opinion' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ask AI for an opinion' })).toBeVisible();
   let aiRequestCount = 0;
   await page.route('https://api.openai.com/v1/responses', async (route) => {
     aiRequestCount += 1;
@@ -96,7 +93,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
     await route.fulfill({ status: 200, contentType: 'application/json', body: openAiEnvelope(result) });
   });
   await page.getByLabel('What should RAWcket create?').fill('Create a cinematic night portrait with a tighter crop.');
-  await page.getByRole('button', { name: 'Generate proposal from my text' }).click();
+  await page.getByRole('button', { name: 'Create recipe' }).click();
   const aiSettings = page.getByRole('dialog', { name: 'Configure AI Companion' });
   await expect(aiSettings).toBeVisible();
   await expect(aiSettings.getByText('OpenAI API', { exact: true }).first()).toBeVisible();
@@ -113,37 +110,45 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('checkbox', { name: 'Update crop and geometry' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Add local mask' })).toBeChecked();
   await page.getByRole('button', { name: 'Apply selected' }).click();
+  await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByRole('button', { name: /Contrast \+14/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Auto Enhance', exact: true }).click();
-  await expect(page.getByText(/Auto Enhance (corrected|left the recipe unchanged)/)).toBeVisible();
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await page.getByRole('button', { name: 'Apply Auto Enhance' }).click();
+  await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
   await page.keyboard.press('1');
-  await expect(page.getByRole('button', { name: 'Light Shortcut 1' })).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute('aria-expanded', 'true');
   await page.getByLabel('Exposure numeric value').fill('0.25');
+  await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Visual history' }).click();
+  await page.keyboard.press('h');
   await expect(page.getByRole('dialog', { name: 'Visual history' }).getByText('Exposure: +0.25')).toBeVisible();
   await page.getByRole('button', { name: 'Close visual history' }).click();
+  await page.getByRole('tab', { name: 'Edit' }).click();
   await expect(page.locator('.adjustment-control.modified').filter({ has: page.getByLabel('Exposure numeric value') }).getByLabel('Modified')).toBeVisible();
   await page.getByRole('button', { name: 'Reset Exposure' }).click();
+  await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByLabel('Active Recipe').getByRole('button', { name: /^Exposure / })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Edit' }).click();
   await page.getByLabel('Exposure numeric value').fill('0.25');
-  await page.getByLabel('Exposure enabled').uncheck();
+  await page.getByRole('button', { name: 'Disable Exposure' }).click();
   await expect(page.getByLabel('Exposure numeric value')).toBeDisabled();
-  await page.getByLabel('Exposure enabled').check();
+  await page.getByRole('button', { name: 'Enable Exposure' }).click();
   await expect(page.getByLabel('Exposure numeric value')).toHaveValue('0.25');
-  await page.getByRole('button', { name: 'After · B' }).click();
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await page.getByLabel('Preview zoom').fill('1.5');
+  await page.keyboard.press('ArrowRight');
+  const viewportBeforeComparison = await page.locator('.preview-surface').getAttribute('style');
+  await page.getByRole('button', { name: 'After B' }).click();
   await expect(page.getByText('Original · Before')).toBeVisible();
-  await page.getByRole('button', { name: 'Before · B' }).click();
-  const canvasWidthBeforeCollapse = await page.locator('.canvas-area').evaluate((element) => element.getBoundingClientRect().width);
-  await page.getByRole('button', { name: 'Collapse Active Recipe' }).click();
-  await expect(page.getByRole('button', { name: 'Expand Active Recipe' })).toBeVisible();
-  await expect.poll(() => page.locator('.canvas-area').evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(canvasWidthBeforeCollapse);
+  await expect(page.locator('.preview-surface')).toHaveAttribute('style', viewportBeforeComparison ?? '');
+  await page.getByRole('button', { name: 'Before B' }).click();
+  await expect(page.locator('.preview-surface')).toHaveAttribute('style', viewportBeforeComparison ?? '');
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
   const horizontalCenterDelta = await page.evaluate(() => {
     const stage = document.querySelector('.photo-stage')?.getBoundingClientRect();
@@ -152,8 +157,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
     return Math.abs((stage.left + stage.width / 2) - (preview.left + preview.width / 2));
   });
   expect(horizontalCenterDelta).toBeLessThan(2);
-  await page.getByRole('button', { name: 'Expand Active Recipe' }).click();
-  await page.getByLabel('Editing tools').getByRole('button', { name: /Crop & Geometry/ }).click();
+  await page.getByRole('button', { name: /Crop/ }).first().click();
   await expect(page.getByRole('toolbar', { name: 'Contextual crop tools' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Rotate crop left 90 degrees' })).toBeVisible();
   await page.getByRole('button', { name: 'Auto straighten · local' }).click();
@@ -238,7 +242,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByLabel('Horizontal perspective numeric value').fill('-12');
   await expect(page.getByLabel('Vertical perspective numeric value')).toHaveValue('18');
   await expect(page.getByLabel('Horizontal perspective numeric value')).toHaveValue('-12');
-  await page.getByLabel('Editing tools').getByRole('button', { name: 'Masks AI ready' }).click();
+  await page.getByRole('tab', { name: 'Masks' }).click();
   await expect(page.getByText('How local masks work')).toBeVisible();
   await page.getByRole('button', { name: '+ Radial mask' }).click();
   await expect(page.getByText('Radial mask selected')).toBeVisible();
@@ -302,7 +306,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Box 2 X numeric value')).toHaveValue('0.25');
   await page.getByRole('button', { name: 'Remove constraint box 2' }).click();
   await expect(page.getByLabel('Box 2 X numeric value')).not.toBeVisible();
-  await expect(page.getByText(webGpuAvailable ? 'WebGPU accelerated preview' : 'WebGL2 accelerated preview')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(new RegExp(webGpuAvailable ? 'WebGPU' : 'WebGL2'))).toBeVisible({ timeout: 15_000 });
   await page.keyboard.press('4');
   await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
   await page.getByRole('button', { name: 'Reset channel' }).click();
@@ -339,20 +343,24 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('tab', { name: 'Red' }).click();
   await page.getByRole('button', { name: 'Paste RGB to Red' }).click();
   await expect(page.locator('.curve-graph.channel-red circle')).toHaveCount(3);
+  await page.getByRole('tab', { name: 'History' }).click();
   await page.getByLabel('New preset name').fill('Night master');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('article').filter({ hasText: 'Night master' })).toBeVisible();
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
+  await page.getByRole('button', { name: 'Open night' }).hover();
   await page.getByRole('button', { name: 'Rate night 4 stars' }).click();
   await expect(page.getByRole('button', { name: 'Rate night 4 stars' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Open night' }).hover();
   await page.getByRole('button', { name: 'Edit tags' }).click();
   await page.getByLabel('Comma-separated tags').fill('night, client');
   await page.getByRole('button', { name: 'Save tags' }).click();
   await expect(page.getByText('client', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open night' }).hover();
   await page.getByRole('button', { name: 'Add night to favorites' }).click();
   await expect(page.getByRole('button', { name: 'Remove night from favorites' })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByLabel('Search names and tags').fill('client');
+  await page.getByLabel('Search projects').fill('client');
   await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
   await page.getByLabel('Favorites only').check();
   await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
@@ -361,17 +369,20 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByLabel('Minimum rating').selectOption('4');
   await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
   await page.getByRole('button', { name: 'Open night' }).click();
+  await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
-  await expect(page.getByText('Saved Companion history · 1')).toBeVisible();
-  await page.getByText('Saved Companion history · 1').click();
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.getByText('Saved AI sessions · 1')).toBeVisible();
+  await page.getByText('Saved AI sessions · 1').click();
   const savedCompanionAdvice = page.getByRole('article');
   await expect(savedCompanionAdvice.getByText('Shape a cinematic night portrait while keeping skin believable.')).toBeVisible();
   await expect(savedCompanionAdvice.getByText('applied', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'History' }).click();
   await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
   await expect(page.getByLabel('Vertical perspective numeric value')).toHaveValue('18');
   await expect(page.getByLabel('Horizontal perspective numeric value')).toHaveValue('-12');
-  await page.getByRole('button', { name: 'Local Masks', exact: true }).click();
+  await page.getByRole('tab', { name: 'Masks' }).click();
   await expect(page.getByRole('button', { name: /Composite \d+ On/ })).toBeVisible();
   await page.getByRole('button', { name: /Composite \d+ On/ }).click();
   await expect(page.getByLabel('Selected composite operation')).toHaveValue('intersect');
@@ -387,9 +398,10 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Color tolerance numeric value')).toHaveValue('0.15');
   await expect(page.getByLabel('Sample 2 X numeric value')).toHaveValue('0.75');
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Tone Curve', exact: true }).click();
+  await page.keyboard.press('4');
   await page.locator('.curve-graph circle').nth(1).click();
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.11');
+  await page.getByRole('tab', { name: 'History' }).click();
   let customPreset = page.getByRole('article').filter({ hasText: 'Night master' });
   await expect(customPreset).toBeVisible();
   await page.getByRole('button', { name: 'Clear recipe' }).click();
@@ -441,7 +453,7 @@ test('imports a photograph by dropping it into the import dialog', async ({ page
     return transfer;
   });
 
-  await page.getByRole('button', { name: 'Import image' }).click();
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Import photographs' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Choose photographs' })).toBeEnabled();
@@ -464,7 +476,8 @@ test('signs in with Google without asking the user for a token or client ID', as
   await page.route('https://openidconnect.googleapis.com/v1/userinfo', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ email: 'photographer@example.com' }) }));
   await page.route('https://www.googleapis.com/drive/v3/files?**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [] }) }));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Google Drive' }).click();
+  await page.locator('summary[aria-label="Library menu"]').click();
+  await page.getByRole('button', { name: 'Sync & Google Drive' }).click();
   const dialog = page.getByRole('dialog', { name: 'Google Drive' });
   await expect(dialog.getByLabel('Google OAuth Web Client ID')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Continue with Google' })).toBeEnabled();
@@ -478,9 +491,8 @@ test('signs in with Google without asking the user for a token or client ID', as
 
 test('keeps the preview visible at maximum spatial detail settings', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Explore with a demo/ }).click();
-  await page.getByRole('tab', { name: 'Manual' }).click();
-  await page.getByRole('button', { name: 'Advanced', exact: true }).click();
+  await page.getByRole('button', { name: 'Open demo' }).click();
+  await page.getByRole('tab', { name: 'Edit' }).click();
   await page.getByLabel('Editing tools').getByRole('button', { name: /Detail/ }).click();
   const preview = page.locator('.source-preview');
   await expect(preview).toBeVisible();
@@ -530,7 +542,7 @@ test('compares multiple imports by post-edit potential and lets the photographer
     return { sharp: render(true), soft: render(false) };
   });
 
-  await page.getByRole('button', { name: 'Import image' }).click();
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   const importDialog = page.getByRole('dialog', { name: 'Import photographs' });
   await expect(importDialog.getByRole('button', { name: 'Choose photographs' })).toBeEnabled();
   await importDialog.getByRole('button', { name: 'Close import' }).click();
@@ -600,6 +612,7 @@ test('imports a Sony ARW container and develops its embedded preview locally', a
   await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeVisible();
   await expect(page.getByText(/Preview up to date/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/Embedded RAW preview fallback/)).toBeVisible();
+  await page.locator('summary[aria-label="Editor menu"]').click();
   await page.getByRole('button', { name: 'Photo information' }).click();
   await expect(page.getByRole('dialog', { name: 'Photo information' })).toContainText('Sony ARW');
   await expect(page.getByRole('dialog', { name: 'Photo information' })).toContainText('6000 × 4000 px');

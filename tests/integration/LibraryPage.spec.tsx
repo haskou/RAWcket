@@ -24,7 +24,7 @@ describe('LibraryPage', () => {
     expect(await screen.findByText('Local AI · 42%')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Local AI 42%' })).toBeDisabled();
     finishInstallation?.();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Import image' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Import' })).toBeEnabled());
   });
 
   it('holds a selected photograph and imports it without automatic tags when local model preparation fails', async () => {
@@ -82,8 +82,8 @@ describe('LibraryPage', () => {
       </ApplicationProvider>
     );
 
-    expect(await screen.findByText('Start with a photograph')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Choose image' }));
+    expect(await screen.findByText('Import your first photograph')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Choose photographs' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import photographs' });
     expect(within(dialog).getByText(/JPEG, PNG, or Sony ARW/)).toBeInTheDocument();
     const input = screen.getByLabelText('Select one or more JPEG, PNG, or Sony ARW images');
@@ -111,7 +111,7 @@ describe('LibraryPage', () => {
       </ApplicationProvider>
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Choose image' }));
+    await user.click(await screen.findByRole('button', { name: 'Choose photographs' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import photographs' });
     expect(within(dialog).getByRole('checkbox', { name: 'Add tags automatically on import' })).toBeChecked();
     await user.upload(

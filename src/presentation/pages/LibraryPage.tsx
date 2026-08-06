@@ -385,39 +385,35 @@ export function LibraryPage(): ReactElement {
       )}
       <header className="library-header">
         <a className="brand" href="/" aria-label="RAWcket library"><span className="brand-mark">R</span><span>RAWcket</span></a>
+        <nav className="library-navigation" aria-label="Library sections">
+          <a className="active" href="/">Library</a>
+        </nav>
+        <label className="library-header-search">
+          <span className="visually-hidden">Search projects</span>
+          <span aria-hidden="true">⌕</span>
+          <input type="search" value={searchQuery} placeholder="Search photographs" onChange={(event) => setSearchQuery(event.target.value)} />
+        </label>
         <div className="header-actions">
           {installingTagModel && <div className="local-model-header-progress" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span>Local AI · {Math.round(tagModelProgress * 100)}%</span></div>}
-          <PwaInstallButton />
-          <button className="button ghost" type="button" onClick={() => setCloudStorageOpen(true)}>Google Drive</button>
-          <button className="button ai-header-button" type="button" onClick={() => setSettingsOpen(true)}>✦ AI Companion</button>
-          <button className="button ghost" type="button" onClick={() => bundleInput.current?.click()}>Import .rawcket</button>
-          <button className="button primary" type="button" onClick={openImportDialog} disabled={busy || localModelPreparing}>{localModelPreparing ? `Local AI ${Math.round(tagModelProgress * 100)}%` : busy ? 'Importing…' : 'Import image'}</button>
+          <details className="library-more-menu">
+            <summary role="button" aria-label="Library menu" title="Library menu">•••</summary>
+            <div>
+              <button type="button" onClick={() => setCloudStorageOpen(true)}>Sync &amp; Google Drive</button>
+              <button type="button" onClick={() => setSettingsOpen(true)}>AI settings</button>
+              <button type="button" onClick={() => bundleInput.current?.click()}>Import RAWcket project</button>
+              <PwaInstallButton />
+            </div>
+          </details>
+          <button className="button primary" type="button" onClick={openImportDialog} disabled={busy || localModelPreparing}>{localModelPreparing ? `Local AI ${Math.round(tagModelProgress * 100)}%` : busy ? 'Importing…' : 'Import'}</button>
         </div>
       </header>
       <input ref={imageInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,.arw,image/x-sony-arw" onChange={onImage} aria-label="Select one or more JPEG, PNG, or Sony ARW images" />
       <input ref={bundleInput} className="visually-hidden" type="file" accept=".rawcket,application/zip" onChange={(event) => void importBundle(event)} aria-label="Select a RAWcket project" />
-      <section className="library-intro">
-        <div>
-          <span className="eyebrow">Local photo library</span>
-          <h1>Your photographs. Your browser.</h1>
-          <p>RAWcket keeps every original untouched and turns each decision into a reversible recipe. Its AI-first workflow helps you create while you remain in control of every parameter.</p>
-        </div>
-        <button className="demo-card" type="button" onClick={() => void createDemo()}>
-          <span className="demo-orbit" aria-hidden="true" />
-          <span><strong>Explore with a demo</strong><small>Generated on your device · no download</small></span>
-          <span aria-hidden="true">→</span>
-        </button>
-      </section>
-      <p className="storage-note">
-        Local browser storage · private by default · not a replacement for a backup
-        {storageCapacity?.supported === true && <span> · {formatBytes(storageCapacity.usageBytes)} used of {formatBytes(storageCapacity.quotaBytes)} · {storageCapacity.persistent ? 'persistent storage granted' : 'storage may be reclaimed by the browser'}</span>}
-      </p>
       {error !== null && <p className="notice error" role="alert">{error}</p>}
       {recoveryMessage !== null && <p className="notice" role="status">{recoveryMessage}</p>}
-      <section aria-labelledby="projects-title">
-        <div className="section-heading"><h2 id="projects-title">Recent projects</h2><span>{filteredProjects.length} of {projects.length} {projects.length === 1 ? 'project' : 'projects'}</span></div>
+      <section className="library-content" aria-labelledby="projects-title">
+        <div className="section-heading"><div><h1 id="projects-title">Library</h1><span>{filteredProjects.length} of {projects.length} {projects.length === 1 ? 'photograph' : 'photographs'}</span></div></div>
         {projects.length > 0 && <div className="library-filters" role="search">
-          <label><span>Search names and tags</span><input type="search" value={searchQuery} placeholder="Portrait, night, client…" onChange={(event) => setSearchQuery(event.target.value)} /></label>
           <label><span>Minimum rating</span><select value={minimumRating} onChange={(event) => setMinimumRating(Number(event.target.value))}>
             <option value={0}>All ratings</option>
             <option value={1}>★ and above</option>
@@ -432,9 +428,12 @@ export function LibraryPage(): ReactElement {
         {projects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon" aria-hidden="true">+</div>
-            <h3>Start with a photograph</h3>
-            <p>Click Choose image or drop JPEG, PNG, or Sony ARW files here. The original remains untouched and local.</p>
-            <button className="button primary" type="button" onClick={openImportDialog} disabled={localModelPreparing}>{localModelPreparing ? `Preparing Local AI · ${Math.round(tagModelProgress * 100)}%` : 'Choose image'}</button>
+            <h2>Import your first photograph</h2>
+            <p>Drop JPEG, PNG, or Sony ARW files anywhere in this window, or choose them from disk.</p>
+            <div className="empty-state-actions">
+              <button className="button primary" type="button" onClick={openImportDialog} disabled={localModelPreparing}>{localModelPreparing ? `Preparing Local AI · ${Math.round(tagModelProgress * 100)}%` : 'Choose photographs'}</button>
+              <button className="button ghost" type="button" onClick={() => void createDemo()}>Open demo</button>
+            </div>
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="empty-state compact">
@@ -449,23 +448,30 @@ export function LibraryPage(): ReactElement {
               const name = project.getName().valueOf();
               return (
                 <article className="project-card" key={id}>
+                  <details className="project-menu">
+                    <summary role="button" aria-label={`Actions for ${name}`} title={`Actions for ${name}`}>•••</summary>
+                    <div>
+                      <button type="button" onClick={() => void rename(project)}>Rename</button>
+                      <button type="button" onClick={() => void duplicate(id)}>Duplicate</button>
+                      <button type="button" onClick={() => void exportProject(project)}>Export project</button>
+                      <button className="danger-text" type="button" onClick={() => void remove(project)}>Delete</button>
+                    </div>
+                  </details>
                   <button className="project-open" type="button" onClick={() => void navigate(`/editor/${id}`)} aria-label={`Open ${name}`}>
                     <ProjectThumbnail projectId={id} name={name} mimeType={project.getSourceMimeType().valueOf()} />
                     <span className="project-meta"><strong>{name}</strong><small>Edited {project.getUpdatedAt().toDate().toLocaleString('en')}</small></span>
                   </button>
                   <ProjectOrganizationControls project={project} onRate={(rating) => void changeRating(project, rating)} onTags={(tags) => void changeTags(project, tags)} onFavorite={(favorite) => void changeFavorite(project, favorite)} />
-                  <div className="project-actions" aria-label={`Actions for ${name}`}>
-                    <button type="button" onClick={() => void rename(project)}>Rename</button>
-                    <button type="button" onClick={() => void duplicate(id)}>Duplicate</button>
-                    <button type="button" onClick={() => void exportProject(project)}>Export</button>
-                    <button className="danger-text" type="button" onClick={() => void remove(project)}>Delete</button>
-                  </div>
                 </article>
               );
             })}
           </div>
         )}
       </section>
+      <footer className="library-status-bar">
+        <span>Local library</span>
+        {storageCapacity?.supported === true && <span>{formatBytes(storageCapacity.usageBytes)} of {formatBytes(storageCapacity.quotaBytes)} used · {storageCapacity.persistent ? 'protected storage' : 'browser-managed storage'}</span>}
+      </footer>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onConfigured={continuePendingImport} />
       <CloudStorageDialog open={cloudStorageOpen} onClose={() => setCloudStorageOpen(false)} />
       <ImportPhotosDialog

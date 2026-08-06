@@ -22,8 +22,9 @@ export function ActiveRecipePanel({
   onDeleteCustomPreset,
   onImportPreset,
   presetMessage,
-  collapsed,
-  onToggleCollapsed
+  collapsed = false,
+  onToggleCollapsed,
+  embedded = false
 }: {
   project: PhotoProject;
   onNavigate: (section: AdjustmentSection) => void;
@@ -40,8 +41,9 @@ export function ActiveRecipePanel({
   onDeleteCustomPreset: (preset: RecipePreset) => void;
   onImportPreset: () => void;
   presetMessage?: string;
-  collapsed: boolean;
-  onToggleCollapsed: () => void;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+  embedded?: boolean;
 }): ReactElement {
   const [newPresetName, setNewPresetName] = useState('');
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
@@ -67,12 +69,11 @@ export function ActiveRecipePanel({
   }
 
   return (
-    <aside className="recipe-panel" aria-label="Active Recipe">
+    <aside className={`recipe-panel${embedded ? ' embedded' : ''}`} aria-label="Active Recipe">
       <div className="recipe-panel-heading">
-        <button className="recipe-collapse" type="button" onClick={onToggleCollapsed} aria-label="Collapse Active Recipe" title="Collapse Active Recipe">‹</button>
-        <span className="eyebrow">Non-destructive</span>
-        <h2>Active Recipe</h2>
-        <p>Toggle any instruction without losing its value. Select it to edit.</p>
+        {!embedded && <button className="recipe-collapse" type="button" onClick={onToggleCollapsed} aria-label="Collapse Active Recipe" title="Collapse Active Recipe">‹</button>}
+        <h2>Recipe</h2>
+        <p>Every enabled change in the current image.</p>
         <div className="recipe-transfer-actions">
           <button type="button" disabled={!hasActiveRecipe} onClick={onClear}>Clear recipe</button>
           <button type="button" onClick={onImportPreset}>Import preset</button>

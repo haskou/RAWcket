@@ -33,7 +33,8 @@ export function AdjustmentControls({ project, definitions, onChange, onToggle }:
                   disabled={!enabled}
                   onChange={(event) => onChange(definition.key, event.currentTarget.valueAsNumber, null)}
                 />
-                <button type="button" disabled={!enabled || value === 0} onClick={() => onChange(definition.key, 0, null)} aria-label={`Reset ${definition.label}`}>↺</button>
+                <span className="adjustment-unit" aria-hidden="true">{definition.unit}</span>
+                <button className="adjustment-reset" type="button" disabled={!enabled || !modified} onClick={() => onChange(definition.key, 0, null)} aria-label={`Reset ${definition.label}`} title="Reset to default">↺</button>
               </div>
             </div>
             <input
@@ -45,7 +46,9 @@ export function AdjustmentControls({ project, definitions, onChange, onToggle }:
               step={definition.step}
               value={value}
               disabled={!enabled}
-              aria-valuetext={`${value}`}
+              aria-valuetext={`${value} ${definition.unit}`}
+              title="Double-click to reset"
+              onDoubleClick={() => onChange(definition.key, 0, null)}
               onPointerDown={() => groups.current.set(definition.key, crypto.randomUUID())}
               onPointerUp={() => groups.current.delete(definition.key)}
               onChange={(event) => onChange(

@@ -15,7 +15,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ApplyEditOperationMessage } from '@/contexts/projects/application/apply-edit-operation/messages/ApplyEditOperationMessage';
 import { UploadCloudAssetMessage } from '@/contexts/cloud-storage/application/manage-cloud-storage/messages/UploadCloudAssetMessage';
 import { ChangeHistoryMessage } from '@/contexts/projects/application/change-history/messages/ChangeHistoryMessage';
-import { ChooseInterfaceModeMessage } from '@/contexts/projects/application/choose-interface-mode/messages/ChooseInterfaceModeMessage';
 import { CreateSemanticMaskMessage } from '@/contexts/projects/application/create-semantic-mask/messages/CreateSemanticMaskMessage';
 import { DecideAiDevelopmentAdviceMessage } from '@/contexts/projects/application/decide-ai-development-advice/messages/DecideAiDevelopmentAdviceMessage';
 import { FindProjectMessage } from '@/contexts/projects/application/find-project/messages/FindProjectMessage';
@@ -31,10 +30,8 @@ import { RenderProjectCropPreviewMessage } from '@/contexts/projects/application
 import { RenderProjectPreviewMessage } from '@/contexts/projects/application/render-project-preview/messages/RenderProjectPreviewMessage';
 import { RecordAiDevelopmentAdviceMessage } from '@/contexts/projects/application/record-ai-development-advice/messages/RecordAiDevelopmentAdviceMessage';
 import { RequestEditingAdviceMessage } from '@/contexts/projects/application/request-editing-advice/messages/RequestEditingAdviceMessage';
-import { ReviewDevelopmentMessage } from '@/contexts/projects/application/review-development/messages/ReviewDevelopmentMessage';
 import { SuggestAutomaticEnhancementMessage } from '@/contexts/projects/application/suggest-automatic-enhancement/messages/SuggestAutomaticEnhancementMessage';
 import type { EditProposal } from '@/contexts/projects/application/ports/EditingAdvisor';
-import type { DevelopmentGuidanceItem } from '@/contexts/projects/application/ports/DevelopmentTutor';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import type { SemanticModelStatus } from '@/contexts/projects/application/ports/SemanticSegmentationModel';
 import { EDIT_OPERATION, type EditOperation } from '@/contexts/projects/domain/EditOperation';
@@ -44,7 +41,6 @@ import { DevelopmentRecipe, type DevelopmentSettingsPrimitives } from '@/context
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { RecipePreset } from '@/contexts/projects/domain/RecipePreset';
-import type { InterfaceModePrimitive } from '@/contexts/projects/domain/ProjectUiState';
 import { CurveSet, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
@@ -73,6 +69,7 @@ import { downloadBlob } from '../lib/browserImages';
 
 type EditorPanel = AdjustmentSection | 'curves' | 'crop' | 'masks' | 'ai';
 type ToolWorkspace = 'ai' | 'develop';
+type InspectorTab = 'edit' | 'masks' | 'ai' | 'history';
 type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
 type BrushGesture = { pointerId: number; maskId: string; groupId: string };
@@ -172,6 +169,7 @@ export function EditorPage(): ReactElement {
   const semanticAbort = useRef<AbortController | null>(null);
   const semanticInstallAbort = useRef<AbortController | null>(null);
   const renderSequence = useRef(0);
+  const preserveViewportOnNextImageLoad = useRef(false);
   const previewRenderDebouncer = useRef<Debouncer<void> | null>(null);
   previewRenderDebouncer.current ??= new Debouncer(80);
   const [project, setProject] = useState<PhotoProject | null>(null);
@@ -185,7 +183,6 @@ export function EditorPage(): ReactElement {
   const [renderBusy, setRenderBusy] = useState(true);
   const [baselineError, setBaselineError] = useState<string | null>(null);
   const [previewAnalysis, setPreviewAnalysis] = useState<PreviewAnalysis | null>(null);
-  const [developmentGuidance, setDevelopmentGuidance] = useState<DevelopmentGuidanceItem[]>([]);
   const [revision, setRevision] = useState(0);
   const [previewRevision, setPreviewRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -194,7 +191,6 @@ export function EditorPage(): ReactElement {
   const [fitDimensions, setFitDimensions] = useState<ImageDimensions | null>(null);
   const [panning, setPanning] = useState(false);
   const [cropDraft, setCropDraft] = useState<ViewportTransformPrimitives['cropFrame'] | null>(null);
-  const [recipeCollapsed, setRecipeCollapsed] = useState(false);
   const [compositionGuide, setCompositionGuide] = useState<CompositionGuide>('none');
   const [maskOverlayVisible, setMaskOverlayVisible] = useState(true);
   const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
@@ -206,6 +202,7 @@ export function EditorPage(): ReactElement {
   const [brushMode, setBrushMode] = useState<'add' | 'erase'>('add');
   const [activePanel, setActivePanel] = useState<EditorPanel>('ai');
   const [toolWorkspace, setToolWorkspace] = useState<ToolWorkspace>('ai');
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('ai');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cloudStorageOpen, setCloudStorageOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -424,17 +421,6 @@ export function EditorPage(): ReactElement {
     return () => controller.abort();
   }, [application, beforeSource, previewRevision, project, projectId]);
 
-  useEffect(() => {
-    if (project === null || previewAnalysis === null) {
-      setDevelopmentGuidance([]);
-      return;
-    }
-    setDevelopmentGuidance(application.reviewDevelopment.review(
-      project,
-      new ReviewDevelopmentMessage(projectId, previewAnalysis.shadowClipping, previewAnalysis.highlightClipping)
-    ));
-  }, [application, previewAnalysis, project, projectId, revision]);
-
   const apply = useCallback((operation: EditOperation): void => {
     if (project === null) return;
     application.applyEditOperation.apply(project, new ApplyEditOperationMessage(projectId, operation));
@@ -502,12 +488,14 @@ export function EditorPage(): ReactElement {
   const openPanel = useCallback((panel: EditorPanel): void => {
     setActivePanel(panel);
     setToolWorkspace(panel === 'ai' ? 'ai' : 'develop');
-    if (panel !== 'ai' && panel !== 'light' && panel !== 'color' && project?.getInterfaceMode().valueOf() === 'simple') {
-      application.chooseInterfaceMode.choose(project, new ChooseInterfaceModeMessage('advanced'));
-      setRevision((current) => current + 1);
-    }
+    setInspectorTab(panel === 'ai' ? 'ai' : panel === 'masks' ? 'masks' : 'edit');
     window.requestAnimationFrame(() => document.getElementById(`tool-${panel}`)?.scrollIntoView({ block: 'start' }));
-  }, [application, project]);
+  }, []);
+
+  const toggleComparison = useCallback((): void => {
+    preserveViewportOnNextImageLoad.current = true;
+    setShowOriginal((value) => !value);
+  }, []);
 
   useEffect(() => {
     const handleShortcut = (event: globalThis.KeyboardEvent): void => {
@@ -535,10 +523,10 @@ export function EditorPage(): ReactElement {
       else if (event.key === '3') openPanel('detail');
       else if (event.key === '4') openPanel('curves');
       else if (event.key.toLowerCase() === 'a') openPanel('ai');
-      else if (event.key.toLowerCase() === 'b' && beforeSource !== null) setShowOriginal((value) => !value);
+      else if (event.key.toLowerCase() === 'b' && beforeSource !== null) toggleComparison();
       else if (event.key.toLowerCase() === 'g') setCompositionGuide((current) => compositionGuideSequence[(compositionGuideSequence.indexOf(current) + 1) % compositionGuideSequence.length] ?? 'none');
       else if (event.key.toLowerCase() === 'm') openPanel('masks');
-      else if (event.key.toLowerCase() === 'r') setRecipeCollapsed((value) => !value);
+      else if (event.key.toLowerCase() === 'r') setInspectorTab('history');
       else if (event.key.toLowerCase() === 'i') setPhotoInformationOpen(true);
       else if (event.key.toLowerCase() === 'h') setHistoryOpen(true);
       else if (event.key === 'Escape') { setBrushActive(false); setColorPointActive(false); setAiPointActive(false); }
@@ -548,15 +536,7 @@ export function EditorPage(): ReactElement {
     };
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [beforeSource, changeHistory, fitPreview, openPanel, settingsOpen]);
-
-  const changeMode = (mode: InterfaceModePrimitive): void => {
-    if (project === null) return;
-    application.chooseInterfaceMode.choose(project, new ChooseInterfaceModeMessage(mode));
-    setToolWorkspace('develop');
-    if (mode === 'simple' && !['light', 'color'].includes(activePanel)) setActivePanel('light');
-    setRevision((current) => current + 1);
-  };
+  }, [beforeSource, changeHistory, fitPreview, openPanel, settingsOpen, toggleComparison]);
 
   const close = async (): Promise<void> => {
     await autosave.flush();
@@ -1291,10 +1271,13 @@ export function EditorPage(): ReactElement {
 
   const previewLoaded = (image: HTMLImageElement): void => {
     const dimensions = { width: image.naturalWidth, height: image.naturalHeight };
+    const preserveViewport = preserveViewportOnNextImageLoad.current;
+    preserveViewportOnNextImageLoad.current = false;
     if (imageDimensions?.width === dimensions.width && imageDimensions.height === dimensions.height) return;
     setImageDimensions(dimensions);
     window.requestAnimationFrame(() => {
       const fitted = calculateFitDimensions(dimensions);
+      if (preserveViewport) return;
       if (fitted !== null && cropWorkspaceActive) frameCropPreview(fitted);
       else {
         setZoom(1);
@@ -1308,7 +1291,6 @@ export function EditorPage(): ReactElement {
   }
   if (project === null) return <main className="centered-state"><div className="loader" /><p>Opening local project…</p></main>;
 
-  const mode = project.getInterfaceMode().valueOf();
   const projectMasks = project.getMasks().map((mask) => mask.toPrimitives());
   const selectedMaskIndex = projectMasks.findIndex((mask) => mask.id === selectedMaskId);
   const selectedMask = selectedMaskIndex < 0 ? null : projectMasks[selectedMaskIndex] ?? null;
@@ -1328,7 +1310,6 @@ export function EditorPage(): ReactElement {
     <main className="editor-shell">
       <header className="editor-header">
         <button className="icon-button back-button" type="button" onClick={() => void close()} aria-label="Close project and return">←</button>
-        <a className="brand compact" href="/" onClick={(event) => { event.preventDefault(); void close(); }}><span className="brand-mark">R</span><span>RAWcket</span></a>
         <div className="project-title-block">
           <input className="project-title-input" aria-label="Project name" defaultValue={project.getName().valueOf()} onBlur={(event) => rename(event.target.value)} onKeyDown={handleNameKey} />
           <span className={`save-status ${autosave.status}`} aria-live="polite"><span aria-hidden="true">●</span> {statusLabel}</span>
@@ -1336,36 +1317,28 @@ export function EditorPage(): ReactElement {
         <div className="history-actions">
           <button className="icon-button" type="button" disabled={!project.canUndo()} onClick={() => changeHistory('undo')} aria-label="Undo">↶</button>
           <button className="icon-button" type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')} aria-label="Redo">↷</button>
-          <button className="icon-button shortcut-button" type="button" onClick={() => setShortcutsOpen(true)} aria-label="Keyboard shortcuts">⌨</button>
-          <button className="icon-button" type="button" onClick={() => setPhotoInformationOpen(true)} aria-label="Photo information">ⓘ</button>
-          <button className="icon-button" type="button" onClick={() => setHistoryOpen(true)} aria-label="Visual history">≡</button>
         </div>
-        {semanticTask === 'installing' && <div className="local-model-header-progress" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span>Local AI · {Math.round(semanticProgress * 100)}%</span></div>}
-        <button className="button ghost" type="button" onClick={() => setCloudStorageOpen(true)}>Drive</button>
+        <button className={`button compare-header ${showOriginal ? 'active' : ''}`} type="button" disabled={!comparisonReady} title={!comparisonHasDifference ? 'Before and After match because the recipe has no enabled edits.' : baselineError !== null ? `Before preview unavailable: ${baselineError}` : beforeSource === null ? 'Preparing the neutral developed RAW baseline' : 'Compare with the neutral developed baseline'} onClick={toggleComparison}>{showOriginal ? 'Before' : 'After'} <span>B</span></button>
+        <details className="editor-more-menu">
+          <summary role="button" aria-label="Editor menu" title="Editor menu">•••</summary>
+          <div>
+            <button type="button" onClick={() => setCloudStorageOpen(true)}>Sync &amp; Google Drive</button>
+            <button type="button" onClick={() => setPhotoInformationOpen(true)}>Photo information</button>
+            <button type="button" onClick={() => setShortcutsOpen(true)}>Keyboard shortcuts</button>
+            <button type="button" onClick={() => setHistoryOpen(true)}>Full visual history</button>
+          </div>
+        </details>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
       </header>
       <input ref={recipePresetInput} className="visually-hidden" type="file" accept=".rawcket-recipe.json,application/json" aria-label="Select a RAWcket recipe preset" onChange={(event) => void importRecipePreset(event)} />
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
-      <section className={`editor-workspace ${recipeCollapsed ? 'recipe-collapsed' : ''}`}>
-        <ActiveRecipePanel
-          project={project}
-          onNavigate={showAdjustment}
-          onToggle={toggleAdjustment}
-          onNavigateTool={openPanel}
-          onApplyPreset={applyBuiltInPreset}
-          onClear={() => apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: DevelopmentRecipe.neutral().toPrimitives(), groupId: null })}
-          customPresets={recipePresets}
-          onCreatePreset={(name) => void createRecipePreset(name)}
-          onApplyCustomPreset={(preset) => { apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: preset.getRecipe().toPrimitives(), groupId: null }); setRecipePresetMessage(`${preset.getName().valueOf()} applied as one reversible recipe operation.`); }}
-          onRenameCustomPreset={(preset, name) => void updateRecipePreset(preset, name, false)}
-          onUpdateCustomPreset={(preset) => void updateRecipePreset(preset, preset.getName().valueOf(), true)}
-          onExportCustomPreset={exportRecipePreset}
-          onDeleteCustomPreset={(preset) => void deleteRecipePreset(preset)}
-          onImportPreset={() => recipePresetInput.current?.click()}
-          presetMessage={recipePresetMessage}
-          collapsed={recipeCollapsed}
-          onToggleCollapsed={() => setRecipeCollapsed((value) => !value)}
-        />
+      <section className="editor-workspace">
+        <nav className="tool-rail" aria-label="Spatial tools">
+          <button className={inspectorTab === 'edit' && activePanel !== 'crop' ? 'active' : ''} type="button" onClick={() => openPanel('light')} title="Edit"><span aria-hidden="true">☼</span><small>Edit</small></button>
+          <button className={activePanel === 'crop' ? 'active' : ''} type="button" onClick={() => openPanel('crop')} title="Crop and geometry"><span aria-hidden="true">⌗</span><small>Crop</small></button>
+          <button className={inspectorTab === 'masks' ? 'active' : ''} type="button" onClick={() => openPanel('masks')} title="Masks"><span aria-hidden="true">◐</span><small>Mask</small></button>
+          <button className={inspectorTab === 'ai' ? 'active ai' : ''} type="button" onClick={() => openPanel('ai')} title="AI"><span aria-hidden="true">✦</span><small>AI</small></button>
+        </nav>
         <div className="canvas-area">
           <div className="canvas-toolbar" aria-label="Preview controls">
             <button type="button" onClick={() => changeZoom(zoom - 0.1)} aria-label="Zoom out">−</button>
@@ -1377,7 +1350,6 @@ export function EditorPage(): ReactElement {
               <option value="none">No guide</option><option value="thirds">Thirds · image</option><option value="grid">Grid · workspace</option><option value="diagonals">Diagonals · workspace</option><option value="golden-ratio">Golden · image</option>
             </select>
             {project.hasMasks() && <button className={maskOverlayVisible ? 'active' : ''} aria-pressed={maskOverlayVisible} type="button" onClick={() => setMaskOverlayVisible((value) => !value)} title="Show or hide the editable mask overlay">Mask</button>}
-            <button className={showOriginal ? 'active' : ''} type="button" disabled={!comparisonReady} title={!comparisonHasDifference ? 'Before and After match because the recipe has no enabled edits.' : baselineError !== null ? `Before preview unavailable: ${baselineError}` : beforeSource === null ? 'Preparing the neutral developed RAW baseline' : 'Compare this recipe with its neutral developed baseline'} onClick={() => setShowOriginal((value) => !value)}>{comparisonHasDifference ? showOriginal ? 'Before' : 'After' : 'No edits'} · B</button>
           </div>
           {toolWorkspace === 'develop' && activePanel === 'crop' && <div className="contextual-canvas-tools crop-tools" role="toolbar" aria-label="Contextual crop tools">
             <span><strong>Crop</strong><small>Drag corner-to-corner on the photograph</small></span>
@@ -1411,112 +1383,47 @@ export function EditorPage(): ReactElement {
               <span className="mask-status-swatch" aria-hidden="true" />
               {selectedMask === null ? <span><strong>No active mask</strong><small>Select or create a mask before painting or placing points.</small></span> : <span><strong>Editing {maskShapeLabel(selectedMask.shape.kind)} {selectedMaskIndex + 1}</strong><small>{selectedMask.enabled ? 'Enabled' : 'Disabled'} · {selectedMask.shape.kind === 'brush' ? `${brushMode === 'add' ? 'Paint' : 'Erase'} mode` : selectedMask.shape.kind === 'color-range' ? `${colorPointActive ? 'Add source sample' : 'Sample editing'} mode` : selectedMask.shape.kind === 'ai-segmentation' ? `${aiPointPolarity === 'positive' ? 'Include' : 'Exclude'} point mode` : 'Use the highlighted controls in the Masks panel'}</small></span>}
             </div>}
-            <div className={`truth-badge ${previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' ? 'source-fallback' : ''}`} title={previewAnalysis?.rawFallbackReason ?? undefined}><span aria-hidden="true">◇</span><span><strong>{previewAnalysis?.backend === 'webgpu' ? 'WebGPU accelerated preview' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2 accelerated preview' : 'CPU compatibility preview'}</strong><small>{sourcePrecisionLabel} · {renderProgress}</small></span></div>
-            {renderBusy && <div className="render-busy-indicator" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>Updating preview</strong><small>{renderProgress} · previous frame remains visible</small></span></div>}
-            {cropWorkspaceActive && cropPreviewBusy && <div className="crop-preview-busy" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /> Preparing full-frame crop workspace…</div>}
             {previewAnalysis?.sourcePrecision === 'embedded-preview-8-bit' && <div className="raw-fallback-notice" role="status">Embedded RAW preview fallback · open Photo information for the decoder reason</div>}
             {baselineError !== null && beforeSource === null && <div className="raw-fallback-notice" role="status">Before preview unavailable · {baselineError}</div>}
             {rawSource && preview === null && loadingSource !== null && <div className="comparison-badge">Camera JPEG preview · developing RAW</div>}
             {showOriginal && <div className="comparison-badge">{rawSource ? 'Neutral developed RAW' : 'Original'} · Before</div>}
-            <div className="pan-hint">Drag to pan · Wheel to zoom · 0 to fit</div>
           </div>
         </div>
         <aside className="tools-panel" aria-label="Editing tools">
-          <div className="tool-workspace-switch" role="tablist" aria-label="Editing workspace">
-            <button role="tab" aria-selected={toolWorkspace === 'ai'} className={toolWorkspace === 'ai' ? 'active ai' : ''} type="button" onClick={() => openPanel('ai')}>✦ AI Companion</button>
-            <button role="tab" aria-selected={toolWorkspace === 'develop'} className={toolWorkspace === 'develop' ? 'active' : ''} type="button" onClick={() => { setToolWorkspace('develop'); if (activePanel === 'ai') setActivePanel('light'); }}>Manual</button>
+          <div className="inspector-tabs" role="tablist" aria-label="Inspector">
+            {(['edit', 'masks', 'ai', 'history'] as const).map((tab) => <button role="tab" aria-selected={inspectorTab === tab} className={inspectorTab === tab ? `active ${tab}` : ''} type="button" key={tab} onClick={() => {
+              setInspectorTab(tab);
+              if (tab === 'edit') { setToolWorkspace('develop'); if (activePanel === 'ai' || activePanel === 'masks') setActivePanel('light'); }
+              if (tab === 'masks') { setToolWorkspace('develop'); setActivePanel('masks'); }
+              if (tab === 'ai') { setToolWorkspace('ai'); setActivePanel('ai'); }
+            }}>{tab === 'ai' ? 'AI' : `${tab[0]?.toUpperCase() ?? ''}${tab.slice(1)}`}</button>)}
           </div>
-          {toolWorkspace === 'ai' ? <>
-          <ToolSection id="ai" title="AI Companion" active onToggle={openPanel} badge="Core workflow">
-            <details className="development-tutor" aria-label="Technical image checks">
-              <summary className="development-tutor-heading"><span aria-hidden="true">◇</span><span><strong>Technical checks</strong><small>{previewAnalysis === null ? 'Analyzing the rendered frame…' : developmentGuidance.length === 0 ? 'No material issues detected' : `${developmentGuidance.length} item${developmentGuidance.length === 1 ? '' : 's'} worth checking`}</small></span></summary>
-              <p>Optional, measurement-based warnings about clipping or unusually strong combinations. They are not aesthetic judgments and never change the recipe.</p>
-              {developmentGuidance.map((item) => (
-                <button className={`guidance-item ${item.severity}`} type="button" key={`${item.title}-${item.evidence}`} onClick={() => openPanel(item.targetPanel)}>
-                  <span><strong>{item.title}</strong><small>{item.kind === 'measurement' ? 'Measured fact' : 'Review suggestion'}</small></span>
-                  <p>{item.detail}</p>
-                  <em>{item.evidence}</em>
-                  <b>Open {item.targetPanel} →</b>
-                </button>
-              ))}
-            </details>
-            <label className="field-label" htmlFor="ai-edit-prompt">What should RAWcket create?</label>
-            <div className="ai-prompt-shell">
-              <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} disabled={aiGenerating} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Write the result you want, then generate a proposal. Or ask for an opinion first." />
-              <button className="ai-prompt-submit" type="button" aria-label="Ask AI Companion for an opinion" title="Ask RAWcket to assess the photograph, write the intent, and prepare a proposal" disabled={aiGenerating || preview === null} onClick={() => void generateAiProposal('', 'opinion')}>{aiGenerating ? <span className="mini-spinner" aria-hidden="true" /> : <span aria-hidden="true">✦</span>}</button>
-            </div>
-            <button className="button ai-primary full" type="button" disabled={aiGenerating || preview === null || aiPrompt.trim().length === 0} onClick={() => void generateAiProposal(aiPrompt, 'prompt')}>Generate proposal from my text</button>
-            <button className="button ghost full" type="button" disabled={aiGenerating || previewAnalysis === null} title="Corrects only material output clipping; never changes color, detail, curves, crop, or masks" onClick={applyClassicAutoEnhance}>Auto Enhance</button>
-            <p className="auto-enhance-explanation">Uses the rendered histogram only when highlights or shadows are materially clipped. If no safe technical correction is needed, it changes nothing.</p>
-            {aiGenerating && <div className="ai-working-state" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>AI Companion is building one editable proposal</strong><small>Reviewing framing, curves, geometry, light, and local masks. The current recipe is unchanged while you wait.</small></span></div>}
-            <p className="ai-status" aria-live="polite">{aiMessage}</p>
-            {aiProposal !== null && (
-              <div className="ai-proposal" aria-label="AI edit proposal">
-                <div className="ai-opinion-summary"><strong>Companion opinion</strong><p>{aiProposal.critique}</p><div><span>Strengths · {aiProposal.strengths.join(' · ')}</span><span>Opportunities · {aiProposal.opportunities.join(' · ')}</span></div></div>
-                <p>{aiProposal.explanation}</p>
-                <div className="ai-proposal-operations">
-                  {aiProposal.operations.map((operation, index) => (
-                    <label key={`${operation.kind}-${index}`}>
-                      <input type="checkbox" checked={aiSelection.has(index)} onChange={() => toggleAiOperation(index)} />
-                      <span>{describeOperation(operation)}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="ai-proposal-actions">
-                  <button className="button ghost" type="button" onClick={rejectAiProposal}>Reject</button>
-                  <button className="button ai-primary" type="button" disabled={aiSelection.size === 0} onClick={applyAiProposal}>Apply selected</button>
-                </div>
+          {inspectorTab === 'edit' && <div className="inspector-pane edit-inspector" role="tabpanel">
+            <HistogramPanel analysis={previewAnalysis} />
+            <div className="auto-enhance-row"><span><strong>Auto Enhance</strong><small>Correct material clipping with standard controls.</small></span><button className="button ghost" type="button" aria-label="Apply Auto Enhance" disabled={aiGenerating || previewAnalysis === null} onClick={applyClassicAutoEnhance}>Apply</button></div>
+            <ToolSection id="light" title="Light" active={activePanel === 'light'} onToggle={setActivePanel}>
+              <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+            </ToolSection>
+            <ToolSection id="color" title="Color" active={activePanel === 'color'} onToggle={setActivePanel}>
+              <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+            </ToolSection>
+            <ToolSection id="detail" title="Detail" active={activePanel === 'detail'} onToggle={setActivePanel}>
+              <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+            </ToolSection>
+            <ToolSection id="curves" title="Tone Curve" active={activePanel === 'curves'} onToggle={setActivePanel}>
+              <p>Click the diagonal to add a point. Drag it or enter exact input and output values.</p>
+              <ToneCurveEditor curves={project.getDevelopmentSettings().curves} analysis={previewAnalysis} onChange={changeCurve} />
+              <div className="curve-presets">
+                {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
               </div>
-            )}
-            {aiDevelopmentHistory.length > 0 && <details className="ai-development-history">
-              <summary>Saved Companion history · {aiDevelopmentHistory.length}</summary>
-              <div className="ai-development-history-list">
-                {aiDevelopmentHistory.map((entry) => <article key={entry.id}>
-                  <div><strong>{entry.suggestedIntent}</strong><span className={`ai-advice-status ${entry.status}`}>{entry.status}</span></div>
-                  <small>{entry.request.length === 0 ? 'Open visual opinion' : `Asked · ${entry.request}`}</small>
-                  <p>{entry.critique}</p>
-                  <footer><span>{entry.operations.length} editable operation{entry.operations.length === 1 ? '' : 's'} · saved in project and bundle</span>{entry.status === 'proposed' && entry.id !== aiProposalId && <button className="text-button" type="button" onClick={() => {
-                    setAiPrompt(entry.suggestedIntent);
-                    setAiProposal(editProposalFromAdvice(entry));
-                    setAiProposalId(entry.id);
-                    setAiSelection(new Set(entry.operations.map((_, index) => index)));
-                    setAiMessage('Restored the selected Companion proposal from project history.');
-                  }}>Resume</button>}</footer>
-                </article>)}
-              </div>
-            </details>}
-            <button className="button ghost full" type="button" onClick={() => setSettingsOpen(true)}>Optional cloud AI and privacy settings</button>
-          </ToolSection>
-          </> : <>
-          <HistogramPanel analysis={previewAnalysis} />
-          <div className="mode-switch" aria-label="Interface level">
-            <button className={mode === 'simple' ? 'active' : ''} type="button" onClick={() => changeMode('simple')}>Simple</button>
-            <button className={mode === 'advanced' ? 'active' : ''} type="button" onClick={() => changeMode('advanced')}>Advanced</button>
-          </div>
-          <p className="mode-explanation">{mode === 'simple' ? 'Essential light and color controls.' : 'Full technical control, curves, geometry, and masks.'}</p>
-          <ToolSection id="light" title="Light" active={activePanel === 'light'} onToggle={setActivePanel} badge="Shortcut 1">
-            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
-          </ToolSection>
-          <ToolSection id="color" title="Color" active={activePanel === 'color'} onToggle={setActivePanel} badge="Shortcut 2">
-            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
-          </ToolSection>
-          {mode === 'advanced' && <>
-          <ToolSection id="detail" title="Detail" active={activePanel === 'detail'} onToggle={setActivePanel} badge="Shortcut 3">
-            <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
-          </ToolSection>
-          <ToolSection id="curves" title="Tone Curve" active={activePanel === 'curves'} onToggle={setActivePanel} badge="Shortcut 4">
-            <p>Edit every channel with draggable or exact numeric points. Click or drag anywhere on the graph to add a point.</p>
-            <ToneCurveEditor curves={project.getDevelopmentSettings().curves} analysis={previewAnalysis} onChange={changeCurve} />
-            <div className="curve-presets">
-              {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
-            </div>
-          </ToolSection>
-          <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel} badge="Rendered">
-            <p>Drag from one corner to the opposite corner on the photograph. The translucent area is excluded; use a locked ratio or choose Free.</p>
-            <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} onGuideChange={setCompositionGuide} horizonBusy={horizonBusy} horizonMessage={horizonMessage} onAutoStraighten={() => void autoStraighten()} />
-          </ToolSection>
-          <ToolSection id="masks" title="Masks" active={activePanel === 'masks'} onToggle={setActivePanel} badge="AI ready">
-            <p>Manual and locally generated semantic selections live together here as editable, composable mask recipe data.</p>
+            </ToolSection>
+            <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel}>
+              <p>Drag corner-to-corner on the photograph. The area outside the white frame is excluded.</p>
+              <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} onGuideChange={setCompositionGuide} horizonBusy={horizonBusy} horizonMessage={horizonMessage} onAutoStraighten={() => void autoStraighten()} />
+            </ToolSection>
+          </div>}
+          {inspectorTab === 'masks' && <div className="inspector-pane masks-inspector" role="tabpanel">
+            <header className="inspector-heading"><h2>Masks</h2><p>Manual and semantic selections share the same editable mask stack.</p></header>
             <SemanticMaskControls
               descriptor={semanticDescriptor}
               status={semanticStatus}
@@ -1561,12 +1468,81 @@ export function EditorPage(): ReactElement {
               onBrushModeChange={setBrushMode}
               onOverlayVisibleChange={setMaskOverlayVisible}
             />
-          </ToolSection>
-          </>}
-          {mode === 'simple' && <section className="advanced-invitation"><strong>Need curves, geometry, or masks?</strong><p>Advanced keeps the same non-destructive recipe and reveals the complete technical toolset.</p><button className="button ghost full" type="button" onClick={() => changeMode('advanced')}>Open Advanced controls</button></section>}
-          </>}
+          </div>}
+          {inspectorTab === 'ai' && <div className="inspector-pane ai-inspector" role="tabpanel">
+            <header className="inspector-heading ai"><span aria-hidden="true">✦</span><div><h2>AI</h2><p>Build a reviewable recipe from the current image.</p></div><button className="icon-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="AI settings">⋯</button></header>
+            <label className="field-label" htmlFor="ai-edit-prompt">What should RAWcket create?</label>
+            <div className="ai-prompt-shell">
+              <textarea id="ai-edit-prompt" className="ai-prompt" rows={5} value={aiPrompt} disabled={aiGenerating} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Describe the result, ask for a crop, or request an open opinion." />
+              <button className="ai-prompt-submit" type="button" aria-label="Ask AI for an opinion" title="Assess the current image and prepare a complete proposal" disabled={aiGenerating || preview === null} onClick={() => void generateAiProposal('', 'opinion')}>{aiGenerating ? <span className="mini-spinner" aria-hidden="true" /> : <span aria-hidden="true">✦</span>}</button>
+            </div>
+            <button className="button ai-primary full" type="button" disabled={aiGenerating || preview === null || aiPrompt.trim().length === 0} onClick={() => void generateAiProposal(aiPrompt, 'prompt')}>Create recipe</button>
+            {aiGenerating && <div className="ai-working-state" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>AI is building an editable recipe</strong><small>Reviewing crop, curves, geometry, light, and local masks. The current image stays unchanged.</small></span></div>}
+            <p className="ai-status" aria-live="polite">{aiMessage}</p>
+            {aiProposal !== null && (
+              <div className="ai-proposal" aria-label="AI edit proposal">
+                <div className="ai-opinion-summary"><strong>AI opinion</strong><p>{aiProposal.critique}</p><div><span>Strengths · {aiProposal.strengths.join(' · ')}</span><span>Opportunities · {aiProposal.opportunities.join(' · ')}</span></div></div>
+                <p>{aiProposal.explanation}</p>
+                <div className="ai-proposal-operations">
+                  {aiProposal.operations.map((operation, index) => (
+                    <label key={`${operation.kind}-${index}`}>
+                      <input type="checkbox" checked={aiSelection.has(index)} onChange={() => toggleAiOperation(index)} />
+                      <span>{describeOperation(operation)}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="ai-proposal-actions">
+                  <button className="button ghost" type="button" onClick={rejectAiProposal}>Reject</button>
+                  <button className="button ai-primary" type="button" disabled={aiSelection.size === 0} onClick={applyAiProposal}>Apply selected</button>
+                </div>
+              </div>
+            )}
+            {aiDevelopmentHistory.length > 0 && <details className="ai-development-history">
+              <summary>Saved AI sessions · {aiDevelopmentHistory.length}</summary>
+              <div className="ai-development-history-list">
+                {aiDevelopmentHistory.map((entry) => <article key={entry.id}>
+                  <div><strong>{entry.suggestedIntent}</strong><span className={`ai-advice-status ${entry.status}`}>{entry.status}</span></div>
+                  <small>{entry.request.length === 0 ? 'Open visual opinion' : `Asked · ${entry.request}`}</small>
+                  <p>{entry.critique}</p>
+                  <footer><span>{entry.operations.length} editable operation{entry.operations.length === 1 ? '' : 's'} · saved in project and bundle</span>{entry.status === 'proposed' && entry.id !== aiProposalId && <button className="text-button" type="button" onClick={() => {
+                    setAiPrompt(entry.suggestedIntent);
+                    setAiProposal(editProposalFromAdvice(entry));
+                    setAiProposalId(entry.id);
+                    setAiSelection(new Set(entry.operations.map((_, index) => index)));
+                    setAiMessage('Restored the selected AI proposal from project history.');
+                  }}>Resume</button>}</footer>
+                </article>)}
+              </div>
+            </details>}
+          </div>}
+          {inspectorTab === 'history' && <div className="inspector-pane history-inspector" role="tabpanel">
+            <div className="history-inspector-actions"><button type="button" disabled={!project.canUndo()} onClick={() => changeHistory('undo')}>Undo</button><button type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')}>Redo</button><button type="button" onClick={() => setHistoryOpen(true)}>Timeline</button></div>
+            <ActiveRecipePanel
+              embedded
+              project={project}
+              onNavigate={showAdjustment}
+              onToggle={toggleAdjustment}
+              onNavigateTool={openPanel}
+              onApplyPreset={applyBuiltInPreset}
+              onClear={() => apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: DevelopmentRecipe.neutral().toPrimitives(), groupId: null })}
+              customPresets={recipePresets}
+              onCreatePreset={(name) => void createRecipePreset(name)}
+              onApplyCustomPreset={(preset) => { apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: preset.getRecipe().toPrimitives(), groupId: null }); setRecipePresetMessage(`${preset.getName().valueOf()} applied as one reversible recipe operation.`); }}
+              onRenameCustomPreset={(preset, name) => void updateRecipePreset(preset, name, false)}
+              onUpdateCustomPreset={(preset) => void updateRecipePreset(preset, preset.getName().valueOf(), true)}
+              onExportCustomPreset={exportRecipePreset}
+              onDeleteCustomPreset={(preset) => void deleteRecipePreset(preset)}
+              onImportPreset={() => recipePresetInput.current?.click()}
+              presetMessage={recipePresetMessage}
+            />
+          </div>}
         </aside>
       </section>
+      <footer className="editor-status-bar">
+        <span>{Math.round(zoom * 100)}% · {showOriginal ? 'Before' : 'After'}</span>
+        <span className={renderBusy || cropPreviewBusy || semanticTask !== null ? 'busy' : ''} role="status" aria-live="polite">{renderBusy ? `Updating preview · ${renderProgress}` : cropPreviewBusy ? 'Preparing crop workspace' : semanticTask === 'installing' ? `Downloading local model · ${Math.round(semanticProgress * 100)}%` : semanticTask === 'segmenting' ? `Creating mask · ${Math.round(semanticProgress * 100)}%` : 'Preview up to date'}</span>
+        <span>{sourcePrecisionLabel} · {previewAnalysis?.backend === 'webgpu' ? 'WebGPU' : previewAnalysis?.backend === 'webgl2' ? 'WebGL2' : 'CPU'}</span>
+      </footer>
       <AiSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onConfigured={continuePendingAiAction} />
       <CloudStorageDialog open={cloudStorageOpen} onClose={() => setCloudStorageOpen(false)} onUploadProject={uploadProjectBundleToDrive} onUploadOriginal={uploadOriginalToDrive} />
       <PhotoInformationDialog project={project} analysis={previewAnalysis} open={photoInformationOpen} onClose={() => setPhotoInformationOpen(false)} />
@@ -1612,10 +1588,10 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }): ReactElement {
     ['Pan preview', 'Drag · Arrow keys'],
     ['Light / Color / Detail', '1 · 2 · 3'],
     ['Tone Curve', '4'],
-    ['AI Companion', 'A'],
+    ['AI', 'A'],
     ['Before / after', 'B'],
     ['Cycle composition guides', 'G'],
-    ['Collapse / expand recipe', 'R'],
+    ['Open recipe', 'R'],
     ['Photo information', 'I'],
     ['Visual history', 'H'],
     ['Masks', 'M'],
