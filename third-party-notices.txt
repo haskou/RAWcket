@@ -1,0 +1,12 @@
+RAWcket third-party notices
+
+libraw-wasm 1.6.0
+Copyright its contributors. Declared license: ISC.
+Source: https://github.com/ybouane/LibRaw-Wasm
+
+LibRaw
+Copyright LibRaw LLC and contributors.
+Dual licensed under GNU LGPL 2.1 or CDDL 1.0.
+Source and full license texts: https://github.com/LibRaw/LibRaw
+
+RAWcket uses the unmodified LibRaw WASM binary distributed by libraw-wasm.
