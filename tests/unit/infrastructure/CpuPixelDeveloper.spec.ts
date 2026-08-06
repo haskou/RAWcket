@@ -21,8 +21,8 @@ describe('CpuPixelDeveloper', () => {
       settings(1)
     );
 
-    expect(developed[0]).toBeGreaterThanOrEqual(160);
-    expect(developed[0]).toBeLessThanOrEqual(162);
+    expect(developed[0]).toBeGreaterThanOrEqual(210);
+    expect(developed[0]).toBeLessThanOrEqual(212);
     expect(developed[3]).toBe(255);
   });
 

@@ -1,7 +1,7 @@
 export type DisplayRgb = { red: number; green: number; blue: number };
 
 export class RawDisplayToneMapper {
-  private static readonly DEFAULT_CONTRAST_POWER = 1.5;
+  private static readonly DEFAULT_CHROMA_FACTOR = 1.25;
   private static readonly MINIMUM_LUMINANCE = 0.000_001;
 
   public map(linearRgb: DisplayRgb): DisplayRgb {
@@ -13,14 +13,28 @@ export class RawDisplayToneMapper {
     const luminance = this.luminance(encoded);
     if (luminance <= RawDisplayToneMapper.MINIMUM_LUMINANCE) return encoded;
 
-    // LibRaw supplies scene-linear pixels. This deterministic base curve gives
-    // them display contrast before any reversible recipe adjustment is applied.
-    const mappedLuminance = luminance ** RawDisplayToneMapper.DEFAULT_CONTRAST_POWER;
+    // LibRaw supplies scene-linear, camera-matrix-corrected sRGB. A photographic
+    // S-curve keeps the shadow floor while restoring the midtone placement that
+    // a normal camera/OS RAW rendering applies before editable adjustments.
+    const mappedLuminance = this.photographicContrast(luminance);
     const ratio = mappedLuminance / luminance;
+    const chroma = this.enrichChroma(encoded, luminance);
     return {
-      red: this.clamp(encoded.red * ratio),
-      green: this.clamp(encoded.green * ratio),
-      blue: this.clamp(encoded.blue * ratio)
+      red: this.clamp(chroma.red * ratio),
+      green: this.clamp(chroma.green * ratio),
+      blue: this.clamp(chroma.blue * ratio)
+    };
+  }
+
+  private photographicContrast(luminance: number): number {
+    return luminance * luminance * (3 - 2 * luminance);
+  }
+
+  private enrichChroma(rgb: DisplayRgb, luminance: number): DisplayRgb {
+    return {
+      red: luminance + (rgb.red - luminance) * RawDisplayToneMapper.DEFAULT_CHROMA_FACTOR,
+      green: luminance + (rgb.green - luminance) * RawDisplayToneMapper.DEFAULT_CHROMA_FACTOR,
+      blue: luminance + (rgb.blue - luminance) * RawDisplayToneMapper.DEFAULT_CHROMA_FACTOR
     };
   }
 
