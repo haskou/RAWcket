@@ -49,6 +49,7 @@ import { CurveSet, type ToneCurvePrimitives } from '@/contexts/projects/domain/T
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import type { SemanticMaskCategoryPrimitive } from '@/contexts/projects/domain/value-objects/SemanticMaskCategory';
+import type { MaskCompositionOperationPrimitive } from '@/contexts/projects/domain/value-objects/MaskCompositionOperation';
 import { useApplication } from '../ApplicationContext';
 import { ActiveRecipePanel } from '../components/ActiveRecipePanel';
 import { AdjustmentControls } from '../components/AdjustmentControls';
@@ -1073,6 +1074,25 @@ export function EditorPage(): ReactElement {
     setAiPointActive(false);
   };
 
+  const composeMasks = (maskIds: string[], operation: MaskCompositionOperationPrimitive): void => {
+    const compositeMaskId = crypto.randomUUID();
+    apply({ kind: EDIT_OPERATION.COMPOSE_MASKS, compositeMaskId, maskIds, operation, groupId: null });
+    setSelectedMaskId(compositeMaskId);
+    setBrushActive(false);
+    setColorPointActive(false);
+    setAiPointActive(false);
+  };
+
+  const decomposeMask = (compositeMaskId: string): void => {
+    const composite = project?.getMasks().find((mask) => mask.getId().valueOf() === compositeMaskId)?.toPrimitives();
+    const firstChildId = composite?.shape.kind === 'composite' ? composite.shape.children[0]?.id ?? null : null;
+    apply({ kind: EDIT_OPERATION.DECOMPOSE_MASK, compositeMaskId, groupId: null });
+    setSelectedMaskId(firstChildId);
+    setBrushActive(false);
+    setColorPointActive(false);
+    setAiPointActive(false);
+  };
+
   const pointOnPreview = (event: ReactPointerEvent<HTMLDivElement>): { x: number; y: number } | null => {
     const bounds = previewSurface.current?.getBoundingClientRect();
     if (bounds === undefined || bounds.width === 0 || bounds.height === 0) return null;
@@ -1530,6 +1550,8 @@ export function EditorPage(): ReactElement {
               onAddColor={addColorMask}
               onUpdate={updateMask}
               onRemove={removeMask}
+              onCompose={composeMasks}
+              onDecompose={decomposeMask}
               onBrushActiveChange={(active) => { setBrushActive(active); if (active) { setColorPointActive(false); setAiPointActive(false); } }}
               onColorPointActiveChange={(active) => { setColorPointActive(active); if (active) { setBrushActive(false); setAiPointActive(false); } }}
               onAiPointActiveChange={(active) => { setAiPointActive(active); if (active) { setBrushActive(false); setColorPointActive(false); } }}
@@ -1628,29 +1650,39 @@ function MaskOverlay({ masks, selectedMaskId }: { masks: MaskDefinitionPrimitive
     <svg className="mask-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Local mask overlay">
       {masks.filter((mask) => mask.enabled).map((mask) => {
         const className = `mask-shape${selectedMaskId === mask.id ? ' selected' : selectedMaskId === null ? '' : ' dimmed'}`;
-        if (mask.shape.kind === 'brush') {
-          return <g className={className} key={mask.id}>{mask.shape.strokes.map((stroke, index) => <polyline className={stroke.mode === 'erase' ? 'mask-erase-stroke' : undefined} key={index} points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" strokeWidth={stroke.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
-        }
-        if (mask.shape.kind === 'radial') {
-          return <g className={className} key={mask.id}><ellipse cx={mask.shape.center.x} cy={mask.shape.center.y} rx={mask.shape.radiusX} ry={mask.shape.radiusY} fill="currentColor" transform={`rotate(${mask.shape.rotationDegrees} ${mask.shape.center.x} ${mask.shape.center.y})`} /></g>;
-        }
-        if (mask.shape.kind === 'linear-gradient') {
-          return <g className={className} key={mask.id}><defs><linearGradient id={`mask-gradient-${mask.id}`} x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y}><stop offset="0" stopOpacity="0" /><stop offset="1" stopOpacity="1" /></linearGradient></defs><rect width="1" height="1" fill={`url(#mask-gradient-${mask.id})`} /><line className="mask-gradient-axis" x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y} /></g>;
-        }
-        if (mask.shape.kind === 'color-range') {
-          return <g className={`${className} color-mask-samples`} key={mask.id}>{mask.shape.samples.map((point, index) => <g key={index} transform={`translate(${point.x} ${point.y})`}><circle r="0.016" /><path d="M-.024 0H.024 M0-.024V.024" /></g>)}</g>;
-        }
-        if (mask.shape.kind === 'ai-segmentation') {
-          return <g className={`${className} smart-mask-points`} key={mask.id}>
-            {mask.shape.boundingBoxes.map((box, index) => <rect className="smart-mask-box" key={`box-${index}`} x={box.x} y={box.y} width={box.width} height={box.height} />)}
-            {mask.shape.positivePoints.map((point, index) => <circle className="positive" key={`positive-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
-            {mask.shape.negativePoints.map((point, index) => <circle className="negative" key={`negative-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
-          </g>;
-        }
-        return null;
+        return <MaskShapeOverlay className={className} key={mask.id} mask={mask} />;
       })}
     </svg>
   );
+}
+
+function MaskShapeOverlay({ mask, className }: { mask: MaskDefinitionPrimitives; className: string }): ReactElement | null {
+  if (!mask.enabled) return null;
+  if (mask.shape.kind === 'brush') {
+    return <g className={className}>{mask.shape.strokes.map((stroke, index) => <polyline className={stroke.mode === 'erase' ? 'mask-erase-stroke' : undefined} key={index} points={stroke.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" strokeWidth={stroke.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
+  }
+  if (mask.shape.kind === 'radial') {
+    return <g className={className}><ellipse cx={mask.shape.center.x} cy={mask.shape.center.y} rx={mask.shape.radiusX} ry={mask.shape.radiusY} fill="currentColor" transform={`rotate(${mask.shape.rotationDegrees} ${mask.shape.center.x} ${mask.shape.center.y})`} /></g>;
+  }
+  if (mask.shape.kind === 'linear-gradient') {
+    return <g className={className}><defs><linearGradient id={`mask-gradient-${mask.id}`} x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y}><stop offset="0" stopOpacity="0" /><stop offset="1" stopOpacity="1" /></linearGradient></defs><rect width="1" height="1" fill={`url(#mask-gradient-${mask.id})`} /><line className="mask-gradient-axis" x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y} /></g>;
+  }
+  if (mask.shape.kind === 'color-range') {
+    return <g className={`${className} color-mask-samples`}>{mask.shape.samples.map((point, index) => <g key={index} transform={`translate(${point.x} ${point.y})`}><circle r="0.016" /><path d="M-.024 0H.024 M0-.024V.024" /></g>)}</g>;
+  }
+  if (mask.shape.kind === 'ai-segmentation') {
+    return <g className={`${className} smart-mask-points`}>
+      {mask.shape.boundingBoxes.map((box, index) => <rect className="smart-mask-box" key={`box-${index}`} x={box.x} y={box.y} width={box.width} height={box.height} />)}
+      {mask.shape.positivePoints.map((point, index) => <circle className="positive" key={`positive-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
+      {mask.shape.negativePoints.map((point, index) => <circle className="negative" key={`negative-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
+    </g>;
+  }
+  if (mask.shape.kind === 'composite') {
+    return <g className={`${className} composite-mask-guides ${mask.shape.operation}`} data-composition-operation={mask.shape.operation}>
+      {mask.shape.children.map((child, index) => <MaskShapeOverlay className={`mask-composite-child ${index === 0 ? 'primary' : 'secondary'}`} key={child.id} mask={child} />)}
+    </g>;
+  }
+  return null;
 }
 
 function ImageCompositionGuideOverlay({ guide }: { guide: CompositionGuide }): ReactElement | null {
@@ -1696,6 +1728,8 @@ function describeOperation(operation: EditOperation): string {
   if (operation.kind === EDIT_OPERATION.SET_PROJECT_RATING) return `Rate project ${operation.rating} stars`;
   if (operation.kind === EDIT_OPERATION.SET_PROJECT_TAGS) return `Replace project tags`;
   if (operation.kind === EDIT_OPERATION.SET_PROJECT_FAVORITE) return operation.favorite ? 'Add project to favorites' : 'Remove project from favorites';
+  if (operation.kind === EDIT_OPERATION.COMPOSE_MASKS) return `Combine ${operation.maskIds.length} masks · ${operation.operation}`;
+  if (operation.kind === EDIT_OPERATION.DECOMPOSE_MASK) return 'Release composite child masks';
   if (operation.kind === EDIT_OPERATION.REMOVE_MASK) return 'Remove local mask';
   return operation.kind === EDIT_OPERATION.ADD_MASK ? 'Add local mask' : 'Update local mask';
 }

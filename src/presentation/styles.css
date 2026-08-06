@@ -178,6 +178,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .mask-overlay .smart-mask-points circle.negative { fill: #ff766c; }
 .mask-overlay .color-mask-samples circle { fill: rgba(16,19,17,.8); stroke: #fff; stroke-width: .004; }
 .mask-overlay .color-mask-samples path { fill: none; stroke: var(--accent); stroke-width: .004; vector-effect: non-scaling-stroke; }
+.composite-mask-guides .mask-composite-child { opacity: .52; }
+.composite-mask-guides .mask-composite-child.primary { opacity: .72; filter: drop-shadow(0 0 3px rgba(201,240,107,.55)); }
+.composite-mask-guides.subtract .mask-composite-child.secondary { color: rgba(255,118,108,.42); }
+.composite-mask-guides.intersect .mask-composite-child { opacity: .38; }
 .smart-mask-box { fill: rgba(201,240,107,.08); stroke: var(--accent); stroke-width: .004; stroke-dasharray: .018 .012; vector-effect: non-scaling-stroke; }
 .truth-badge { position: absolute; left: 22px; bottom: 19px; display: flex; gap: 9px; align-items: center; padding: 9px 12px; border: 1px solid #393d3a; border-radius: 9px; background: rgba(16,18,17,.88); backdrop-filter: blur(10px); }
 .active-mask-canvas-status { position: absolute; z-index: 7; left: 22px; bottom: 78px; display: flex; align-items: center; gap: 9px; max-width: 330px; padding: 9px 11px; border: 1px solid #65764d; border-radius: 9px; background: rgba(15,20,13,.93); box-shadow: 0 8px 25px rgba(0,0,0,.28); backdrop-filter: blur(10px); pointer-events: none; }
@@ -386,6 +390,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .mask-list button { display: flex; justify-content: space-between; align-items: center; padding: 0 10px; text-align: left; }
 .mask-list button.active { border-color: var(--accent); background: var(--accent-dark); color: var(--accent); }
 .mask-list small { color: #777f79; font-size: .58rem; }
+.mask-composition-builder { display: grid; gap: 9px; margin: 0; padding: 11px; border: 1px solid #3d4935; border-radius: 9px; background: #111610; }
+.mask-composition-builder legend { padding: 0 5px; color: var(--accent); font-size: .62rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.mask-composition-builder > p { margin: 0; color: #8d978a; font-size: .58rem; line-height: 1.5; }
+.mask-composition-choices { display: grid; gap: 4px; }
+.mask-composition-choices label { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; padding: 7px; border: 1px solid #30372f; border-radius: 6px; background: #171b16; cursor: pointer; }
+.mask-composition-choices input { accent-color: var(--accent); }
+.mask-composition-choices strong, .mask-composition-choices small { display: block; }
+.mask-composition-choices strong { color: #c5cdc3; font-size: .61rem; }
+.mask-composition-choices small { margin-top: 2px; color: #747d72; font-size: .53rem; }
+.mask-composition-operation { display: grid; gap: 5px; color: #bfc7bc; font-size: .62rem; }
+.mask-composition-operation select, .selected-composite-mask select { width: 100%; height: 31px; border: 1px solid #394137; border-radius: 6px; background: #0d100c; color: #d2d9cf; font-size: .59rem; }
+.mask-composition-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.selected-composite-mask { display: grid; gap: 9px; padding: 10px; border: 1px solid #465636; border-radius: 8px; background: #12170f; }
+.selected-composite-mask > label { display: grid; gap: 5px; color: #c1c9be; font-size: .62rem; }
+.selected-composite-mask ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.selected-composite-mask li { padding: 7px; border-left: 2px solid var(--accent); background: #171c15; }
+.selected-composite-mask strong, .selected-composite-mask small { display: block; }
+.selected-composite-mask strong { color: #cbd3c7; font-size: .6rem; }
+.selected-composite-mask small { margin-top: 2px; color: #788274; font-size: .53rem; }
+.selected-composite-mask > p { margin: 0; color: #909b8c; font-size: .57rem; line-height: 1.5; }
 .selected-mask-controls { display: grid; gap: 15px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
 .selected-mask-status { display: flex; align-items: center; gap: 8px; padding: 9px; border: 1px solid #465636; border-radius: 8px; background: #12170f; }
 .selected-mask-status strong, .selected-mask-status small { display: block; }

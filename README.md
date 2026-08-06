@@ -15,14 +15,14 @@ Implemented:
 - Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
 - Collapsible, navigable Active Recipe sidebar that lists only non-default instructions, with reversible enable switches and links back to each editor.
 - Adaptive renderer with cancellable scheduling: LibRaw/WASM develops supported camera mosaics to linear 16-bit RGB in its isolated browser worker, then a render worker applies the recipe. WebGPU compute and real WebGL2 shaders natively rasterize brush, gradient, range, smart-point, and nested composite masks before applying compatible global development, ordered local adjustments, curve LUTs, denoise, texture, and sharpening. The deterministic CPU evaluator remains the reference and bounded fallback. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, validation/device-loss fallback, and a versioned LRU preview cache share the same boundary.
-- Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families, including position-independent source-color sampling with editable points and tolerance.
+- Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families, including position-independent source-color sampling plus ordered Add/Subtract/Intersect composition whose exact child masks can be released again.
 - Bounded Companion history stored with each local project and checksummed bundle: original request, suggested intent, critique, strengths, opportunities, explanation, editable operations, and applied/rejected state. API keys, reduced previews, and provider envelopes are never project data.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
 - A persistent cross-store write-ahead journal reconciles interrupted create, duplicate, import, and delete operations and removes only originals proven orphaned.
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
-- Versioned schema migrations through version 9.
+- Versioned schema migrations through version 10.
 - Safe TIFF/EXIF inspection for Sony ARW camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern, with an honest in-editor source-information view.
 - AI-first workspace with OpenAI visual critique and reviewable proposals for sliders, tone curves, crop/geometry, radial, linear-gradient, luminance-range, and point/box-guided smart masks. The current rendered state and active recipe are supplied as context. Explicit crop/curve requests are contract-checked and repaired once instead of silently dropping the requested tool.
 - OpenAI defaults to the editable `gpt-5.6-luna` model identifier. Keys can remain tab-only, use the existing AES-GCM/PBKDF2 device vault, or be stored without a RAWcket master password in the app's private Google Drive `appDataFolder` after Google sign-in.

@@ -23,6 +23,7 @@ import { AdjustmentKey } from './value-objects/AdjustmentKey';
 import type { AiDevelopmentAdviceId } from './value-objects/AiDevelopmentAdviceId';
 import { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
 import { MaskId } from './value-objects/MaskId';
+import { MaskCompositionOperation } from './value-objects/MaskCompositionOperation';
 import { ProjectId } from './value-objects/ProjectId';
 import { ProjectName } from './value-objects/ProjectName';
 import { ProjectRating } from './value-objects/ProjectRating';
@@ -348,6 +349,20 @@ export class PhotoProject {
     if (operation.kind === EDIT_OPERATION.REMOVE_MASK) {
       const removed = this.recipe.removeMask(new MaskId(operation.maskId));
       return { kind: EDIT_OPERATION.ADD_MASK, mask: removed.toPrimitives(), groupId: operation.groupId };
+    }
+    if (operation.kind === EDIT_OPERATION.COMPOSE_MASKS) {
+      const previous = this.recipe.toPrimitives();
+      this.recipe.composeMasks(
+        new MaskId(operation.compositeMaskId),
+        MaskCompositionOperation.fromPrimitives(operation.operation),
+        operation.maskIds.map((id) => new MaskId(id))
+      );
+      return { kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: previous, groupId: operation.groupId };
+    }
+    if (operation.kind === EDIT_OPERATION.DECOMPOSE_MASK) {
+      const previous = this.recipe.toPrimitives();
+      this.recipe.decomposeMask(new MaskId(operation.compositeMaskId));
+      return { kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: previous, groupId: operation.groupId };
     }
     if (operation.kind === EDIT_OPERATION.SET_VIEWPORT_TRANSFORM) {
       const previous = this.recipe.getViewport();

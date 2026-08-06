@@ -128,6 +128,14 @@ export const editOperationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('add-mask'), mask: maskSchema, groupId: z.string().nullable() }),
   z.object({ kind: z.literal('update-mask'), mask: maskSchema, groupId: z.string().nullable() }),
   z.object({ kind: z.literal('remove-mask'), maskId: z.uuid(), groupId: z.string().nullable() }),
+  z.object({
+    kind: z.literal('compose-masks'),
+    compositeMaskId: z.uuid(),
+    maskIds: z.array(z.uuid()).min(2),
+    operation: z.enum(['add', 'subtract', 'intersect']),
+    groupId: z.string().nullable()
+  }),
+  z.object({ kind: z.literal('decompose-mask'), compositeMaskId: z.uuid(), groupId: z.string().nullable() }),
   z.object({ kind: z.literal('set-project-rating'), rating: z.int().min(0).max(5), groupId: z.string().nullable() }),
   z.object({ kind: z.literal('set-project-tags'), tags: z.array(z.string().min(1).max(32)).max(20), groupId: z.string().nullable() }),
   z.object({ kind: z.literal('set-project-favorite'), favorite: z.boolean(), groupId: z.string().nullable() }),

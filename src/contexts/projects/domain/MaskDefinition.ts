@@ -1,6 +1,10 @@
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from './value-objects/AdjustmentKey';
 import { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
 import { MaskId } from './value-objects/MaskId';
+import {
+  MaskCompositionOperation,
+  type MaskCompositionOperationPrimitive
+} from './value-objects/MaskCompositionOperation';
 import type { SemanticMaskCategoryPrimitive } from './value-objects/SemanticMaskCategory';
 
 type PointPrimitive = { x: number; y: number };
@@ -35,7 +39,7 @@ export type AiSegmentationMaskShape = {
 };
 export type CompositeMaskShape = {
   kind: 'composite';
-  operation: 'add' | 'subtract' | 'intersect';
+  operation: MaskCompositionOperationPrimitive;
   children: MaskDefinitionPrimitives[];
 };
 export type MaskShape =
@@ -87,12 +91,51 @@ export class MaskDefinition {
     }));
   }
 
+  public static compose(
+    id: MaskId,
+    operation: MaskCompositionOperation,
+    children: readonly MaskDefinition[]
+  ): MaskDefinition {
+    if (children.length < 2) throw new Error('A composite mask needs at least two masks.');
+    if (children.some((child, index) => children.slice(0, index).some((candidate) => candidate.isIdentifiedBy(child.getId())))) {
+      throw new Error('A mask can only appear once inside a composition.');
+    }
+    if (children.some((child) => child.isIdentifiedBy(id))) {
+      throw new Error('A composite mask must use a new identifier.');
+    }
+    const primary = children[0];
+    if (primary === undefined) throw new Error('A composite mask needs a primary mask.');
+    return new MaskDefinition(id, {
+      enabled: true,
+      inverted: false,
+      opacity: 1,
+      feather: 0,
+      density: 1,
+      expansion: 0,
+      localAdjustments: structuredClone(primary.primitives.localAdjustments),
+      shape: {
+        kind: 'composite',
+        operation: operation.valueOf(),
+        children: children.map((child) => child.toPrimitives())
+      }
+    });
+  }
+
   public isIdentifiedBy(id: MaskId): boolean {
     return this.id.isEqual(id);
   }
 
   public getId(): MaskId {
     return this.id;
+  }
+
+  public isComposite(): boolean {
+    return this.primitives.shape.kind === 'composite';
+  }
+
+  public releaseComposition(): MaskDefinition[] {
+    if (this.primitives.shape.kind !== 'composite') throw new Error('Only a composite mask can release child masks.');
+    return this.primitives.shape.children.map((child) => MaskDefinition.fromPrimitives(child));
   }
 
   public toPrimitives(): MaskDefinitionPrimitives {
@@ -158,7 +201,11 @@ export class MaskDefinition {
     }
     if (shape.kind === 'composite') {
       if (shape.children.length < 2) throw new Error('A composite mask needs at least two masks.');
-      shape.children.forEach((child) => MaskDefinition.fromPrimitives(child));
+      MaskCompositionOperation.fromPrimitives(shape.operation);
+      const children = shape.children.map((child) => MaskDefinition.fromPrimitives(child));
+      if (children.some((child, index) => children.slice(0, index).some((candidate) => candidate.isIdentifiedBy(child.getId())))) {
+        throw new Error('A mask can only appear once inside a composition.');
+      }
     }
   }
 

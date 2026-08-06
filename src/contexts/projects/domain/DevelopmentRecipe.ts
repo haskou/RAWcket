@@ -6,6 +6,7 @@ import { ViewportTransform, type ViewportTransformPrimitives } from './ViewportT
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from './value-objects/AdjustmentKey';
 import type { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
 import type { MaskId } from './value-objects/MaskId';
+import type { MaskCompositionOperation } from './value-objects/MaskCompositionOperation';
 
 export type DevelopmentRecipePrimitives = {
   globalAdjustments: GlobalAdjustmentsPrimitives;
@@ -102,6 +103,38 @@ export class DevelopmentRecipe {
     if (mask === undefined) throw new Error('A missing mask cannot be removed.');
     this.masks = this.masks.filter((candidate) => !candidate.isIdentifiedBy(id));
     return mask;
+  }
+
+  public composeMasks(
+    compositeId: MaskId,
+    operation: MaskCompositionOperation,
+    maskIds: readonly MaskId[]
+  ): void {
+    if (maskIds.length < 2) throw new Error('Choose at least two masks to create a composition.');
+    if (maskIds.some((id, index) => maskIds.slice(0, index).some((candidate) => candidate.isEqual(id)))) {
+      throw new Error('A mask can only be selected once for a composition.');
+    }
+    if (this.masks.some((mask) => mask.isIdentifiedBy(compositeId))) {
+      throw new Error('A mask with the same identifier already exists.');
+    }
+    const children = maskIds.map((id) => this.findMask(id));
+    const primaryId = maskIds[0];
+    if (primaryId === undefined) throw new Error('A composition needs a primary mask.');
+    const composite = MaskDefinition.compose(compositeId, operation, children);
+    this.masks = this.masks.flatMap((mask) => {
+      if (mask.isIdentifiedBy(primaryId)) return [composite];
+      return maskIds.some((id) => mask.isIdentifiedBy(id)) ? [] : [mask];
+    });
+  }
+
+  public decomposeMask(compositeId: MaskId): void {
+    const composite = this.findMask(compositeId);
+    const children = composite.releaseComposition();
+    const siblings = this.masks.filter((mask) => !mask.isIdentifiedBy(compositeId));
+    if (children.some((child) => siblings.some((sibling) => sibling.isIdentifiedBy(child.getId())))) {
+      throw new Error('A child mask identifier already exists outside the composition.');
+    }
+    this.masks = this.masks.flatMap((mask) => (mask.isIdentifiedBy(compositeId) ? children : [mask]));
   }
 
   public getGlobalAdjustment(key: AdjustmentKey): GlobalAdjustmentValue {

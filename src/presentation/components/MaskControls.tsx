@@ -1,6 +1,7 @@
-import { useRef, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
+import type { MaskCompositionOperationPrimitive } from '@/contexts/projects/domain/value-objects/MaskCompositionOperation';
 
 type UnitField = 'opacity' | 'feather' | 'density';
 
@@ -22,6 +23,8 @@ export function MaskControls({
   onAddColor,
   onUpdate,
   onRemove,
+  onCompose,
+  onDecompose,
   onBrushActiveChange,
   onColorPointActiveChange,
   onAiPointActiveChange,
@@ -47,6 +50,8 @@ export function MaskControls({
   onAddColor: () => void;
   onUpdate: (mask: MaskDefinitionPrimitives, groupId: string | null) => void;
   onRemove: (id: string) => void;
+  onCompose: (maskIds: string[], operation: MaskCompositionOperationPrimitive) => void;
+  onDecompose: (id: string) => void;
   onBrushActiveChange: (active: boolean) => void;
   onColorPointActiveChange: (active: boolean) => void;
   onAiPointActiveChange: (active: boolean) => void;
@@ -56,10 +61,30 @@ export function MaskControls({
   onOverlayVisibleChange: (visible: boolean) => void;
 }): ReactElement {
   const groups = useRef(new Map<string, string>());
+  const [compositionMaskIds, setCompositionMaskIds] = useState<string[]>([]);
+  const [compositionOperation, setCompositionOperation] = useState<MaskCompositionOperationPrimitive>('add');
   const masks = project.getMasks().map((mask) => mask.toPrimitives());
+  const maskIdsKey = masks.map((mask) => mask.id).join(':');
   const selected = masks.find((mask) => mask.id === selectedId) ?? null;
   const selectedAiBoundingBox = selected?.shape.kind === 'ai-segmentation' ? selected.shape.boundingBoxes[0] : undefined;
   const selectedColorSamples = selected?.shape.kind === 'color-range' ? selected.shape.samples : [];
+
+  useEffect(() => {
+    const available = new Set(maskIdsKey.length === 0 ? [] : maskIdsKey.split(':'));
+    setCompositionMaskIds((current) => current.filter((id) => available.has(id)));
+  }, [maskIdsKey]);
+
+  const toggleCompositionMask = (id: string): void => {
+    setCompositionMaskIds((current) => current.includes(id)
+      ? current.filter((candidate) => candidate !== id)
+      : [...current, id]);
+  };
+
+  const composeSelectedMasks = (): void => {
+    if (compositionMaskIds.length < 2) return;
+    onCompose([...compositionMaskIds], compositionOperation);
+    setCompositionMaskIds([]);
+  };
 
   const updateUnit = (field: UnitField, value: number, groupId: string | null): void => {
     if (selected === null || !Number.isFinite(value)) return;
@@ -156,6 +181,11 @@ export function MaskControls({
     onUpdate({ ...selected, shape: { ...selected.shape, positivePoints: [], negativePoints: [] } }, null);
   };
 
+  const updateCompositeOperation = (operation: MaskCompositionOperationPrimitive): void => {
+    if (selected?.shape.kind !== 'composite') return;
+    onUpdate({ ...selected, shape: { ...selected.shape, operation } }, null);
+  };
+
   return (
     <div className="mask-controls">
       <details className="context-help mask-help" open={masks.length === 0}>
@@ -175,11 +205,35 @@ export function MaskControls({
       <div className="mask-list">
         {masks.map((mask, index) => (
           <button className={mask.id === selectedId ? 'active' : ''} type="button" key={mask.id} onClick={() => onSelect(mask.id)}>
-            <span>{mask.shape.kind === 'brush' ? 'Brush' : mask.shape.kind === 'radial' ? 'Radial' : mask.shape.kind === 'linear-gradient' ? 'Linear' : mask.shape.kind === 'luminance-range' ? 'Luminance' : mask.shape.kind === 'color-range' ? 'Color' : mask.shape.kind === 'ai-segmentation' ? 'Smart' : 'Mask'} {index + 1}</span>
+            <span>{maskKindLabel(mask.shape.kind)} {index + 1}</span>
             <small>{mask.enabled ? `On · ${maskVisualizationStatus(mask.shape.kind)}` : 'Off'}</small>
           </button>
         ))}
       </div>
+      {masks.length >= 2 && <fieldset className="mask-composition-builder">
+        <legend>Combine masks</legend>
+        <p>Choose masks in order. The first selection is the primary mask: its local adjustments move to the composite. Every child shape and modifier remains intact and can be released later.</p>
+        <div className="mask-composition-choices" role="group" aria-label="Masks to combine">
+          {masks.map((mask, index) => {
+            const selectionIndex = compositionMaskIds.indexOf(mask.id);
+            return <label key={mask.id}>
+              <input type="checkbox" aria-label={`Use ${maskKindLabel(mask.shape.kind)} ${index + 1} in composition`} checked={selectionIndex >= 0} onChange={() => toggleCompositionMask(mask.id)} />
+              <span><strong>{maskKindLabel(mask.shape.kind)} {index + 1}</strong><small>{selectionIndex < 0 ? 'Not selected' : selectionIndex === 0 ? '1 · Primary adjustment' : `${selectionIndex + 1} · Boolean child`}</small></span>
+            </label>;
+          })}
+        </div>
+        <label className="mask-composition-operation">Boolean operation
+          <select aria-label="Mask composition operation" value={compositionOperation} onChange={(event) => setCompositionOperation(maskCompositionOperationFromInput(event.target.value))}>
+            <option value="add">Add · union</option>
+            <option value="subtract">Subtract · primary minus the rest</option>
+            <option value="intersect">Intersect · overlap only</option>
+          </select>
+        </label>
+        <div className="mask-composition-actions">
+          <button className="button ghost" type="button" disabled={compositionMaskIds.length === 0} onClick={() => setCompositionMaskIds([])}>Clear selection</button>
+          <button className="button ai-primary" type="button" disabled={compositionMaskIds.length < 2} onClick={composeSelectedMasks}>Combine {compositionMaskIds.length < 2 ? 'masks' : `${compositionMaskIds.length} masks`}</button>
+        </div>
+      </fieldset>}
       {selected !== null && (
         <div className="selected-mask-controls">
           <div className="selected-mask-status"><span className="mask-status-swatch" aria-hidden="true" /><span><strong>{maskKindLabel(selected.shape.kind)} mask selected</strong><small>{maskKindExplanation(selected.shape.kind)}</small></span></div>
@@ -259,6 +313,20 @@ export function MaskControls({
               )}
             </>
           )}
+          {selected.shape.kind === 'composite' && (
+            <div className="selected-composite-mask">
+              <label>Boolean operation
+                <select aria-label="Selected composite operation" value={selected.shape.operation} onChange={(event) => updateCompositeOperation(maskCompositionOperationFromInput(event.target.value))}>
+                  <option value="add">Add · union</option>
+                  <option value="subtract">Subtract · primary minus the rest</option>
+                  <option value="intersect">Intersect · overlap only</option>
+                </select>
+              </label>
+              <ol aria-label="Composite mask children">{selected.shape.children.map((child, index) => <li key={child.id}><span><strong>{maskKindLabel(child.shape.kind)} child</strong><small>{index === 0 ? 'Primary area' : `${index + 1} · ${child.enabled ? 'Enabled' : 'Disabled'}`}</small></span></li>)}</ol>
+              <p>Child masks keep their exact vectors, opacity, feather, density, expansion, inversion, and prior local values. The composite local controls below define the visible edit.</p>
+              <button className="button ghost full" type="button" onClick={() => onDecompose(selected.id)}>Release child masks</button>
+            </div>
+          )}
           <MaskNumberControl label="Local exposure" value={selected.localAdjustments.exposure ?? 0} minimum={-5} maximum={5} step={0.05} groupKey="mask-exposure" groups={groups.current} onChange={updateExposure} />
           <MaskNumberControl label="Opacity" value={selected.opacity} minimum={0} maximum={1} step={0.01} groupKey="mask-opacity" groups={groups.current} onChange={(value, groupId) => updateUnit('opacity', value, groupId)} />
           <MaskNumberControl label="Feather" value={selected.feather} minimum={0} maximum={1} step={0.01} groupKey="mask-feather" groups={groups.current} onChange={(value, groupId) => updateUnit('feather', value, groupId)} />
@@ -269,6 +337,11 @@ export function MaskControls({
       )}
     </div>
   );
+}
+
+function maskCompositionOperationFromInput(value: string): MaskCompositionOperationPrimitive {
+  if (value === 'add' || value === 'subtract' || value === 'intersect') return value;
+  throw new Error(`Unsupported mask composition operation: ${value}`);
 }
 
 function boxFieldLabel(field: 'x' | 'y' | 'width' | 'height'): string {

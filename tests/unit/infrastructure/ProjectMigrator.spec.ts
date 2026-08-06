@@ -9,6 +9,7 @@ import { VersionFiveToSixProjectMigration } from '@/contexts/projects/infrastruc
 import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSixToSevenProjectMigration';
 import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSevenToEightProjectMigration';
 import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
+import { VersionNineToTenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionNineToTenProjectMigration';
 import { photoProjectSchema } from '@/contexts/projects/infrastructure/serialization/ProjectSchemas';
 
 describe('ProjectMigrator', () => {
@@ -21,7 +22,8 @@ describe('ProjectMigrator', () => {
     new VersionFiveToSixProjectMigration(),
     new VersionSixToSevenProjectMigration(),
     new VersionSevenToEightProjectMigration(),
-    new VersionEightToNineProjectMigration()
+    new VersionEightToNineProjectMigration(),
+    new VersionNineToTenProjectMigration()
   ]);
 
   it('migrates a demo project from schema 0 to the current schema', () => {
@@ -29,7 +31,7 @@ describe('ProjectMigrator', () => {
     const legacy = { ...current, schemaVersion: 0 };
     delete (legacy as Partial<typeof legacy>).uiState;
     const migrated = photoProjectSchema.parse(migrator.migrate(legacy));
-    expect(migrated.schemaVersion).toBe(9);
+    expect(migrated.schemaVersion).toBe(10);
     expect(migrated.uiState.mode).toBe('simple');
     expect(migrated.recipe.disabledGlobalAdjustments).toEqual([]);
     expect(migrated.recipe.globalAdjustments.texture).toBe(0);
@@ -93,5 +95,13 @@ describe('ProjectMigrator', () => {
     const migrated = photoProjectSchema.parse(new VersionEightToNineProjectMigration().migrate(legacy));
 
     expect(migrated).toMatchObject({ schemaVersion: 9, aiDevelopment: { advice: [] } });
+  });
+
+  it('marks schema 9 projects as compatible with atomic mask composition history', () => {
+    const legacy = { ...PhotoProjectMother.create().toPrimitives(), schemaVersion: 9 };
+
+    const migrated = photoProjectSchema.parse(new VersionNineToTenProjectMigration().migrate(legacy));
+
+    expect(migrated.schemaVersion).toBe(10);
   });
 });

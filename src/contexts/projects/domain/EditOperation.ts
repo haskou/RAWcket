@@ -3,6 +3,7 @@ import type { CurveChannelPrimitive, ToneCurvePrimitives } from './ToneCurve';
 import type { MaskDefinitionPrimitives } from './MaskDefinition';
 import type { ViewportTransformPrimitives } from './ViewportTransform';
 import type { DevelopmentRecipePrimitives, DevelopmentSettingsPrimitives } from './DevelopmentRecipe';
+import type { MaskCompositionOperationPrimitive } from './value-objects/MaskCompositionOperation';
 
 export const EDIT_OPERATION = {
   SET_GLOBAL_ADJUSTMENT: 'set-global-adjustment',
@@ -11,6 +12,8 @@ export const EDIT_OPERATION = {
   ADD_MASK: 'add-mask',
   UPDATE_MASK: 'update-mask',
   REMOVE_MASK: 'remove-mask',
+  COMPOSE_MASKS: 'compose-masks',
+  DECOMPOSE_MASK: 'decompose-mask',
   SET_VIEWPORT_TRANSFORM: 'set-viewport-transform',
   REPLACE_DEVELOPMENT_SETTINGS: 'replace-development-settings',
   REPLACE_RECIPE: 'replace-recipe',
@@ -49,6 +52,16 @@ export type RemoveMaskOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.REMOVE_MASK;
   maskId: string;
 };
+export type ComposeMasksOperation = OperationMetadata & {
+  kind: typeof EDIT_OPERATION.COMPOSE_MASKS;
+  compositeMaskId: string;
+  maskIds: string[];
+  operation: MaskCompositionOperationPrimitive;
+};
+export type DecomposeMaskOperation = OperationMetadata & {
+  kind: typeof EDIT_OPERATION.DECOMPOSE_MASK;
+  compositeMaskId: string;
+};
 export type SetViewportTransformOperation = OperationMetadata & {
   kind: typeof EDIT_OPERATION.SET_VIEWPORT_TRANSFORM;
   viewport: ViewportTransformPrimitives;
@@ -85,6 +98,8 @@ export type EditOperation =
   | AddMaskOperation
   | UpdateMaskOperation
   | RemoveMaskOperation
+  | ComposeMasksOperation
+  | DecomposeMaskOperation
   | SetViewportTransformOperation
   | ReplaceDevelopmentSettingsOperation
   | ReplaceRecipeOperation
