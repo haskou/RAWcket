@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rawcket-app-shell-v1';
+const CACHE_NAME = 'rawcket-app-shell-v2';
 const ISOLATION_HEADERS = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -41,10 +41,9 @@ async function isolatedNavigation(request) {
     : withIsolationHeaders(cached);
 }
 
-async function cachedAsset(request) {
+async function isolatedAsset(request) {
   const cached = await caches.match(request);
-  if (cached !== undefined) return cached;
-  return fetch(request);
+  return withIsolationHeaders(cached ?? await fetch(request));
 }
 
 self.addEventListener('install', (event) => {
@@ -71,5 +70,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(isolatedNavigation(event.request));
     return;
   }
-  if (PRECACHE_URL_SET.has(event.request.url)) event.respondWith(cachedAsset(event.request));
+  const url = new URL(event.request.url);
+  if (url.origin === self.location.origin) event.respondWith(isolatedAsset(event.request));
 });
