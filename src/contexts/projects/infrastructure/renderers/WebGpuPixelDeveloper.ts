@@ -1,4 +1,5 @@
 import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments';
+import { CurveSet } from '../../domain/ToneCurve';
 import type { CpuDevelopmentSettings } from './CpuPixelDeveloper';
 import { ToneCurveLut } from './ToneCurveLut';
 import { WebGpuMaskWeightRasterizer } from './WebGpuMaskWeightRasterizer';
@@ -204,12 +205,17 @@ export class WebGpuPixelDeveloper {
   }
 
   private curves(settings: CpuDevelopmentSettings): Float32Array<ArrayBuffer> {
+    const identity = CurveSet.identity().toPrimitives();
     const definitions = [
       settings.curves.rgb,
       settings.curves.red,
       settings.curves.green,
       settings.curves.blue,
-      settings.curves.luminance ?? settings.curves.rgb
+      settings.curves.luminance ?? settings.curves.rgb,
+      ...settings.masks.flatMap((mask) => {
+        const curves = mask.localCurves ?? identity;
+        return [curves.rgb, curves.red, curves.green, curves.blue, curves.luminance ?? identity.rgb];
+      })
     ];
     const values = new Float32Array(new ArrayBuffer(definitions.length * 1024 * Float32Array.BYTES_PER_ELEMENT));
     definitions.forEach((curve, index) => values.set(ToneCurveLut.create(curve).toFloat32Array(), index * 1024));
@@ -275,6 +281,19 @@ fn curve(channel: u32, value: f32) -> f32 {
   let offset = channel * 1024u;
   return mix(curves[offset + lower], curves[offset + upper], position - f32(lower));
 }
+fn applyCurveSet(sourceRgb: vec3f, base: u32, hasLuminance: bool) -> vec3f {
+  var rgb = vec3f(
+    curve(base + 1u, curve(base, sourceRgb.r)),
+    curve(base + 2u, curve(base, sourceRgb.g)),
+    curve(base + 3u, curve(base, sourceRgb.b))
+  );
+  if (hasLuminance) {
+    let beforeLight = luminance(rgb);
+    let afterLight = curve(base + 4u, beforeLight);
+    rgb *= select(0.0, afterLight / beforeLight, beforeLight > 0.000001);
+  }
+  return clamp(rgb, vec3f(0.0), vec3f(1.0));
+}
 fn unpack(value: u32) -> vec4f {
   return vec4f(
     f32(value & 255u),
@@ -313,7 +332,8 @@ fn developLocal(sourceRgb: vec3f, mask: u32) -> vec3f {
   let saturation = 1.0 + localAdjustment(mask, 8u) / 100.0;
   let vibrance = 1.0 + localAdjustment(mask, 9u) / 100.0 * (1.0 - min(1.0, chroma));
   let colorFactor = saturation * vibrance * (1.0 + max(0.0, localAdjustment(mask, 12u)) / 300.0);
-  return clamp(vec3f(light) + (rgb - vec3f(light)) * colorFactor, vec3f(0.0), vec3f(1.0));
+  let adjusted = clamp(vec3f(light) + (rgb - vec3f(light)) * colorFactor, vec3f(0.0), vec3f(1.0));
+  return applyCurveSet(adjusted, 5u + mask * 5u, true);
 }
 
 @compute @workgroup_size(16, 16)
@@ -349,13 +369,7 @@ fn develop(@builtin(global_invocation_id) invocation: vec3u) {
     let weight = maskWeights[mask * pixelCount + index];
     if (weight > 0.0) { rgb = mix(rgb, developLocal(rgb, mask), weight); }
   }
-  rgb = vec3f(curve(1u, curve(0u, rgb.r)), curve(2u, curve(0u, rgb.g)), curve(3u, curve(0u, rgb.b)));
-  if (parameters.hasLuminanceCurve == 1u) {
-    let beforeLight = luminance(rgb);
-    let afterLight = curve(4u, beforeLight);
-    rgb *= select(0.0, afterLight / beforeLight, beforeLight > 0.000001);
-  }
-  rgb = clamp(rgb, vec3f(0.0), vec3f(1.0));
+  rgb = applyCurveSet(rgb, 0u, parameters.hasLuminanceCurve == 1u);
   let vignette = parameters.a3.w;
   if (vignette != 0.0) {
     let point = (vec2f(invocation.xy) + vec2f(0.5)) / vec2f(parameters.dimensions);

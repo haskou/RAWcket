@@ -1485,21 +1485,6 @@ export function EditorPage(): ReactElement {
                 </article>)}
               </div>
             </details>}
-            <SemanticMaskControls
-              descriptor={semanticDescriptor}
-              status={semanticStatus}
-              task={semanticTask}
-              progress={semanticProgress}
-              category={semanticCategory}
-              message={semanticMessage}
-              previewAvailable={preview !== null}
-              onCategoryChange={setSemanticCategory}
-              onInstall={() => void prepareSemanticModel()}
-              onCancel={() => semanticAbort.current?.abort()}
-              onRemove={() => void removeSemanticModel()}
-              onGenerate={() => void generateSemanticMask()}
-              onCreatePointMask={() => { addAiMask(); openPanel('masks'); }}
-            />
             <button className="button ghost full" type="button" onClick={() => setSettingsOpen(true)}>Optional cloud AI and privacy settings</button>
           </ToolSection>
           </> : <>
@@ -1521,7 +1506,7 @@ export function EditorPage(): ReactElement {
           </ToolSection>
           <ToolSection id="curves" title="Tone Curve" active={activePanel === 'curves'} onToggle={setActivePanel} badge="Shortcut 4">
             <p>Edit every channel with draggable or exact numeric points. Click or drag anywhere on the graph to add a point.</p>
-            <ToneCurveEditor project={project} analysis={previewAnalysis} onChange={changeCurve} />
+            <ToneCurveEditor curves={project.getDevelopmentSettings().curves} analysis={previewAnalysis} onChange={changeCurve} />
             <div className="curve-presets">
               {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
             </div>
@@ -1531,9 +1516,25 @@ export function EditorPage(): ReactElement {
             <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} onGuideChange={setCompositionGuide} horizonBusy={horizonBusy} horizonMessage={horizonMessage} onAutoStraighten={() => void autoStraighten()} />
           </ToolSection>
           <ToolSection id="masks" title="Masks" active={activePanel === 'masks'} onToggle={setActivePanel} badge="AI ready">
-            <p>Local masks remain editable recipe data. Brush and radial coverage now render through the reference pipeline.</p>
+            <p>Manual and locally generated semantic selections live together here as editable, composable mask recipe data.</p>
+            <SemanticMaskControls
+              descriptor={semanticDescriptor}
+              status={semanticStatus}
+              task={semanticTask}
+              progress={semanticProgress}
+              category={semanticCategory}
+              message={semanticMessage}
+              previewAvailable={preview !== null}
+              onCategoryChange={setSemanticCategory}
+              onInstall={() => void prepareSemanticModel()}
+              onCancel={() => semanticAbort.current?.abort()}
+              onRemove={() => void removeSemanticModel()}
+              onGenerate={() => void generateSemanticMask()}
+              onCreatePointMask={addAiMask}
+            />
             <MaskControls
               project={project}
+              analysis={previewAnalysis}
               selectedId={selectedMaskId}
               brushActive={brushActive}
               colorPointActive={colorPointActive}

@@ -1,4 +1,5 @@
 import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments';
+import { CurveSet } from '../../domain/ToneCurve';
 import type { CpuDevelopmentSettings } from './CpuPixelDeveloper';
 import { ToneCurveLut } from './ToneCurveLut';
 import { WebGl2MaskWeightRasterizer } from './WebGl2MaskWeightRasterizer';
@@ -78,6 +79,9 @@ export class WebGl2PixelDeveloper {
     gl.useProgram(program);
     textures.push(maskTexture);
     this.bindTexture(gl, program, maskTexture, 'uMaskWeights', 6);
+    const localCurveTexture = this.createLocalCurveTexture(gl, settings);
+    textures.push(localCurveTexture);
+    this.bindTexture(gl, program, localCurveTexture, 'uLocalCurves', 7);
     this.uniform1i(gl, program, 'uMaskCount', settings.masks.length);
     const localAdjustmentLocation = gl.getUniformLocation(program, 'uLocalAdjustments[0]');
     if (localAdjustmentLocation === null) throw new Error('The WebGL2 local-adjustment uniform is unavailable.');
@@ -181,6 +185,21 @@ export class WebGl2PixelDeveloper {
     return texture;
   }
 
+  private createLocalCurveTexture(gl: WebGL2RenderingContext, settings: CpuDevelopmentSettings): WebGLTexture {
+    const identity = CurveSet.identity().toPrimitives();
+    const definitions = settings.masks.flatMap((mask) => {
+      const curves = mask.localCurves ?? identity;
+      return [curves.rgb, curves.red, curves.green, curves.blue, curves.luminance ?? identity.rgb];
+    });
+    const rows = Math.max(1, definitions.length);
+    const values = new Float32Array(rows * 1024);
+    if (definitions.length === 0) values.set(ToneCurveLut.create(identity.rgb).toFloat32Array());
+    definitions.forEach((curve, index) => values.set(ToneCurveLut.create(curve).toFloat32Array(), index * 1024));
+    const texture = this.texture(gl);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 1024, rows, 0, gl.RED, gl.FLOAT, values);
+    return texture;
+  }
+
   private createOutputTexture(gl: WebGL2RenderingContext, width: number, height: number): WebGLTexture {
     const texture = this.texture(gl);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -250,6 +269,7 @@ uniform sampler2D uRedCurve;
 uniform sampler2D uGreenCurve;
 uniform sampler2D uBlueCurve;
 uniform sampler2D uLuminanceCurve;
+uniform sampler2D uLocalCurves;
 uniform float uAdjustments[16];
 uniform float uLocalAdjustments[64];
 uniform int uHasLuminanceCurve;
@@ -267,6 +287,24 @@ float curve(sampler2D lut, float value) {
   int lower = int(floor(position));
   int upper = min(1023, lower + 1);
   return mix(texelFetch(lut, ivec2(lower, 0), 0).r, texelFetch(lut, ivec2(upper, 0), 0).r, position - float(lower));
+}
+float localCurve(int mask, int channel, float value) {
+  float position = clamp(value, 0.0, 1.0) * 1023.0;
+  int lower = int(floor(position));
+  int upper = min(1023, lower + 1);
+  int row = mask * 5 + channel;
+  return mix(texelFetch(uLocalCurves, ivec2(lower, row), 0).r, texelFetch(uLocalCurves, ivec2(upper, row), 0).r, position - float(lower));
+}
+vec3 applyLocalCurves(vec3 sourceRgb, int mask) {
+  vec3 rgb = vec3(
+    localCurve(mask, 1, localCurve(mask, 0, sourceRgb.r)),
+    localCurve(mask, 2, localCurve(mask, 0, sourceRgb.g)),
+    localCurve(mask, 3, localCurve(mask, 0, sourceRgb.b))
+  );
+  float beforeLight = luminance(rgb);
+  float afterLight = localCurve(mask, 4, beforeLight);
+  rgb *= beforeLight <= 0.000001 ? 0.0 : afterLight / beforeLight;
+  return clamp(rgb, 0.0, 1.0);
 }
 float localAdjustment(int mask, int adjustment) {
   return uLocalAdjustments[mask * 16 + adjustment];
@@ -294,7 +332,8 @@ vec3 developLocal(vec3 sourceRgb, int mask) {
   float saturation = 1.0 + localAdjustment(mask, 8) / 100.0;
   float vibrance = 1.0 + localAdjustment(mask, 9) / 100.0 * (1.0 - min(1.0, chroma));
   float colorFactor = saturation * vibrance * (1.0 + max(0.0, localAdjustment(mask, 12)) / 300.0);
-  return clamp(vec3(light) + (rgb - vec3(light)) * colorFactor, 0.0, 1.0);
+  vec3 adjusted = clamp(vec3(light) + (rgb - vec3(light)) * colorFactor, 0.0, 1.0);
+  return applyLocalCurves(adjusted, mask);
 }
 void main() {
   ivec2 pixel = ivec2(gl_FragCoord.xy - vec2(0.5));

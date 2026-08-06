@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
+import { CurveChannel, CurveSet, ToneCurve, type CurveChannelPrimitive, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { MaskCompositionOperationPrimitive } from '@/contexts/projects/domain/value-objects/MaskCompositionOperation';
 import { maskKindLabel, projectMaskRow } from '../editor/MaskRowProjector';
+import { ToneCurveEditor } from './ToneCurveEditor';
 
 type UnitField = 'opacity' | 'feather' | 'density';
 
 export function MaskControls({
   project,
+  analysis,
   selectedId,
   brushActive,
   colorPointActive,
@@ -35,6 +39,7 @@ export function MaskControls({
   onOverlayVisibleChange
 }: {
   project: PhotoProject;
+  analysis: PreviewAnalysis | null;
   selectedId: string | null;
   brushActive: boolean;
   colorPointActive: boolean;
@@ -217,6 +222,20 @@ export function MaskControls({
     onUpdate({ ...selected, shape: { ...selected.shape, operation } }, null);
   };
 
+  const updateLocalCurve = (
+    channel: CurveChannelPrimitive,
+    curve: ToneCurvePrimitives | null,
+    groupId: string | null
+  ): void => {
+    if (selected === null) return;
+    const curves = CurveSet.fromPrimitives(selected.localCurves ?? CurveSet.identity().toPrimitives());
+    const next = curves.replace(
+      CurveChannel.fromPrimitives(channel),
+      curve === null ? null : ToneCurve.fromPrimitives(curve)
+    );
+    onUpdate({ ...selected, localCurves: next.toPrimitives() }, groupId);
+  };
+
   return (
     <div className="mask-controls">
       <details className="context-help mask-help" open={masks.length === 0}>
@@ -358,6 +377,11 @@ export function MaskControls({
               <button className="button ghost full" type="button" onClick={() => onDecompose(selected.id)}>Release child masks</button>
             </div>
           )}
+          <details className="local-curve-controls">
+            <summary>Local tone curves</summary>
+            <p>These RGB, channel, and luminance curves are blended only through the selected mask and remain editable recipe data.</p>
+            <ToneCurveEditor curves={selected.localCurves ?? CurveSet.identity().toPrimitives()} analysis={analysis} onChange={updateLocalCurve} />
+          </details>
           <MaskNumberControl label="Local exposure" value={selected.localAdjustments.exposure ?? 0} minimum={-5} maximum={5} step={0.05} groupKey="mask-exposure" groups={groups.current} onChange={updateExposure} />
           <MaskNumberControl label="Opacity" value={selected.opacity} minimum={0} maximum={1} step={0.01} groupKey="mask-opacity" groups={groups.current} onChange={(value, groupId) => updateUnit('opacity', value, groupId)} />
           <MaskNumberControl label="Feather" value={selected.feather} minimum={0} maximum={1} step={0.01} groupKey="mask-feather" groups={groups.current} onChange={(value, groupId) => updateUnit('feather', value, groupId)} />

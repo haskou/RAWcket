@@ -1,4 +1,5 @@
 import { MaskDefinition, type MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
+import { CurveSet } from '@/contexts/projects/domain/ToneCurve';
 import { maskSchema } from '@/contexts/projects/infrastructure/serialization/ProjectSchemas';
 
 function semanticMask(): MaskDefinitionPrimitives {
@@ -31,7 +32,19 @@ describe('MaskDefinition', () => {
     const parsed = maskSchema.parse(primitives);
     const mask = MaskDefinition.fromPrimitives(parsed);
 
-    expect(mask.toPrimitives()).toEqual({ ...primitives, expansion: 0 });
+    expect(mask.toPrimitives()).toEqual({ ...primitives, expansion: 0, localCurves: CurveSet.identity().toPrimitives() });
+  });
+
+  it('validates and preserves editable local channel curves', () => {
+    const primitives = semanticMask();
+    primitives.localCurves = {
+      ...CurveSet.identity().toPrimitives(),
+      rgb: { points: [{ x: 0, y: 0 }, { x: 0.5, y: 0.7 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' }
+    };
+
+    expect(MaskDefinition.fromPrimitives(primitives).toPrimitives().localCurves).toEqual(primitives.localCurves);
+    primitives.localCurves.rgb.points[1] = { x: 1.2, y: 0.5 };
+    expect(() => MaskDefinition.fromPrimitives(primitives)).toThrow(/between 0 and 1/);
   });
 
   it('normalizes legacy brush strokes to additive full-pressure recipe data', () => {

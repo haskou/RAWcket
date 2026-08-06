@@ -138,8 +138,9 @@ export class PhotoProject {
   }
 
   public apply(operation: EditOperation, at: Timestamp): void {
-    const inverse = this.perform(operation);
-    this.history.record(structuredClone(operation), inverse);
+    const canonicalOperation = this.withCanonicalMaskCurves(operation);
+    const inverse = this.perform(canonicalOperation);
+    this.history.record(structuredClone(canonicalOperation), inverse);
     this.markChanged(at);
   }
 
@@ -397,6 +398,12 @@ export class PhotoProject {
     const previousName = this.name;
     this.name = new ProjectName(operation.name);
     return { ...operation, name: previousName.valueOf() };
+  }
+
+  private withCanonicalMaskCurves(operation: EditOperation): EditOperation {
+    if (operation.kind !== EDIT_OPERATION.ADD_MASK && operation.kind !== EDIT_OPERATION.UPDATE_MASK) return operation;
+    const mask = MaskDefinition.fromPrimitives(operation.mask).toPrimitives();
+    return { ...operation, mask };
   }
 
   private markChanged(at: Timestamp): void {

@@ -29,6 +29,11 @@ test('keeps accelerated masked spatial development within the CPU reference tole
         {
           id: '00000000-0000-4000-8000-000000000001', enabled: true, inverted: false,
           opacity: 0.8, feather: 0.6, density: 0.9, localAdjustments: { exposure: 0.45, saturation: 12 },
+          localCurves: {
+            rgb: { points: [{ x: 0, y: 0 }, { x: 0.4, y: 0.55 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' as const },
+            red: { points: [{ x: 0, y: 0 }, { x: 0.6, y: 0.52 }, { x: 1, y: 1 }], interpolation: 'linear' as const },
+            green: identity, blue: identity, luminance: null
+          },
           shape: { kind: 'radial' as const, center: { x: 0.5, y: 0.5 }, radiusX: 0.36, radiusY: 0.42, rotationDegrees: 12 }
         },
         {

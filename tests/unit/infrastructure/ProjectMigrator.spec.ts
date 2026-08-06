@@ -10,6 +10,7 @@ import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastru
 import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSevenToEightProjectMigration';
 import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
 import { VersionNineToTenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionNineToTenProjectMigration';
+import { VersionTenToElevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTenToElevenProjectMigration';
 import { photoProjectSchema } from '@/contexts/projects/infrastructure/serialization/ProjectSchemas';
 
 describe('ProjectMigrator', () => {
@@ -23,7 +24,8 @@ describe('ProjectMigrator', () => {
     new VersionSixToSevenProjectMigration(),
     new VersionSevenToEightProjectMigration(),
     new VersionEightToNineProjectMigration(),
-    new VersionNineToTenProjectMigration()
+    new VersionNineToTenProjectMigration(),
+    new VersionTenToElevenProjectMigration()
   ]);
 
   it('migrates a demo project from schema 0 to the current schema', () => {
@@ -31,7 +33,7 @@ describe('ProjectMigrator', () => {
     const legacy = { ...current, schemaVersion: 0 };
     delete (legacy as Partial<typeof legacy>).uiState;
     const migrated = photoProjectSchema.parse(migrator.migrate(legacy));
-    expect(migrated.schemaVersion).toBe(10);
+    expect(migrated.schemaVersion).toBe(11);
     expect(migrated.uiState.mode).toBe('simple');
     expect(migrated.recipe.disabledGlobalAdjustments).toEqual([]);
     expect(migrated.recipe.globalAdjustments.texture).toBe(0);
@@ -103,5 +105,38 @@ describe('ProjectMigrator', () => {
     const migrated = photoProjectSchema.parse(new VersionNineToTenProjectMigration().migrate(legacy));
 
     expect(migrated.schemaVersion).toBe(10);
+  });
+
+  it('adds identity local curves recursively to schema 10 masks, history, and AI advice', () => {
+    const current = PhotoProjectMother.create().toPrimitives();
+    const child = {
+      id: crypto.randomUUID(), enabled: true, inverted: false, opacity: 1, feather: 0, density: 1, expansion: 0,
+      localAdjustments: {}, shape: { kind: 'radial', center: { x: 0.5, y: 0.5 }, radiusX: 0.2, radiusY: 0.2, rotationDegrees: 0 }
+    };
+    const mask = {
+      id: crypto.randomUUID(), enabled: true, inverted: false, opacity: 1, feather: 0, density: 1, expansion: 0,
+      localAdjustments: {}, shape: { kind: 'composite', operation: 'add', children: [child, { ...child, id: crypto.randomUUID() }] }
+    };
+    const operation = { kind: 'add-mask', mask, groupId: null };
+    const legacy = {
+      ...current,
+      schemaVersion: 10,
+      recipe: { ...current.recipe, masks: [mask] },
+      history: { ...current.history, undo: [{ operation, inverse: { kind: 'remove-mask', maskId: mask.id, groupId: null } }], redo: [] },
+      aiDevelopment: { advice: [{
+        id: crypto.randomUUID(), request: '', suggestedIntent: 'Local curve', critique: 'Use a local curve.', strengths: [], opportunities: [], explanation: 'The curve remains editable.',
+        operations: [operation], createdAt: 1_750_000_000_000, status: 'proposed'
+      }] }
+    };
+
+    const migrated = photoProjectSchema.parse(new VersionTenToElevenProjectMigration().migrate(legacy));
+
+    expect(migrated.schemaVersion).toBe(11);
+    const migratedMask = migrated.recipe.masks[0];
+    expect(migratedMask?.localCurves).toMatchObject({ luminance: null });
+    if (migratedMask?.shape.kind !== 'composite') throw new Error('The migrated test mask must remain composite.');
+    expect(migratedMask.shape.children.every((child) => child.localCurves?.luminance === null)).toBe(true);
+    expect(migrated.history.undo[0]?.operation).toMatchObject({ kind: 'add-mask', mask: { localCurves: { luminance: null } } });
+    expect(migrated.aiDevelopment.advice[0]?.operations[0]).toMatchObject({ kind: 'add-mask', mask: { localCurves: { luminance: null } } });
   });
 });

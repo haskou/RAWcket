@@ -1,6 +1,7 @@
 import { Timestamp } from '@haskou/value-objects';
 import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
+import { CurveSet } from '@/contexts/projects/domain/ToneCurve';
 import { AdjustmentKey } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import { GlobalAdjustmentValue } from '@/contexts/projects/domain/value-objects/GlobalAdjustmentValue';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
@@ -67,5 +68,22 @@ describe('PhotoProject edit history', () => {
     expect(timeline.availableRedo.map((operation) => operation.kind)).toEqual([EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT]);
     if (timeline.applied[0]?.kind === EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT) timeline.applied[0].value = 99;
     expect(project.getHistoryTimeline().applied[0]).toMatchObject({ value: 10 });
+  });
+
+  it('records newly added masks with an explicit identity local curve set', () => {
+    const project = PhotoProjectMother.create();
+    project.apply({
+      kind: EDIT_OPERATION.ADD_MASK,
+      mask: {
+        id: crypto.randomUUID(), enabled: true, inverted: false, opacity: 1, feather: 0.2, density: 1,
+        localAdjustments: {}, shape: { kind: 'radial', center: { x: 0.5, y: 0.5 }, radiusX: 0.25, radiusY: 0.25, rotationDegrees: 0 }
+      },
+      groupId: null
+    }, Timestamp.now());
+
+    expect(project.getHistoryTimeline().applied[0]).toMatchObject({
+      kind: EDIT_OPERATION.ADD_MASK,
+      mask: { localCurves: CurveSet.identity().toPrimitives() }
+    });
   });
 });

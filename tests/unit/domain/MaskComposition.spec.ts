@@ -88,7 +88,9 @@ describe('Mask composition', () => {
 
     project.apply({ kind: EDIT_OPERATION.DECOMPOSE_MASK, compositeMaskId, groupId: null }, Timestamp.now());
 
-    expect(project.getMasks().map((mask) => mask.toPrimitives())).toEqual([first, second]);
+    expect(project.getMasks().map((mask) => mask.toPrimitives())).toEqual(
+      [first, second].map((mask) => MaskDefinition.fromPrimitives(mask).toPrimitives())
+    );
     expect(project.undo(Timestamp.now())).toBe(true);
     expect(project.getMasks()[0]?.isIdentifiedBy(new MaskId(compositeMaskId))).toBe(true);
   });

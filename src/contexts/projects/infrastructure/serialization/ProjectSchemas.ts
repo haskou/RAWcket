@@ -20,6 +20,13 @@ const curveSetSchema = z.object({
   blue: toneCurveSchema,
   luminance: toneCurveSchema.nullable()
 });
+const identityCurveSet = {
+  rgb: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' as const },
+  red: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' as const },
+  green: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' as const },
+  blue: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' as const },
+  luminance: null
+};
 const viewportSchema = z.object({
   cropFrame: rectangleSchema,
   translation: pointSchema,
@@ -48,6 +55,7 @@ export const maskSchema: z.ZodType<MaskDefinitionPrimitives> = z.lazy(() =>
     density: z.number().min(0).max(1),
     expansion: z.number().min(-0.25).max(0.25).default(0),
     localAdjustments: localAdjustmentSchema,
+    localCurves: curveSetSchema.default(identityCurveSet),
     shape: z.discriminatedUnion('kind', [
       z.object({
         kind: z.literal('brush'),

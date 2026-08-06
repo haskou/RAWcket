@@ -1,10 +1,9 @@
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
-import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { PreviewAnalysis } from '@/contexts/projects/application/ports/PreviewRenderer';
 import {
-  CurveChannel,
   ToneCurve,
   type CurveChannelPrimitive,
+  type CurveSetPrimitives,
   type CurveInterpolationPrimitive,
   type ToneCurvePrimitives
 } from '@/contexts/projects/domain/ToneCurve';
@@ -19,8 +18,8 @@ const channels: Array<{ value: CurveChannelPrimitive; label: string }> = [
   { value: 'luminance', label: 'Luma' }
 ];
 
-export function ToneCurveEditor({ project, analysis, onChange }: {
-  project: PhotoProject;
+export function ToneCurveEditor({ curves, analysis, onChange }: {
+  curves: CurveSetPrimitives;
   analysis: PreviewAnalysis | null;
   onChange: (channel: CurveChannelPrimitive, curve: ToneCurvePrimitives | null, groupId: string | null) => void;
 }): ReactElement {
@@ -31,7 +30,7 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [copiedCurve, setCopiedCurve] = useState<ToneCurvePrimitives | null>(null);
   const [copiedChannel, setCopiedChannel] = useState<CurveChannelPrimitive | null>(null);
-  const curve = project.getCurve(CurveChannel.fromPrimitives(channel))?.toPrimitives() ?? ToneCurve.identity().toPrimitives();
+  const curve = curveForChannel(curves, channel);
   const selected = selectedIndex === null ? undefined : curve.points[selectedIndex];
   const identity = curve.points.length === 2
     && curve.points[0]?.x === 0 && curve.points[0].y === 0
@@ -57,7 +56,7 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
   };
 
   const movePoint = (index: number, x: number, y: number, groupId: string | null): void => {
-    const latest = project.getCurve(CurveChannel.fromPrimitives(channel))?.toPrimitives() ?? ToneCurve.identity().toPrimitives();
+    const latest = curveForChannel(curves, channel);
     const point = latest.points[index];
     if (point === undefined) return;
     const previousX = latest.points[index - 1]?.x ?? 0;
@@ -73,7 +72,7 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
     if (event.target instanceof SVGCircleElement) return;
     const point = graphPoint(event);
     if (point === null || point.x <= 0 || point.x >= 1) return;
-    const latest = project.getCurve(CurveChannel.fromPrimitives(channel))?.toPrimitives() ?? ToneCurve.identity().toPrimitives();
+    const latest = curveForChannel(curves, channel);
     const points = [...latest.points, point].sort((left, right) => left.x - right.x);
     const index = points.findIndex((candidate) => candidate === point);
     const groupId = crypto.randomUUID();
@@ -183,6 +182,11 @@ export function ToneCurveEditor({ project, analysis, onChange }: {
       </div>
     </div>
   );
+}
+
+function curveForChannel(curves: CurveSetPrimitives, channel: CurveChannelPrimitive): ToneCurvePrimitives {
+  const curve = curves[channel];
+  return curve ?? ToneCurve.identity().toPrimitives();
 }
 
 function channelLabel(channel: CurveChannelPrimitive): string {

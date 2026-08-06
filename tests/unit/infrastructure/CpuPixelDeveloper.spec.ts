@@ -89,6 +89,29 @@ describe('CpuPixelDeveloper', () => {
     expect([...developed]).toEqual([128, 128, 128, 255, 64, 64, 64, 255]);
   });
 
+  it('blends full RGB and channel curves only through the mask weight', () => {
+    const localCurves = CurveSet.identity().toPrimitives();
+    localCurves.rgb = { points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.5 }, { x: 1, y: 1 }], interpolation: 'linear' };
+    localCurves.red = { points: [{ x: 0, y: 0 }, { x: 0.5, y: 0.75 }, { x: 1, y: 1 }], interpolation: 'linear' };
+    const developed = new CpuPixelDeveloper().develop(
+      new Uint8ClampedArray([64, 64, 64, 255, 64, 64, 64, 255]),
+      2,
+      1,
+      {
+        ...settings(),
+        masks: [{
+          id: crypto.randomUUID(), enabled: true, inverted: false, opacity: 1, feather: 0, density: 1,
+          localAdjustments: {}, localCurves,
+          shape: { kind: 'brush', strokes: [{ points: [{ x: 0.25, y: 0.5 }], size: 0.4, hardness: 1, flow: 1 }] }
+        }]
+      }
+    );
+
+    expect(developed[0]).toBeGreaterThan(developed[1] ?? 0);
+    expect(developed[1]).toBeGreaterThan(64);
+    expect([...developed.slice(4)]).toEqual([64, 64, 64, 255]);
+  });
+
   it('applies a color-range adjustment to matching colors anywhere in a high-depth source', () => {
     const source = new Uint16Array([
       42_000, 4_000, 4_000,

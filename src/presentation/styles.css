@@ -414,6 +414,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .selected-composite-mask strong { color: #cbd3c7; font-size: .6rem; }
 .selected-composite-mask small { margin-top: 2px; color: #788274; font-size: .53rem; }
 .selected-composite-mask > p { margin: 0; color: #909b8c; font-size: .57rem; line-height: 1.5; }
+.local-curve-controls { padding: 9px; border: 1px solid #374033; border-radius: 8px; background: #10140e; }
+.local-curve-controls > summary { color: #c7d1c2; cursor: pointer; font-size: .64rem; font-weight: 750; }
+.local-curve-controls > p { color: #879183; font-size: .57rem; line-height: 1.45; }
+.local-curve-controls .tone-curve-editor { margin-top: 10px; }
 .selected-mask-controls { display: grid; gap: 15px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
 .selected-mask-status { display: flex; align-items: center; gap: 8px; padding: 9px; border: 1px solid #465636; border-radius: 8px; background: #12170f; }
 .selected-mask-status strong, .selected-mask-status small { display: block; }

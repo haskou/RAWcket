@@ -71,9 +71,11 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'Advanced', exact: true }).click();
   await expect(page.getByText('Full technical control, curves, geometry, and masks.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Detail Shortcut 3' })).toBeVisible();
-  await page.getByRole('tab', { name: '✦ AI Companion' }).click();
+  await page.getByRole('button', { name: 'Masks AI ready' }).click();
   await expect(page.getByRole('region', { name: 'Local semantic masks' })).toBeVisible();
   await expect(page.getByText(/prepared automatically/)).toBeVisible();
+  await page.getByRole('tab', { name: '✦ AI Companion' }).click();
+  await expect(page.getByRole('region', { name: 'Local semantic masks' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Ask AI Companion for an opinion' })).toBeVisible();
   let aiRequestCount = 0;
   await page.route('https://api.openai.com/v1/responses', async (route) => {
@@ -241,7 +243,15 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: '+ Radial mask' }).click();
   await expect(page.getByText('Radial mask selected')).toBeVisible();
   await expect(page.getByText(/Editing Radial \d+/)).toBeVisible();
+  const editedRadialTitle = await page.locator('.mask-list button.active strong').textContent();
+  if (editedRadialTitle === null) throw new Error('The edited radial mask row is unavailable.');
   await page.getByLabel('Local exposure numeric value').fill('1');
+  await page.getByText('Local tone curves').click();
+  const localCurveGraph = page.locator('.local-curve-controls .curve-graph');
+  const localCurveBounds = await localCurveGraph.boundingBox();
+  if (localCurveBounds === null) throw new Error('The local tone curve graph is unavailable.');
+  await localCurveGraph.click({ position: { x: localCurveBounds.width * 0.35, y: localCurveBounds.height * 0.38 } });
+  await expect(localCurveGraph.locator('circle')).toHaveCount(3);
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
   await page.getByRole('button', { name: '+ Brush mask' }).click();
   await expect(page.getByText('Brush mask selected')).toBeVisible();
@@ -271,7 +281,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.locator('.color-mask-samples > g')).toHaveCount(2);
   await expect(page.getByLabel('Sample 2 X numeric value')).toHaveValue('0.75');
   await expect(page.getByLabel('Sample 2 Y numeric value')).toHaveValue('0.25');
-  await page.getByLabel('Use Radial 1 in composition').check();
+  await page.getByLabel(`Use ${editedRadialTitle} in composition`).check();
   await page.getByLabel(/Use Color range \d+ in composition/).check();
   await page.getByLabel('Mask composition operation').selectOption('subtract');
   await page.getByRole('button', { name: 'Combine 2 masks' }).click();
@@ -281,7 +291,6 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Selected composite operation')).toHaveValue('subtract');
   await page.getByLabel('Selected composite operation').selectOption('intersect');
   await expect(page.getByLabel('Selected composite operation')).toHaveValue('intersect');
-  await page.getByRole('tab', { name: '✦ AI Companion' }).click();
   await page.getByRole('button', { name: 'Create and place points' }).click();
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
   await page.mouse.click(brushBounds.x + brushBounds.width * 0.61, brushBounds.y + brushBounds.height * 0.36);
@@ -369,6 +378,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Composite mask children').getByRole('listitem')).toHaveCount(2);
   await page.getByRole('button', { name: 'Release child masks' }).click();
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
+  await page.getByRole('button', { name: new RegExp(`^${editedRadialTitle} On`) }).click();
+  await page.getByText('Local tone curves').click();
+  await expect(page.locator('.local-curve-controls .curve-graph circle')).toHaveCount(3);
   await page.getByRole('button', { name: /Brush \d+ On/ }).click();
   await expect(page.getByLabel('Expand / contract numeric value')).toHaveValue('0.05');
   await page.getByRole('button', { name: /Color range \d+ On/ }).click();

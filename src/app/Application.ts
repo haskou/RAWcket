@@ -60,6 +60,7 @@ import { VersionSixToSevenProjectMigration } from '@/contexts/projects/infrastru
 import { VersionSevenToEightProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionSevenToEightProjectMigration';
 import { VersionEightToNineProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionEightToNineProjectMigration';
 import { VersionNineToTenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionNineToTenProjectMigration';
+import { VersionTenToElevenProjectMigration } from '@/contexts/projects/infrastructure/migrations/VersionTenToElevenProjectMigration';
 import { BrowserSourceFileRepository } from '@/contexts/projects/infrastructure/repositories/BrowserSourceFileRepository';
 import { IndexedDbProjectRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbProjectRepository';
 import { IndexedDbRecipePresetRepository } from '@/contexts/projects/infrastructure/repositories/IndexedDbRecipePresetRepository';
@@ -142,7 +143,8 @@ export function createApplication(databaseName = 'rawcket'): Application {
     new VersionSixToSevenProjectMigration(),
     new VersionSevenToEightProjectMigration(),
     new VersionEightToNineProjectMigration(),
-    new VersionNineToTenProjectMigration()
+    new VersionNineToTenProjectMigration(),
+    new VersionTenToElevenProjectMigration()
   ]);
   const projects = new IndexedDbProjectRepository(database, migrator);
   const recipePresets = new IndexedDbRecipePresetRepository(database);

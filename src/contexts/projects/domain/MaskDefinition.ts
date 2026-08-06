@@ -1,6 +1,7 @@
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from './value-objects/AdjustmentKey';
 import { GlobalAdjustmentValue } from './value-objects/GlobalAdjustmentValue';
 import { MaskId } from './value-objects/MaskId';
+import { CurveSet, type CurveSetPrimitives } from './ToneCurve';
 import {
   MaskCompositionOperation,
   type MaskCompositionOperationPrimitive
@@ -60,6 +61,7 @@ export type MaskDefinitionPrimitives = {
   density: number;
   expansion?: number;
   localAdjustments: Partial<Record<AdjustmentKeyPrimitive, number>>;
+  localCurves?: CurveSetPrimitives;
   shape: MaskShape;
 };
 
@@ -75,6 +77,7 @@ export class MaskDefinition {
       throw new Error('Mask expansion must be between -0.25 and 0.25.');
     }
     this.ensureLocalAdjustments(primitives.localAdjustments);
+    CurveSet.fromPrimitives(primitives.localCurves ?? CurveSet.identity().toPrimitives());
     this.ensureShape(primitives.shape);
   }
 
@@ -87,6 +90,7 @@ export class MaskDefinition {
       density: input.density,
       expansion: input.expansion ?? 0,
       localAdjustments: input.localAdjustments,
+      localCurves: CurveSet.fromPrimitives(input.localCurves ?? CurveSet.identity().toPrimitives()).toPrimitives(),
       shape: MaskDefinition.normalizeShape(input.shape)
     }));
   }
@@ -113,6 +117,7 @@ export class MaskDefinition {
       density: 1,
       expansion: 0,
       localAdjustments: structuredClone(primary.primitives.localAdjustments),
+      localCurves: CurveSet.fromPrimitives(primary.primitives.localCurves ?? CurveSet.identity().toPrimitives()).toPrimitives(),
       shape: {
         kind: 'composite',
         operation: operation.valueOf(),

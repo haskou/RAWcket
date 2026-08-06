@@ -1,4 +1,4 @@
-import type { CurveSetPrimitives } from '../../domain/ToneCurve';
+import { CurveSet, type CurveSetPrimitives } from '../../domain/ToneCurve';
 import type { GlobalAdjustmentsPrimitives } from '../../domain/GlobalAdjustments';
 import type { AdjustmentKeyPrimitive } from '../../domain/value-objects/AdjustmentKey';
 import type { MaskDefinitionPrimitives } from '../../domain/MaskDefinition';
@@ -16,6 +16,13 @@ export type CpuDevelopmentSettings = {
 type Rgb = { red: number; green: number; blue: number };
 type PixelReader = (pixel: number) => Rgb;
 type AlphaReader = (pixel: number) => number;
+type CurveLuts = {
+  rgb: ToneCurveLut;
+  red: ToneCurveLut;
+  green: ToneCurveLut;
+  blue: ToneCurveLut;
+  luminance: ToneCurveLut | null;
+};
 
 export class CpuPixelDeveloper {
   private readonly masks = new CpuMaskEvaluator();
@@ -71,13 +78,8 @@ export class CpuPixelDeveloper {
   ): Uint8ClampedArray<ArrayBuffer> {
     const working = new Float32Array(width * height * 4);
     const adjustments = this.activeAdjustments(settings);
-    const luts = {
-      rgb: ToneCurveLut.create(settings.curves.rgb),
-      red: ToneCurveLut.create(settings.curves.red),
-      green: ToneCurveLut.create(settings.curves.green),
-      blue: ToneCurveLut.create(settings.curves.blue),
-      luminance: settings.curves.luminance === null ? null : ToneCurveLut.create(settings.curves.luminance)
-    };
+    const luts = this.curveLuts(settings.curves);
+    const localLuts = settings.masks.map((mask) => this.curveLuts(mask.localCurves ?? CurveSet.identity().toPrimitives()));
     const sourceSamples = new Map<string, Rgb>();
     settings.masks.flatMap((mask) => this.maskSourcePoints(mask)).forEach((point) => {
       const key = this.pointKey(point);
@@ -97,7 +99,7 @@ export class CpuPixelDeveloper {
       let developed = this.developPixel(sourcePixel, adjustments, sourceIsLinear);
       const x = (pixel % width + 0.5) / width;
       const y = (Math.floor(pixel / width) + 0.5) / height;
-      for (const mask of settings.masks) {
+      for (const [maskIndex, mask] of settings.masks.entries()) {
         const weight = this.masks.evaluate(mask, {
           x,
           y,
@@ -108,7 +110,10 @@ export class CpuPixelDeveloper {
         });
         if (weight <= 0) continue;
         const local = { ...this.neutralAdjustments(), ...mask.localAdjustments };
-        const locallyDeveloped = this.developPixel(developed, local, false);
+        const locallyAdjusted = this.developPixel(developed, local, false);
+        const maskCurves = localLuts[maskIndex];
+        if (maskCurves === undefined) throw new Error('The local curve pipeline is inconsistent with the mask recipe.');
+        const locallyDeveloped = this.applyCurves(locallyAdjusted, maskCurves);
         developed = this.mix(developed, locallyDeveloped, weight);
       }
       const curved = this.applyCurves(developed, luts);
@@ -207,13 +212,17 @@ export class CpuPixelDeveloper {
     };
   }
 
-  private applyCurves(rgb: Rgb, luts: {
-    rgb: ToneCurveLut;
-    red: ToneCurveLut;
-    green: ToneCurveLut;
-    blue: ToneCurveLut;
-    luminance: ToneCurveLut | null;
-  }): Rgb {
+  private curveLuts(curves: CurveSetPrimitives): CurveLuts {
+    return {
+      rgb: ToneCurveLut.create(curves.rgb),
+      red: ToneCurveLut.create(curves.red),
+      green: ToneCurveLut.create(curves.green),
+      blue: ToneCurveLut.create(curves.blue),
+      luminance: curves.luminance === null ? null : ToneCurveLut.create(curves.luminance)
+    };
+  }
+
+  private applyCurves(rgb: Rgb, luts: CurveLuts): Rgb {
     let result = {
       red: luts.red.evaluate(luts.rgb.evaluate(rgb.red)),
       green: luts.green.evaluate(luts.rgb.evaluate(rgb.green)),
