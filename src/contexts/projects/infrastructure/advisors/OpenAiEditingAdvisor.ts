@@ -27,7 +27,9 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
         'Return a candid critique, strengths, opportunities, a concrete suggestedIntent, and a complete editable proposal in this single response.',
         'Judge the visible photograph, preserve believable color and texture, and propose any combination of global adjustments, monotonic-cubic tone curves, crop and geometry, radial masks, linear gradient masks, luminance-range masks, and point-guided smart masks that materially supports the intent.',
         'Treat the supplied render as the color-managed photographic baseline. When a matching camera JPEG was imported with a RAW file, RAWcket has already matched the RAW baseline to its tone and color; do not undo that calibration. Otherwise judge only what is visibly present. Diagnose visible color casts, weak chroma, compressed midtones, or haze independently instead of applying blanket exposure or saturation.',
-        'When the visible image genuinely looks flat or washed out, restore separation with a restrained RGB or luminance tone curve plus bounded vibrance or saturation as needed. Preserve the black point and highlights; do not try to solve tonal compression with exposure alone.',
+        'The default finish must look photographically rich and natural, never pale, milky, faded, or low-density unless the photographer explicitly requests that aesthetic. Preserve a convincing black point, luminous rather than grey highlights, midtone separation, and the scene’s existing warm/cool atmosphere.',
+        'When the visible image looks flat or washed out, restore separation with a restrained RGB or luminance tone curve and modest vibrance where needed. Prefer curve shape, black/white placement, local contrast, and vibrance over blanket exposure, lifted shadows, or heavy saturation. Do not combine raised blacks, strongly opened shadows, and reduced color density.',
+        'Do not neutralize expressive color merely because it is not neutral daylight. Reduce saturation only when the supplied current render is visibly excessive or the photographer asks for it; otherwise preserve or gently strengthen perceptual color density while keeping skin and memory colors believable.',
         'Make an explicit framing decision on every request. Unless the current frame is already clearly optimal, include exactly one viewport operation with a purposeful crop and any justified rotation or perspective correction. Never omit a beneficial crop merely because it is more complex than a slider, and explain the compositional gain.',
         'Use smart-mask only for a visually identifiable subject or region. Supply normalized positive/negative points and optional bounding boxes; the resulting local spatial-luminance segmentation remains editable in RAWcket.',
         'Return absolute slider values, not deltas. Exposure must be between -5 and 5. Sharpness and noiseReduction must be between 0 and 100; every other value must be between -100 and 100.',
@@ -58,7 +60,7 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
   }
 
   private missingExplicitTools(context: EditingContext, result: { suggestedIntent: string; explanation: string; operations: Array<{ kind: string }> }): string[] {
-    const requested = `${context.intent ?? ''} ${result.suggestedIntent} ${result.explanation}`;
+    const requested = context.intent ?? '';
     const missing: string[] = [];
     if (/(crop|cropping|reframe|reframing|recort|encuadr)/iu.test(requested) && !result.operations.some((operation) => operation.kind === 'viewport')) missing.push('crop/viewport');
     if (/(tone curve|curves|curve|curvas|curva)/iu.test(context.intent ?? '') && !result.operations.some((operation) => operation.kind === 'tone-curve')) missing.push('tone-curve');

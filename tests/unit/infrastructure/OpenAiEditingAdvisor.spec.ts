@@ -48,7 +48,33 @@ describe('OpenAiEditingAdvisor', () => {
     expect(reason.mock.calls[0]?.[0].instructions).toContain('matching camera JPEG');
     expect(reason.mock.calls[0]?.[0].instructions).toContain('judge only what is visibly present');
     expect(reason.mock.calls[0]?.[0].instructions).toContain('restrained RGB or luminance tone curve');
+    expect(reason.mock.calls[0]?.[0].instructions).toContain('never pale, milky, faded, or low-density');
+    expect(reason.mock.calls[0]?.[0].instructions).toContain('preserve or gently strengthen perceptual color density');
     expect(proposal.operations[4]).toMatchObject({ mask: { shape: { kind: 'ai-segmentation', prompt: 'face' } } });
+  });
+
+  it('keeps an open visual opinion to one call when its prose mentions a crop but does not propose one', async () => {
+    const reason = vi.fn<(request: OpenAiStructuredRequest) => Promise<unknown>>().mockResolvedValue({
+      suggestedIntent: 'Keep the existing crop and add restrained tonal separation.',
+      critique: 'The framing already supports the subject.', strengths: ['Composition'], opportunities: ['Midtone separation'],
+      explanation: 'The crop is already effective, so only a small contrast adjustment is useful.',
+      operations: [{ kind: 'global-adjustment', key: 'contrast', value: 6 }]
+    });
+    const advisor = new OpenAiEditingAdvisor({ reason } as unknown as OpenAiResponsesClient, new OpenAiEditProposalMapper());
+
+    await expect(advisor.propose({
+      projectName: 'Street', intent: null, preview: new Blob(['preview']), shadowClipping: 0, highlightClipping: 0,
+      currentAdjustments: {},
+      currentCurves: {
+        rgb: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        red: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        green: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        blue: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' }, luminance: null
+      },
+      currentViewport: { cropFrame: { x: 0, y: 0, width: 1, height: 1 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
+      existingMaskCount: 0
+    })).resolves.toMatchObject({ operations: [{ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT }] });
+    expect(reason).toHaveBeenCalledTimes(1);
   });
 
   it('rejects malformed curve coordinates before they reach the recipe', () => {

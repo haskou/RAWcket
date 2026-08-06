@@ -219,6 +219,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-working-state strong, .ai-working-state small { display: block; }
 .ai-working-state strong { color: #dce7cf; font-size: .72rem; }
 .ai-working-state small { margin-top: 4px; color: #9fa99f; font-size: .64rem; line-height: 1.45; }
+.ai-failure { display: grid; gap: 4px; margin: 10px 0; padding: 11px 12px; border: 1px solid #9b5d51; border-radius: 10px; background: rgba(155, 93, 81, .1); }
+.ai-failure strong { color: #f1c4ba; font-size: .71rem; }
+.ai-failure span { color: #c5aaa4; font-size: .65rem; line-height: 1.45; }
 .ai-opinion-summary { margin-bottom: 10px; padding: 11px; border-left: 2px solid var(--accent); background: rgba(201,240,107,.04); }
 .ai-opinion-summary > strong { color: var(--accent); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
 .ai-opinion-summary p { margin: 6px 0; }

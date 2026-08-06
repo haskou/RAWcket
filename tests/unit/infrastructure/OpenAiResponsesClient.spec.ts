@@ -29,6 +29,55 @@ describe('OpenAiResponsesClient', () => {
     );
     await expect(client.reason({ schemaName: 'test', schema: {}, instructions: 'Inspect', images: [] })).rejects.not.toThrow(/sk-secret-must-not-leak/);
   });
+
+  it('retries a temporary API failure and returns the proposal from the same user action', async () => {
+    const fetchRequest = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'Temporary overload' } }), { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        status: 'completed',
+        output: [{ content: [{ type: 'output_text', text: '{"answer":"recovered"}' }] }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const client = new OpenAiResponsesClient(
+      credentialVault('sk-test', 'model'),
+      { encode: vi.fn() } as unknown as BrowserAiImageEncoder,
+      fetchRequest,
+      { retryDelayMilliseconds: 0 }
+    );
+
+    await expect(client.reason({ schemaName: 'test', schema: {}, instructions: 'Inspect', images: [] })).resolves.toEqual({ answer: 'recovered' });
+    expect(fetchRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a completed HTTP request that contains no editable result', async () => {
+    const fetchRequest = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, output: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        status: 'completed',
+        output: [{ content: [{ type: 'output_text', text: '{"answer":"second-attempt"}' }] }]
+      }), { status: 200 }));
+    const client = new OpenAiResponsesClient(
+      credentialVault('sk-test', 'model'),
+      { encode: vi.fn() } as unknown as BrowserAiImageEncoder,
+      fetchRequest,
+      { retryDelayMilliseconds: 0 }
+    );
+
+    await expect(client.reason({ schemaName: 'test', schema: {}, instructions: 'Inspect', images: [] })).resolves.toEqual({ answer: 'second-attempt' });
+    expect(fetchRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry authentication or malformed-request failures', async () => {
+    const fetchRequest = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ error: { message: 'Invalid key' } }), { status: 401 }));
+    const client = new OpenAiResponsesClient(
+      credentialVault('sk-test', 'model'),
+      { encode: vi.fn() } as unknown as BrowserAiImageEncoder,
+      fetchRequest,
+      { retryDelayMilliseconds: 0 }
+    );
+
+    await expect(client.reason({ schemaName: 'test', schema: {}, instructions: 'Inspect', images: [] })).rejects.toThrow(/Invalid key.*Check the API key/);
+    expect(fetchRequest).toHaveBeenCalledTimes(1);
+  });
 });
 
 function credentialVault(apiKey: string, model: string): AiCredentialVault {

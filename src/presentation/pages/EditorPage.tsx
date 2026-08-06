@@ -168,6 +168,7 @@ export function EditorPage(): ReactElement {
   const recipePresetInput = useRef<HTMLInputElement>(null);
   const semanticAbort = useRef<AbortController | null>(null);
   const semanticInstallAbort = useRef<AbortController | null>(null);
+  const aiRequestActive = useRef(false);
   const renderSequence = useRef(0);
   const preserveViewportOnNextImageLoad = useRef(false);
   const previewRenderDebouncer = useRef<Debouncer<void> | null>(null);
@@ -216,6 +217,7 @@ export function EditorPage(): ReactElement {
   const [recipePresets, setRecipePresets] = useState<RecipePreset[]>([]);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiMessage, setAiMessage] = useState('Connect OpenAI API to request a visual opinion or an editable proposal. Cloud AI actions send only a reduced preview.');
+  const [aiFailure, setAiFailure] = useState<string | null>(null);
   const [aiProposal, setAiProposal] = useState<EditProposal | null>(null);
   const [aiProposalId, setAiProposalId] = useState<string | null>(null);
   const [aiSelection, setAiSelection] = useState<Set<number>>(new Set());
@@ -930,21 +932,23 @@ export function EditorPage(): ReactElement {
   };
 
   const generateAiProposal = async (request: string, pendingAction: Exclude<PendingAiAction, null>): Promise<void> => {
-    if (project === null || preview === null) return;
-    const configuration = await application.inspectAiConfiguration.inspect();
-    if (!configuration.ready) {
-      setPendingAiAction(pendingAction);
-      setAiMessage(pendingAction === 'opinion'
-        ? 'Configure OpenAI API to ask for an opinion. RAWcket will continue afterwards.'
-        : 'Configure OpenAI API to generate this proposal. Your written brief will be kept.');
-      setSettingsOpen(true);
-      return;
-    }
-    setAiGenerating(true);
-    setAiMessage(pendingAction === 'opinion'
-      ? 'Reviewing the photograph and writing an editable intent and proposal in one request…'
-      : 'Turning your written intent into an editable proposal with crop, curves, geometry, and local masks…');
+    if (project === null || preview === null || aiRequestActive.current) return;
+    aiRequestActive.current = true;
+    setAiFailure(null);
     try {
+      const configuration = await application.inspectAiConfiguration.inspect();
+      if (!configuration.ready) {
+        setPendingAiAction(pendingAction);
+        setAiMessage(pendingAction === 'opinion'
+          ? 'Configure OpenAI API to ask for an opinion. RAWcket will continue afterwards.'
+          : 'Configure OpenAI API to generate this proposal. Your written brief will be kept.');
+        setSettingsOpen(true);
+        return;
+      }
+      setAiGenerating(true);
+      setAiMessage(pendingAction === 'opinion'
+        ? 'Reviewing the photograph and writing an editable intent and proposal in one request…'
+        : 'Turning your written intent into an editable proposal with crop, curves, geometry, and local masks…');
       const proposal = await application.requestEditingAdvice.propose(
         project,
         new RequestEditingAdviceMessage(
@@ -977,8 +981,11 @@ export function EditorPage(): ReactElement {
       setRevision((current) => current + 1);
       setAiMessage('Opinion and editable proposal ready. Review every operation before applying it.');
     } catch (error: unknown) {
-      setAiMessage(error instanceof Error ? error.message : 'The proposal could not be generated.');
+      const message = error instanceof Error ? error.message : 'The proposal could not be generated.';
+      setAiFailure(message);
+      setAiMessage('No recipe was created. The current image and recipe were not changed.');
     } finally {
+      aiRequestActive.current = false;
       setAiGenerating(false);
     }
   };
@@ -1477,7 +1484,8 @@ export function EditorPage(): ReactElement {
               <button className="ai-prompt-submit" type="button" aria-label="Ask AI for an opinion" title="Assess the current image and prepare a complete proposal" disabled={aiGenerating || preview === null} onClick={() => void generateAiProposal('', 'opinion')}>{aiGenerating ? <span className="mini-spinner" aria-hidden="true" /> : <span aria-hidden="true">✦</span>}</button>
             </div>
             <button className="button ai-primary full" type="button" disabled={aiGenerating || preview === null || aiPrompt.trim().length === 0} onClick={() => void generateAiProposal(aiPrompt, 'prompt')}>Create recipe</button>
-            {aiGenerating && <div className="ai-working-state" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>AI is building an editable recipe</strong><small>Reviewing crop, curves, geometry, light, and local masks. The current image stays unchanged.</small></span></div>}
+            {aiGenerating && <div className="ai-working-state" role="status" aria-live="polite"><span className="mini-spinner" aria-hidden="true" /><span><strong>AI is building an editable recipe</strong><small>Reviewing crop, curves, geometry, light, and local masks. Empty, timed-out, and temporary failed responses are retried once automatically.</small></span></div>}
+            {aiFailure !== null && <div className="ai-failure" role="alert"><strong>No editable recipe was returned</strong><span>{aiFailure}</span></div>}
             <p className="ai-status" aria-live="polite">{aiMessage}</p>
             {aiProposal !== null && (
               <div className="ai-proposal" aria-label="AI edit proposal">
