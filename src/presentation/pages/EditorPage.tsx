@@ -63,6 +63,7 @@ import {
   type AdjustmentSection
 } from '../editor/adjustmentDefinitions';
 import type { CompositionGuide } from '../editor/CompositionGuide';
+import { CropFrameProjector, type CropPoint } from '../editor/CropFrameProjector';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { useProjectAutosave } from '../hooks/useProjectAutosave';
 import { downloadBlob } from '../lib/browserImages';
@@ -73,7 +74,9 @@ type InspectorTab = 'edit' | 'masks' | 'ai' | 'history';
 type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
 type BrushGesture = { pointerId: number; maskId: string; groupId: string };
-type CropGesture = { pointerId: number; start: { x: number; y: number } };
+type CropGesture =
+  | { kind: 'draw'; pointerId: number; anchor: CropPoint }
+  | { kind: 'move'; pointerId: number; pointerStart: CropPoint; cropStart: ViewportTransformPrimitives['cropFrame'] };
 type AiPointPolarity = 'positive' | 'negative';
 type ImageDimensions = { width: number; height: number };
 type PendingAiAction = 'opinion' | 'prompt' | null;
@@ -1178,8 +1181,15 @@ export function EditorPage(): ReactElement {
     const requestedHandle = event.target instanceof HTMLElement ? event.target.dataset.cropHandle : undefined;
     const resizeCorner = corners.find((corner) => corner.handle === requestedHandle)
       ?? corners.find((corner) => Math.abs(start.x - corner.point.x) <= horizontalTolerance && Math.abs(start.y - corner.point.y) <= verticalTolerance);
-    cropGesture.current = { pointerId: event.pointerId, start: resizeCorner?.opposite ?? start };
-    const draft = resizeCorner === undefined ? { x: start.x, y: start.y, width: 0, height: 0 } : current;
+    const movingExistingCrop = resizeCorner === undefined
+      && !CropFrameProjector.fillsImage(current)
+      && CropFrameProjector.contains(current, start);
+    cropGesture.current = movingExistingCrop
+      ? { kind: 'move', pointerId: event.pointerId, pointerStart: start, cropStart: current }
+      : { kind: 'draw', pointerId: event.pointerId, anchor: resizeCorner?.opposite ?? start };
+    const draft = movingExistingCrop || resizeCorner !== undefined
+      ? current
+      : { x: start.x, y: start.y, width: 0, height: 0 };
     cropDraftValue.current = draft;
     setCropDraft(draft);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1191,18 +1201,10 @@ export function EditorPage(): ReactElement {
     if (gesture?.pointerId !== event.pointerId) return false;
     const end = pointOnCropFrame(event);
     if (end === null || project === null) return true;
-    let width = Math.abs(end.x - gesture.start.x);
-    let height = Math.abs(end.y - gesture.start.y);
-    const aspectRatio = project.getViewportTransform().toPrimitives().aspectRatio;
-    if (aspectRatio !== null && width > 0 && height > 0) {
-      const metadata = project.toPrimitives().metadata;
-      const normalizedRatio = (aspectRatio.width / aspectRatio.height) / (metadata.width / metadata.height);
-      if (width / height > normalizedRatio) width = height * normalizedRatio;
-      else height = width / normalizedRatio;
-    }
-    const x = end.x >= gesture.start.x ? gesture.start.x : gesture.start.x - width;
-    const y = end.y >= gesture.start.y ? gesture.start.y : gesture.start.y - height;
-    const draft = { x: Math.max(0, x), y: Math.max(0, y), width: Math.min(width, 1 - Math.max(0, x)), height: Math.min(height, 1 - Math.max(0, y)) };
+    const viewport = project.getViewportTransform().toPrimitives();
+    const draft = gesture.kind === 'move'
+      ? CropFrameProjector.move(gesture.cropStart, gesture.pointerStart, end)
+      : CropFrameProjector.draw(gesture.anchor, end, viewport.aspectRatio, project.toPrimitives().metadata);
     cropDraftValue.current = draft;
     setCropDraft(draft);
     return true;
@@ -1359,7 +1361,7 @@ export function EditorPage(): ReactElement {
             {project.hasMasks() && <button className={maskOverlayVisible ? 'active' : ''} aria-pressed={maskOverlayVisible} type="button" onClick={() => setMaskOverlayVisible((value) => !value)} title="Show or hide the editable mask overlay">Mask</button>}
           </div>
           {toolWorkspace === 'develop' && activePanel === 'crop' && <div className="contextual-canvas-tools crop-tools" role="toolbar" aria-label="Contextual crop tools">
-            <span><strong>Crop</strong><small>Drag corner-to-corner on the photograph</small></span>
+            <span><strong>Crop</strong><small>Drag outside to draw · drag inside to move · drag corners to resize</small></span>
             <button type="button" onClick={() => rotateContextualCrop(-90)} aria-label="Rotate crop left 90 degrees">↶ 90°</button>
             <button type="button" onClick={() => rotateContextualCrop(90)} aria-label="Rotate crop right 90 degrees">↷ 90°</button>
             <button type="button" disabled={horizonBusy} onClick={() => void autoStraighten()}>{horizonBusy ? 'Analyzing…' : 'Straighten · local'}</button>
@@ -1688,7 +1690,7 @@ function WorkspaceCompositionGuideOverlay({ guide }: { guide: CompositionGuide }
 }
 
 function CropSelectionOverlay({ crop }: { crop: ViewportTransformPrimitives['cropFrame'] }): ReactElement {
-  return <div className="crop-selection-overlay" role="img" aria-label={`Crop selection: left ${crop.x.toFixed(3)}, top ${crop.y.toFixed(3)}, width ${crop.width.toFixed(3)}, height ${crop.height.toFixed(3)}. Drag a corner to resize or drag elsewhere to draw a new crop.`}>
+  return <div className="crop-selection-overlay" role="img" aria-label={`Crop selection: left ${crop.x.toFixed(3)}, top ${crop.y.toFixed(3)}, width ${crop.width.toFixed(3)}, height ${crop.height.toFixed(3)}. Drag inside to move, drag a corner to resize, or drag outside to draw a new crop.`}>
     <span className="crop-selection-shade top" style={{ height: `${crop.y * 100}%` }} />
     <span className="crop-selection-shade bottom" style={{ top: `${(crop.y + crop.height) * 100}%` }} />
     <span className="crop-selection-shade left" style={{ top: `${crop.y * 100}%`, width: `${crop.x * 100}%`, height: `${crop.height * 100}%` }} />

@@ -169,7 +169,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .crop-selection-shade.bottom { inset: auto 0 0; }
 .crop-selection-shade.left { left: 0; }
 .crop-selection-shade.right { right: 0; }
-.crop-selection-frame { position: absolute; z-index: 1; border: 1.5px solid rgba(255,255,255,.92); box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
+.crop-selection-frame { position: absolute; z-index: 1; border: 1.5px solid rgba(255,255,255,.92); box-shadow: 0 0 0 1px rgba(0,0,0,.7); cursor: move; }
 .crop-selection-frame > span { position: absolute; width: 14px; height: 14px; border-color: #fff; border-style: solid; filter: drop-shadow(0 1px 1px #000); pointer-events: auto; }
 .crop-selection-frame .top-left { left: -2px; top: -2px; border-width: 2px 0 0 2px; }
 .crop-selection-frame .top-right { right: -2px; top: -2px; border-width: 2px 2px 0 0; }
