@@ -51,7 +51,7 @@ class ControllableSemanticModel implements SemanticSegmentationModel {
   public suggestTags(_image: Blob, options: SemanticModelTaskOptions): Promise<SemanticPhotoTagSuggestion[]> {
     void _image;
     options.onProgress?.(1);
-    return Promise.resolve([{ category: 'sky', confidence: 0.9, coverage: 0.4 }]);
+    return Promise.resolve([{ tag: 'sky', confidence: 0.9, coverage: 0.4 }]);
   }
 }
 

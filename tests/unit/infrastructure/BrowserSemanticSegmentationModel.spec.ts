@@ -89,7 +89,25 @@ describe('BrowserSemanticSegmentationModel', () => {
       { signal: new AbortController().signal }
     );
 
-    expect(tags.map((tag) => tag.category)).toEqual(['sky', 'people']);
+    expect(tags.map((tag) => tag.tag)).toEqual(['sky', 'people', 'furniture']);
     expect(pipeline).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds broad searchable tags beyond the five mask categories', async () => {
+    const pipeline = Object.assign(vi.fn().mockResolvedValue([
+      { label: 'car', score: 0.91, mask: { width: 2, height: 2, data: new Uint8Array([1, 0, 0, 0]) } },
+      { label: 'road', score: 0.87, mask: { width: 2, height: 2, data: new Uint8Array([0, 1, 1, 0]) } },
+      { label: 'building', score: 0.94, mask: { width: 2, height: 2, data: new Uint8Array([0, 0, 0, 1]) } }
+    ]), { dispose: vi.fn().mockResolvedValue(undefined) });
+    const runtime = installedRuntime({
+      loadTransformers: vi.fn().mockResolvedValue({ env: {}, pipeline: vi.fn().mockResolvedValue(pipeline) }) as BrowserSemanticModelRuntime['loadTransformers']
+    });
+
+    const tags = await new BrowserSemanticSegmentationModel(runtime).suggestTags(
+      new Blob(['preview'], { type: 'image/jpeg' }),
+      { signal: new AbortController().signal }
+    );
+
+    expect(tags.map((tag) => tag.tag)).toEqual(['buildings', 'road', 'vehicles', 'urban']);
   });
 });

@@ -7,6 +7,6 @@ export class SuggestPhotoTags {
 
   public async suggest(message: SuggestPhotoTagsMessage, options: SemanticModelTaskOptions): Promise<string[]> {
     const suggestions = await this.model.suggestTags(message.getImage(), options);
-    return ProjectTags.fromPrimitives(suggestions.map((suggestion) => suggestion.category)).toPrimitives();
+    return ProjectTags.fromPrimitives(suggestions.map((suggestion) => suggestion.tag)).toPrimitives();
   }
 }

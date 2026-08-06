@@ -19,7 +19,7 @@ export type SemanticMaskSuggestion = {
 };
 
 export type SemanticPhotoTagSuggestion = {
-  category: SemanticMaskCategoryPrimitive;
+  tag: string;
   confidence: number | null;
   coverage: number;
 };

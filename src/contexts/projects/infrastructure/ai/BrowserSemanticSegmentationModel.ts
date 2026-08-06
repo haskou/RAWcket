@@ -65,6 +65,25 @@ const categoryLabels: Record<SemanticMaskCategoryPrimitive, string[]> = {
   buildings: ['building', 'house', 'skyscraper']
 };
 
+const photoTagLabels: Record<string, string[]> = {
+  sky: ['sky'],
+  water: ['water', 'sea', 'river', 'lake', 'swimming pool', 'waterfall'],
+  vegetation: ['tree', 'grass', 'plant', 'flower', 'field', 'palm'],
+  people: ['person'],
+  buildings: ['building', 'house', 'skyscraper', 'hovel', 'tower'],
+  landscape: ['mountain', 'hill', 'field', 'earth', 'rock', 'land'],
+  beach: ['sand', 'sea'],
+  road: ['road', 'sidewalk', 'path', 'runway', 'dirt track'],
+  vehicles: ['car', 'bus', 'truck', 'van', 'minibike', 'bicycle'],
+  boats: ['boat', 'ship'],
+  aircraft: ['airplane'],
+  animals: ['animal'],
+  interior: ['wall', 'floor', 'ceiling', 'windowpane', 'door', 'curtain', 'stairway'],
+  furniture: ['bed', 'table', 'chair', 'sofa', 'cabinet', 'shelf', 'desk', 'bench'],
+  food: ['food', 'plate'],
+  urban: ['building', 'road', 'sidewalk', 'streetlight', 'traffic light', 'skyscraper']
+};
+
 function browserRuntime(): BrowserSemanticModelRuntime {
   return {
     cacheStorage: typeof globalThis.caches === 'undefined' ? undefined : globalThis.caches,
@@ -175,8 +194,7 @@ export class BrowserSemanticSegmentationModel implements SemanticSegmentationMod
   }
 
   private describeCategories(output: ImageSegmentationPipelineOutput[], signal: AbortSignal): SemanticPhotoTagSuggestion[] {
-    return (Object.keys(categoryLabels) as SemanticMaskCategoryPrimitive[]).flatMap((category) => {
-      const accepted = categoryLabels[category];
+    return Object.entries(photoTagLabels).flatMap(([tag, accepted]) => {
       const segments = output.filter((segment) => segment.label !== null && accepted.includes(segment.label.toLowerCase()));
       const first = segments[0];
       if (first === undefined) return [];
@@ -192,7 +210,7 @@ export class BrowserSemanticSegmentationModel implements SemanticSegmentationMod
       const scores = segments.flatMap((segment) => segment.score === null ? [] : [segment.score]);
       const confidence = scores.length === 0 ? null : scores.reduce((total, score) => total + score, 0) / scores.length;
       if (coverage < 0.002 || (confidence !== null && confidence < 0.25)) return [];
-      return [{ category, confidence, coverage }];
+      return [{ tag, confidence, coverage }];
     });
   }
 
