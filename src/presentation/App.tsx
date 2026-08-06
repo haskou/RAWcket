@@ -7,7 +7,7 @@ import { PwaUpdateNotice } from './components/PwaUpdateNotice';
 export function App(): ReactElement {
   return (
     <>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/" element={<LibraryPage />} />
           <Route path="/editor/:projectId" element={<EditorPage />} />

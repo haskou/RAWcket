@@ -30,5 +30,12 @@ export default tseslint.config(
       '@typescript-eslint/no-extraneous-class': 'off',
       'react-refresh/only-export-components': 'off'
     }
+  },
+  {
+    files: ['src/pwa-sw.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.serviceworker
+    }
   }
 );

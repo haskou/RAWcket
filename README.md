@@ -14,21 +14,21 @@ Implemented:
 - Local library with a dedicated JPEG/PNG/Sony ARW dropzone dialog, direct library drag and drop, multi-photo selection, optional on-device automatic tags, a Canvas-generated demo, reopening, rename, duplicate, confirmed deletion, quota preflight, and portable project bundles.
 - Editor with Simple/Advanced modes, exact numeric entry, sliders, reset, undo/redo, keyboard shortcuts, and draggable/zoomable preview.
 - Collapsible, navigable Active Recipe sidebar that lists only non-default instructions, with reversible enable switches and links back to each editor.
-- Adaptive renderer with cancellable scheduling: LibRaw/WASM develops supported camera mosaics to linear 16-bit RGB in its isolated browser worker, then a render worker applies the recipe. WebGPU compute and real WebGL2 shaders natively rasterize brush, gradient, range, smart-point, and nested composite masks before applying compatible global development, ordered local adjustments, curve LUTs, denoise, texture, and sharpening. The deterministic CPU evaluator remains the reference and bounded fallback. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, validation/device-loss fallback, and a versioned LRU preview cache share the same boundary.
-- Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families, including position-independent source-color sampling plus ordered Add/Subtract/Intersect composition whose exact child masks can be released again.
+- Adaptive renderer with cancellable scheduling: LibRaw/WASM develops supported camera mosaics to linear 16-bit RGB in its isolated browser worker, then a render worker applies the recipe. WebGPU compute and real WebGL2 shaders natively rasterize brush, gradient, range, smart-point, and nested composite masks before applying compatible global development, ordered local adjustments and local/global curve LUTs, denoise, texture, and sharpening. The deterministic CPU evaluator remains the reference and bounded fallback. Geometry, histograms, clipping analysis, progress, timeout, bounded concurrency, validation/device-loss fallback, and a versioned LRU preview cache share the same boundary.
+- Non-destructive domain model for global adjustments, curves, viewport geometry, and seven mask families, including per-mask tone curves, position-independent source-color sampling, and ordered Add/Subtract/Intersect composition whose exact child masks can be released again.
 - Bounded Companion history stored with each local project and checksummed bundle: original request, suggested intent, critique, strengths, opportunities, explanation, editable operations, and applied/rejected state. API keys, reduced previews, and provider envelopes are never project data.
 - One shared operation contract for human and AI edits, schema validation, serialization, continuous-change grouping, bounded history, undo, and redo.
 - IndexedDB project/index/settings persistence, five verified SHA-256 snapshots per project, corruption recovery, and OPFS originals with an IndexedDB fallback.
 - A persistent cross-store write-ahead journal reconciles interrupted create, duplicate, import, and delete operations and removes only originals proven orphaned.
 - Debounced autosave plus saves on `visibilitychange`, `pagehide`, and explicit close.
 - `.rawcket` ZIP bundles containing `manifest.json`, `project.json`, the original, and SHA-256 integrity data.
-- Versioned schema migrations through version 10.
+- Versioned schema migrations through version 11.
 - Safe TIFF/EXIF inspection for Sony ARW camera, lens, exposure, aperture, ISO, focal length, orientation, white balance, color space, sensor levels, and CFA pattern, with an honest in-editor source-information view.
 - AI-first workspace with OpenAI visual critique and reviewable proposals for sliders, tone curves, crop/geometry, radial, linear-gradient, luminance-range, and point/box-guided smart masks. The current rendered state and active recipe are supplied as context. Explicit crop/curve requests are contract-checked and repaired once instead of silently dropping the requested tool.
 - OpenAI defaults to the editable `gpt-5.6-luna` model identifier. Keys can remain tab-only, use the existing AES-GCM/PBKDF2 device vault, or be stored without a RAWcket master password in the app's private Google Drive `appDataFolder` after Google sign-in.
 - Optional Google sign-in uses a deployment-configured public OAuth Web Client ID, never a token or Client ID entered by the photographer. The same session enables private OpenAI-key restoration and visible RAWcket/Projects, Originals, and Exports backups.
 - Real JPEG, PNG, and baseline uncompressed RGB 8-bit TIFF export in a worker, with full-size/resize options, progress, and cancellation.
-- Interactive curves with histogram and aligned black/shadow/midtone/highlight/white input regions; before/after; workspace-relative Fit; image-anchored thirds/golden guides; workspace-wide dense grid/diagonals; local edge-based auto straightening; and drag-to-crop with an outside veil, locked ratios, reusable corner handles, and a contextual canvas toolbar. Active masks and exact source-color sample points are highlighted both on-canvas and in the mask list. Semantic mask rows expose category/confidence directly, and every smart-mask point plus multiple constraint boxes remain numerically editable.
+- Interactive global and per-mask curves with histogram and aligned black/shadow/midtone/highlight/white input regions; before/after; workspace-relative Fit; image-anchored thirds/golden guides; workspace-wide dense grid/diagonals; local edge-based auto straightening; and drag-to-crop with an outside veil, locked ratios, reusable corner handles, and a contextual canvas toolbar. Active masks and exact source-color sample points are highlighted both on-canvas and in the mask list. Semantic selection lives with the other masks; its rows expose category/confidence directly, and every smart-mask point plus multiple constraint boxes remain numerically editable.
 - A clearly separated AI Companion and Manual workspace, visibly pending one-call Companion review, conservative histogram-based no-AI Auto Enhance, OpenAI-authored editable briefs, one-click recipe clearing, and comparative multi-photo review based on post-edit potential with photographer override.
 - Local library search across names and tags, optional semantic tags derived from the installed pinned local model, validated editable comma-separated tags, and reversible zero-to-five-star ratings.
 - Persistent favorites with instant filtering and a visual editor history derived from real undo/redo operations.
@@ -72,6 +72,16 @@ pnpm test:e2e
 `pnpm preview` serves the production build locally.
 
 LibRaw uses shared WebAssembly memory and pthread workers. Any production host must return the COOP/COEP/CORP headers recorded in [`public/_headers`](public/_headers); Vite development and preview already apply the same policy.
+
+## Deploy to GitHub Pages
+
+The Pages workflow builds RAWcket at `/RAWcket/`, publishes direct-route fallback HTML, and activates the same cross-origin isolation policy through the application service worker after its first controlled reload:
+
+```bash
+pnpm build:pages
+```
+
+Pushes to `main` publish through [`.github/workflows/pages.yml`](.github/workflows/pages.yml). Configure the repository Actions variable `VITE_GOOGLE_CLIENT_ID` with a Google OAuth Web Client ID whose authorized JavaScript origin includes `https://haskou.github.io`; the value is public deployment configuration, not a secret. The expected project URL is `https://haskou.github.io/RAWcket/`.
 
 ## Architecture
 

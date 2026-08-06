@@ -8,11 +8,19 @@ export function PwaUpdateNotice(): ReactElement | null {
   const [notice, setNotice] = useState<'offline-ready' | 'update-ready' | null>(null);
 
   useEffect(() => {
+    let reloadForIsolation = !window.crossOriginIsolated;
+    const handleControllerChange = (): void => {
+      if (!reloadForIsolation) return;
+      reloadForIsolation = false;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
     updateServiceWorker.current = registerSW({
       immediate: true,
       onOfflineReady: () => setNotice('offline-ready'),
       onNeedRefresh: () => setNotice('update-ready')
     });
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
   }, []);
 
   if (notice === null) return null;

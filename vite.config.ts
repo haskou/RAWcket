@@ -7,11 +7,16 @@ const crossOriginIsolationHeaders = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
   'Cross-Origin-Resource-Policy': 'cross-origin'
 };
+const basePath = process.env.VITE_BASE_PATH ?? '/';
 
 export default defineConfig({
+  base: basePath,
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'pwa-sw.js',
       registerType: 'prompt',
       manifest: {
         name: 'RAWcket',
@@ -20,12 +25,12 @@ export default defineConfig({
         theme_color: '#10100f',
         background_color: '#10100f',
         display: 'standalone',
-        start_url: '/'
+        start_url: basePath,
+        scope: basePath
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,png,webp,svg,woff2}', 'assets/libraw-*.wasm'],
-        cleanupOutdatedCaches: true,
-        navigateFallback: '/index.html'
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024
       }
     })
   ],

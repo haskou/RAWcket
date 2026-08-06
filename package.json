@@ -9,7 +9,7 @@
     "dev": "vite",
     "start": "vite",
     "build": "tsc -b && vite build",
-    "build:sites": "npm run build && mkdir -p dist/server && cp sites/worker.js dist/server/index.js",
+    "build:pages": "VITE_BASE_PATH=/RAWcket/ npm run build && cp dist/index.html dist/404.html",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b --pretty false",
