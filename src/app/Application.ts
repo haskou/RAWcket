@@ -36,6 +36,7 @@ import { SuggestAutomaticEnhancement } from '@/contexts/projects/application/sug
 import { RenderProjectPreview } from '@/contexts/projects/application/render-project-preview/RenderProjectPreview';
 import { RenderProjectBaseline } from '@/contexts/projects/application/render-project-baseline/RenderProjectBaseline';
 import { RenderProjectCropPreview } from '@/contexts/projects/application/render-project-crop-preview/RenderProjectCropPreview';
+import { RenderProjectThumbnail } from '@/contexts/projects/application/render-project-thumbnail/RenderProjectThumbnail';
 import { RequestEditingAdvice } from '@/contexts/projects/application/request-editing-advice/RequestEditingAdvice';
 import { RequestPhotoOpinion } from '@/contexts/projects/application/request-photo-opinion/RequestPhotoOpinion';
 import { ReviewDevelopment } from '@/contexts/projects/application/review-development/ReviewDevelopment';
@@ -75,6 +76,7 @@ import { RenderSourceDecoder } from '@/contexts/projects/infrastructure/renderer
 import { CachingRenderSourceDecoder } from '@/contexts/projects/infrastructure/renderers/CachingRenderSourceDecoder';
 import { BrowserImagePixelReader } from '@/contexts/projects/infrastructure/renderers/BrowserImagePixelReader';
 import { ReferenceRawDisplayCalibrator } from '@/contexts/projects/infrastructure/renderers/ReferenceRawDisplayCalibrator';
+import { BrowserProjectThumbnailRenderer } from '@/contexts/projects/infrastructure/renderers/BrowserProjectThumbnailRenderer';
 import { RawDisplayStatisticsAnalyzer } from '@/contexts/projects/infrastructure/renderers/RawDisplayStatisticsAnalyzer';
 import { RawDisplayToneMapper } from '@/contexts/projects/infrastructure/renderers/RawDisplayToneMapper';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
@@ -127,6 +129,7 @@ export type Application = {
   renderProjectPreview: RenderProjectPreview;
   renderProjectBaseline: RenderProjectBaseline;
   renderProjectCropPreview: RenderProjectCropPreview;
+  renderProjectThumbnail: RenderProjectThumbnail;
   requestEditingAdvice: RequestEditingAdvice;
   recordAiDevelopmentAdvice: RecordAiDevelopmentAdvice;
   requestPhotoOpinion: RequestPhotoOpinion;
@@ -222,6 +225,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     renderProjectBaseline: new RenderProjectBaseline(previewRenderer),
     renderProjectCropPreview: new RenderProjectCropPreview(previewRenderer),
+    renderProjectThumbnail: new RenderProjectThumbnail(projects, sourceFiles, sourceImageInspector, new BrowserProjectThumbnailRenderer()),
     requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi, new OpenAiEditProposalMapper())),
     recordAiDevelopmentAdvice: new RecordAiDevelopmentAdvice(),
     requestPhotoOpinion: new RequestPhotoOpinion(new OpenAiPhotoOpinionAdvisor(openAi)),

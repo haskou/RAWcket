@@ -1,4 +1,4 @@
-import { CaptureMetadata, emptyCaptureMetadata } from '@/contexts/projects/domain/CaptureMetadata';
+import { CaptureMetadata, emptyCaptureMetadata, ExifOrientation } from '@/contexts/projects/domain/CaptureMetadata';
 
 describe('CaptureMetadata', () => {
   it('validates and serializes photographic source facts', () => {
@@ -19,6 +19,7 @@ describe('CaptureMetadata', () => {
     });
 
     expect(metadata.isEmpty()).toBe(false);
+    expect(metadata.getOrientation()?.isEqual(new ExifOrientation(1))).toBe(true);
     expect(metadata.toPrimitives()).toMatchObject({ cameraMake: 'SONY', cameraModel: 'ILCE-6600', iso: 640, cfaPattern: 'RGGB' });
   });
 

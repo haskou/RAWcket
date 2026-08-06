@@ -507,7 +507,7 @@ export function LibraryPage(): ReactElement {
                     </div>
                   </details>
                   <button className="project-open" type="button" onClick={() => void navigate(`/editor/${id}`)} aria-label={`Open ${name}`}>
-                    <ProjectThumbnail projectId={id} name={name} mimeType={project.getSourceMimeType().valueOf()} />
+                    <ProjectThumbnail projectId={id} name={name} />
                     <span className="project-meta"><strong>{name}</strong><small>Edited {project.getUpdatedAt().toDate().toLocaleString('en')}</small></span>
                   </button>
                   <ProjectOrganizationControls project={project} onRate={(rating) => void changeRating(project, rating)} onTags={(tags) => void changeTags(project, tags)} onFavorite={(favorite) => void changeFavorite(project, favorite)} />

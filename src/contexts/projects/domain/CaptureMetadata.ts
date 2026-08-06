@@ -95,6 +95,10 @@ export class CaptureMetadata {
     return Object.values(this.toPrimitives()).every((value) => value === null);
   }
 
+  public getOrientation(): ExifOrientation | null {
+    return this.orientation === null ? null : new ExifOrientation(this.orientation);
+  }
+
   public toPrimitives(): CaptureMetadataPrimitives {
     return {
       cameraMake: this.cameraMake?.valueOf() ?? null,
