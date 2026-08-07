@@ -105,8 +105,10 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
           { kind: 'global-adjustment', key: 'contrast', value: 14 },
           { kind: 'global-adjustment', key: 'highlights', value: -22 },
           { kind: 'tone-curve', channel: 'rgb', interpolation: 'monotonic-cubic', points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.2 }, { x: 0.75, y: 0.82 }, { x: 1, y: 1 }] },
+          { kind: 'tone-curve', channel: 'luminance', interpolation: 'monotonic-cubic', points: [{ x: 0, y: 0 }, { x: 0.35, y: 0.3 }, { x: 0.8, y: 0.84 }, { x: 1, y: 1 }] },
           { kind: 'viewport', cropFrame: { x: 0.05, y: 0.05, width: 0.9, height: 0.9 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
-          { kind: 'radial-mask', center: { x: 0.5, y: 0.45 }, radiusX: 0.2, radiusY: 0.28, rotationDegrees: 0, inverted: false, opacity: 0.8, feather: 0.6, density: 1, localAdjustments: [{ key: 'exposure', value: 0.3 }] }
+          { kind: 'radial-mask', center: { x: 0.5, y: 0.45 }, radiusX: 0.2, radiusY: 0.28, rotationDegrees: 0, inverted: false, opacity: 0.8, feather: 0.6, density: 1, localAdjustments: [{ key: 'exposure', value: 0.3 }] },
+          { kind: 'linear-gradient-mask', start: { x: 0.5, y: 0 }, end: { x: 0.5, y: 0.45 }, inverted: false, opacity: 0.7, feather: 0.5, density: 1, localAdjustments: [{ key: 'highlights', value: -12 }] }
         ]
       };
     await route.fulfill({ status: 200, contentType: 'application/json', body: openAiEnvelope(result) });
@@ -126,8 +128,12 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   expect(aiRequestCount).toBe(1);
   await expect(page.getByRole('checkbox', { name: 'Contrast: +14' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Update RGB curve' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Update LUMINANCE curve' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Update crop and geometry' })).toBeChecked();
-  await expect(page.getByRole('checkbox', { name: 'Add local mask' })).toBeChecked();
+  const proposedMasks = page.getByRole('checkbox', { name: 'Add local mask' });
+  await expect(proposedMasks).toHaveCount(2);
+  await expect(proposedMasks.first()).toBeChecked();
+  await expect(proposedMasks.last()).toBeChecked();
   await page.getByRole('button', { name: 'Apply selected' }).click();
   await expect(activeRecipe.getByRole('button', { name: /Contrast \+14/ })).toBeVisible();
   await expect(activeRecipe.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
