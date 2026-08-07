@@ -1417,8 +1417,9 @@ export function EditorPage(): ReactElement {
                 <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => previewLoaded(event.currentTarget)} />
                 {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || colorPointActive || aiPointActive) && <MaskOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />}
                 {fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame">
-                  <ImageCompositionGuideOverlay guide={compositionGuide} />
-                  {toolWorkspace === 'develop' && activePanel === 'crop' && <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} />}
+                  {toolWorkspace === 'develop' && activePanel === 'crop'
+                    ? <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} guide={compositionGuide} />
+                    : <CompositionFrameGuideOverlay guide={compositionGuide} frame="image" />}
                 </div>}
               </div>
             )}
@@ -1686,9 +1687,9 @@ function MaskShapeOverlay({ mask, className }: { mask: MaskDefinitionPrimitives;
   return null;
 }
 
-function ImageCompositionGuideOverlay({ guide }: { guide: CompositionGuide }): ReactElement | null {
+function CompositionFrameGuideOverlay({ guide, frame }: { guide: CompositionGuide; frame: 'image' | 'crop' }): ReactElement | null {
   if (guide !== 'thirds' && guide !== 'golden-ratio') return null;
-  return <svg className="composition-guide-overlay image-guide" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Image composition guide">
+  return <svg className={`composition-guide-overlay ${frame}-guide`} viewBox="0 0 1 1" preserveAspectRatio="none" aria-label={`${frame === 'crop' ? 'Crop' : 'Image'} composition guide`}>
     {guide === 'thirds' && <path d="M.333 0V1 M.667 0V1 M0 .333H1 M0 .667H1" />}
     {guide === 'golden-ratio' && <path d="M.382 0V1 M.618 0V1 M0 .382H1 M0 .618H1" />}
   </svg>;
@@ -1703,13 +1704,14 @@ function WorkspaceCompositionGuideOverlay({ guide }: { guide: CompositionGuide }
   </svg>;
 }
 
-function CropSelectionOverlay({ crop }: { crop: ViewportTransformPrimitives['cropFrame'] }): ReactElement {
+function CropSelectionOverlay({ crop, guide }: { crop: ViewportTransformPrimitives['cropFrame']; guide: CompositionGuide }): ReactElement {
   return <div className="crop-selection-overlay" role="img" aria-label={`Crop selection: left ${crop.x.toFixed(3)}, top ${crop.y.toFixed(3)}, width ${crop.width.toFixed(3)}, height ${crop.height.toFixed(3)}. Drag inside to move, drag a corner to resize, or drag outside to draw a new crop.`}>
     <span className="crop-selection-shade top" style={{ height: `${crop.y * 100}%` }} />
     <span className="crop-selection-shade bottom" style={{ top: `${(crop.y + crop.height) * 100}%` }} />
     <span className="crop-selection-shade left" style={{ top: `${crop.y * 100}%`, width: `${crop.x * 100}%`, height: `${crop.height * 100}%` }} />
     <span className="crop-selection-shade right" style={{ top: `${crop.y * 100}%`, left: `${(crop.x + crop.width) * 100}%`, height: `${crop.height * 100}%` }} />
     <div className="crop-selection-frame" style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }}>
+      <CompositionFrameGuideOverlay guide={guide} frame="crop" />
       <span className="top-left" data-crop-handle="top-left" /><span className="top-right" data-crop-handle="top-right" /><span className="bottom-left" data-crop-handle="bottom-left" /><span className="bottom-right" data-crop-handle="bottom-right" />
     </div>
   </div>;

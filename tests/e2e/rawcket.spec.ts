@@ -220,6 +220,20 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByLabel('Height numeric value').fill('0.6');
   await expect(page.locator('.crop-selection-frame')).toHaveAttribute('style', /width: 30%/);
   await expect(page.locator('.crop-selection-shade')).toHaveCount(4);
+  await expect(page.getByLabel('Crop composition guide')).toBeVisible();
+  await expect(page.getByLabel('Image composition guide')).toHaveCount(0);
+  const cropGuideAlignment = await page.evaluate(() => {
+    const crop = document.querySelector('.crop-selection-frame')?.getBoundingClientRect();
+    const guide = document.querySelector('.crop-guide')?.getBoundingClientRect();
+    if (crop === undefined || guide === undefined) return Number.POSITIVE_INFINITY;
+    return Math.max(
+      Math.abs(crop.left - guide.left),
+      Math.abs(crop.top - guide.top),
+      Math.abs(crop.right - guide.right),
+      Math.abs(crop.bottom - guide.bottom)
+    );
+  });
+  expect(cropGuideAlignment).toBeLessThan(2);
   await expect.poll(() => page.evaluate(() => {
     const preview = document.querySelector('.source-preview')?.getBoundingClientRect();
     const guide = document.querySelector('.fixed-guide-frame')?.getBoundingClientRect();
