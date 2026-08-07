@@ -70,7 +70,7 @@ import { downloadBlob } from '../lib/browserImages';
 
 type EditorPanel = AdjustmentSection | 'curves' | 'crop' | 'masks' | 'ai';
 type ToolWorkspace = 'ai' | 'develop';
-type InspectorTab = 'edit' | 'masks' | 'ai' | 'history';
+type InspectorTab = 'edit' | 'crop' | 'masks' | 'ai' | 'history';
 type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
 type BrushGesture = { pointerId: number; maskId: string; groupId: string };
@@ -80,6 +80,14 @@ type CropGesture =
 type AiPointPolarity = 'positive' | 'negative';
 type ImageDimensions = { width: number; height: number };
 type PendingAiAction = 'opinion' | 'prompt' | null;
+
+const inspectorTabs: ReadonlyArray<{ id: InspectorTab; label: string; icon: string }> = [
+  { id: 'edit', label: 'Edit', icon: '☼' },
+  { id: 'crop', label: 'Crop', icon: '⌗' },
+  { id: 'masks', label: 'Masks', icon: '◐' },
+  { id: 'ai', label: 'AI', icon: '✦' },
+  { id: 'history', label: 'History', icon: '◷' }
+];
 
 const minimumZoom = 0.1;
 const maximumZoom = 8;
@@ -216,6 +224,7 @@ export function EditorPage(): ReactElement {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [photoInformationOpen, setPhotoInformationOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [recipeCollapsed, setRecipeCollapsed] = useState(false);
   const [recipePresetMessage, setRecipePresetMessage] = useState<string | undefined>();
   const [recipePresets, setRecipePresets] = useState<RecipePreset[]>([]);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -493,9 +502,20 @@ export function EditorPage(): ReactElement {
   const openPanel = useCallback((panel: EditorPanel): void => {
     setActivePanel(panel);
     setToolWorkspace(panel === 'ai' ? 'ai' : 'develop');
-    setInspectorTab(panel === 'ai' ? 'ai' : panel === 'masks' ? 'masks' : 'edit');
+    setInspectorTab(panel === 'ai' ? 'ai' : panel === 'masks' ? 'masks' : panel === 'crop' ? 'crop' : 'edit');
     window.requestAnimationFrame(() => document.getElementById(`tool-${panel}`)?.scrollIntoView({ block: 'start' }));
   }, []);
+
+  const selectInspectorTab = (tab: InspectorTab): void => {
+    if (tab === 'edit') openPanel(activePanel === 'color' || activePanel === 'detail' || activePanel === 'curves' ? activePanel : 'light');
+    else if (tab === 'crop') openPanel('crop');
+    else if (tab === 'masks') openPanel('masks');
+    else if (tab === 'ai') openPanel('ai');
+    else {
+      setInspectorTab('history');
+      setToolWorkspace('develop');
+    }
+  };
 
   const toggleComparison = useCallback((): void => {
     preserveViewportOnNextImageLoad.current = true;
@@ -1283,6 +1303,8 @@ export function EditorPage(): ReactElement {
     const preserveViewport = preserveViewportOnNextImageLoad.current;
     preserveViewportOnNextImageLoad.current = false;
     if (imageDimensions?.width === dimensions.width && imageDimensions.height === dimensions.height) return;
+    if (preserveViewport && imageDimensions !== null
+      && Math.abs(imageDimensions.width / imageDimensions.height - dimensions.width / dimensions.height) < 0.0001) return;
     setImageDimensions(dimensions);
     window.requestAnimationFrame(() => {
       const fitted = calculateFitDimensions(dimensions);
@@ -1341,13 +1363,26 @@ export function EditorPage(): ReactElement {
       </header>
       <input ref={recipePresetInput} className="visually-hidden" type="file" accept=".rawcket-recipe.json,application/json" aria-label="Select a RAWcket recipe preset" onChange={(event) => void importRecipePreset(event)} />
       {autosave.error !== null && <p className="editor-error" role="alert">{autosave.error}</p>}
-      <section className="editor-workspace">
-        <nav className="tool-rail" aria-label="Spatial tools">
-          <button className={inspectorTab === 'edit' && activePanel !== 'crop' ? 'active' : ''} type="button" onClick={() => openPanel('light')} title="Edit"><span aria-hidden="true">☼</span><small>Edit</small></button>
-          <button className={activePanel === 'crop' ? 'active' : ''} type="button" onClick={() => openPanel('crop')} title="Crop and geometry"><span aria-hidden="true">⌗</span><small>Crop</small></button>
-          <button className={inspectorTab === 'masks' ? 'active' : ''} type="button" onClick={() => openPanel('masks')} title="Masks"><span aria-hidden="true">◐</span><small>Mask</small></button>
-          <button className={inspectorTab === 'ai' ? 'active ai' : ''} type="button" onClick={() => openPanel('ai')} title="AI"><span aria-hidden="true">✦</span><small>AI</small></button>
-        </nav>
+      <section className={`editor-workspace ${recipeCollapsed ? 'recipe-collapsed' : ''}`}>
+        <ActiveRecipePanel
+          collapsed={recipeCollapsed}
+          onToggleCollapsed={() => setRecipeCollapsed((collapsed) => !collapsed)}
+          project={project}
+          onNavigate={showAdjustment}
+          onToggle={toggleAdjustment}
+          onNavigateTool={openPanel}
+          onApplyPreset={applyBuiltInPreset}
+          onClear={() => apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: DevelopmentRecipe.neutral().toPrimitives(), groupId: null })}
+          customPresets={recipePresets}
+          onCreatePreset={(name) => void createRecipePreset(name)}
+          onApplyCustomPreset={(preset) => { apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: preset.getRecipe().toPrimitives(), groupId: null }); setRecipePresetMessage(`${preset.getName().valueOf()} applied as one reversible recipe operation.`); }}
+          onRenameCustomPreset={(preset, name) => void updateRecipePreset(preset, name, false)}
+          onUpdateCustomPreset={(preset) => void updateRecipePreset(preset, preset.getName().valueOf(), true)}
+          onExportCustomPreset={exportRecipePreset}
+          onDeleteCustomPreset={(preset) => void deleteRecipePreset(preset)}
+          onImportPreset={() => recipePresetInput.current?.click()}
+          presetMessage={recipePresetMessage}
+        />
         <div className="canvas-area">
           <div className="canvas-toolbar" aria-label="Preview controls">
             <button type="button" onClick={() => changeZoom(zoom - 0.1)} aria-label="Zoom out">−</button>
@@ -1400,12 +1435,7 @@ export function EditorPage(): ReactElement {
         </div>
         <aside className="tools-panel" aria-label="Editing tools">
           <div className="inspector-tabs" role="tablist" aria-label="Inspector">
-            {(['edit', 'masks', 'ai', 'history'] as const).map((tab) => <button role="tab" aria-selected={inspectorTab === tab} className={inspectorTab === tab ? `active ${tab}` : ''} type="button" key={tab} onClick={() => {
-              setInspectorTab(tab);
-              if (tab === 'edit') { setToolWorkspace('develop'); if (activePanel === 'ai' || activePanel === 'masks') setActivePanel('light'); }
-              if (tab === 'masks') { setToolWorkspace('develop'); setActivePanel('masks'); }
-              if (tab === 'ai') { setToolWorkspace('ai'); setActivePanel('ai'); }
-            }}>{tab === 'ai' ? 'AI' : `${tab[0]?.toUpperCase() ?? ''}${tab.slice(1)}`}</button>)}
+            {inspectorTabs.map((tab) => <button role="tab" aria-selected={inspectorTab === tab.id} className={inspectorTab === tab.id ? `active ${tab.id}` : ''} type="button" key={tab.id} onClick={() => selectInspectorTab(tab.id)}><span aria-hidden="true">{tab.icon}</span><small>{tab.label}</small></button>)}
           </div>
           {inspectorTab === 'edit' && <div className="inspector-pane edit-inspector" role="tabpanel">
             <HistogramPanel analysis={previewAnalysis} />
@@ -1426,10 +1456,11 @@ export function EditorPage(): ReactElement {
                 {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
               </div>
             </ToolSection>
-            <ToolSection id="crop" title="Crop & Geometry" active={activePanel === 'crop'} onToggle={setActivePanel}>
-              <p>Drag corner-to-corner on the photograph. The area outside the white frame is excluded.</p>
-              <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} onGuideChange={setCompositionGuide} horizonBusy={horizonBusy} horizonMessage={horizonMessage} onAutoStraighten={() => void autoStraighten()} />
-            </ToolSection>
+          </div>}
+          {inspectorTab === 'crop' && <div id="tool-crop" className="inspector-pane crop-inspector" role="tabpanel">
+            <header className="inspector-heading"><div><h2>Crop &amp; Geometry</h2><p>Frame, straighten, rotate, and correct perspective.</p></div></header>
+            <p className="crop-inspector-intro">Drag inside the frame to move it, use its corners to resize, or drag outside it to draw a new crop.</p>
+            <GeometryControls project={project} onChange={changeViewport} guide={compositionGuide} onGuideChange={setCompositionGuide} horizonBusy={horizonBusy} horizonMessage={horizonMessage} onAutoStraighten={() => void autoStraighten()} />
           </div>}
           {inspectorTab === 'masks' && <div className="inspector-pane masks-inspector" role="tabpanel">
             <header className="inspector-heading"><h2>Masks</h2><p>Manual and semantic selections share the same editable mask stack.</p></header>
@@ -1527,24 +1558,7 @@ export function EditorPage(): ReactElement {
           </div>}
           {inspectorTab === 'history' && <div className="inspector-pane history-inspector" role="tabpanel">
             <div className="history-inspector-actions"><button type="button" disabled={!project.canUndo()} onClick={() => changeHistory('undo')}>Undo</button><button type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')}>Redo</button><button type="button" onClick={() => setHistoryOpen(true)}>Timeline</button></div>
-            <ActiveRecipePanel
-              embedded
-              project={project}
-              onNavigate={showAdjustment}
-              onToggle={toggleAdjustment}
-              onNavigateTool={openPanel}
-              onApplyPreset={applyBuiltInPreset}
-              onClear={() => apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: DevelopmentRecipe.neutral().toPrimitives(), groupId: null })}
-              customPresets={recipePresets}
-              onCreatePreset={(name) => void createRecipePreset(name)}
-              onApplyCustomPreset={(preset) => { apply({ kind: EDIT_OPERATION.REPLACE_RECIPE, recipe: preset.getRecipe().toPrimitives(), groupId: null }); setRecipePresetMessage(`${preset.getName().valueOf()} applied as one reversible recipe operation.`); }}
-              onRenameCustomPreset={(preset, name) => void updateRecipePreset(preset, name, false)}
-              onUpdateCustomPreset={(preset) => void updateRecipePreset(preset, preset.getName().valueOf(), true)}
-              onExportCustomPreset={exportRecipePreset}
-              onDeleteCustomPreset={(preset) => void deleteRecipePreset(preset)}
-              onImportPreset={() => recipePresetInput.current?.click()}
-              presetMessage={recipePresetMessage}
-            />
+            <div className="history-inspector-empty"><strong>Visual history</strong><p>Use Timeline for the complete undo and redo sequence. The active recipe stays visible in the left panel.</p></div>
           </div>}
         </aside>
       </section>

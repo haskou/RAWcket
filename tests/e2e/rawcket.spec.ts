@@ -44,9 +44,25 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   });
 
   await expect(page.getByLabel('Project name')).toHaveValue('night');
+  await expect(page.getByRole('navigation', { name: 'Spatial tools' })).toHaveCount(0);
+  for (const [tab, icon] of [['Edit', '☼'], ['Crop', '⌗'], ['Masks', '◐'], ['AI', '✦'], ['History', '◷']] as const) {
+    await expect(page.getByRole('tab', { name: tab }).locator('span')).toHaveText(icon);
+  }
+  const recipeBounds = await page.getByRole('complementary', { name: 'Active Recipe', exact: true }).boundingBox();
+  const canvasAreaBounds = await page.locator('.canvas-area').boundingBox();
+  if (recipeBounds === null || canvasAreaBounds === null) throw new Error('The desktop editor columns are unavailable.');
+  expect(recipeBounds.x + recipeBounds.width).toBeLessThanOrEqual(canvasAreaBounds.x + 1);
+  await page.getByRole('button', { name: 'Collapse Active Recipe' }).click();
+  await expect(page.getByRole('complementary', { name: 'Active Recipe collapsed', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Expand Active Recipe' }).click();
+  await expect(page.getByRole('complementary', { name: 'Active Recipe', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByText('No active edits')).toBeVisible();
-  await expect(page.getByLabel('Active Recipe').getByRole('button', { name: /^Exposure / })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('complementary', { name: 'Active Recipe', exact: true })
+      .getByRole('button', { name: /^Exposure / }),
+  ).toHaveCount(0);
   const webGpuAvailable = await page.evaluate(async () => {
     if (!Reflect.has(navigator, 'gpu')) return false;
     return (await navigator.gpu.requestAdapter()) !== null;
@@ -133,7 +149,11 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.locator('.adjustment-control.modified').filter({ has: page.getByLabel('Exposure numeric value') }).getByLabel('Modified')).toBeVisible();
   await page.getByRole('button', { name: 'Reset Exposure' }).click();
   await page.getByRole('tab', { name: 'History' }).click();
-  await expect(page.getByLabel('Active Recipe').getByRole('button', { name: /^Exposure / })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('complementary', { name: 'Active Recipe', exact: true })
+      .getByRole('button', { name: /^Exposure / }),
+  ).toHaveCount(0);
   await page.getByRole('tab', { name: 'Edit' }).click();
   await page.getByLabel('Exposure numeric value').fill('0.25');
   await page.getByRole('button', { name: 'Disable Exposure' }).click();
