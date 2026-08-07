@@ -1,7 +1,7 @@
 import type { EditingAdvisor, EditingContext, EditProposal } from '../../application/ports/EditingAdvisor';
 import type { OpenAiResponsesClient } from '@/contexts/ai/infrastructure/openai/OpenAiResponsesClient';
 import { parseAiStructuredResult } from '@/contexts/ai/infrastructure/validation/parseAiStructuredResult';
-import { openAiEditProposalJsonSchema, openAiEditProposalSchema } from './OpenAiEditProposalContract';
+import { openAiEditProposalJsonSchema, openAiEditProposalSchema, type OpenAiEditProposal } from './OpenAiEditProposalContract';
 import type { OpenAiEditProposalMapper } from './OpenAiEditProposalMapper';
 
 export class OpenAiEditingAdvisor implements EditingAdvisor {
@@ -26,6 +26,7 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
         'The supplied image is the CURRENT rendered state after the active recipe, not the untouched original. Judge it as shown and propose absolute final settings that build on that current state.',
         'Return a candid critique, strengths, opportunities, a concrete suggestedIntent, and a complete editable proposal in this single response.',
         'Judge the visible photograph, preserve believable color and texture, and propose any combination of global adjustments, monotonic-cubic tone curves, crop and geometry, radial masks, linear gradient masks, luminance-range masks, and point-guided smart masks that materially supports the intent.',
+        'A complete RAWcket proposal is not slider-only. In the FIRST response include at least one purposeful tone-curve operation and at least one purposeful local mask operation unless the photographer explicitly excludes curves or masks. For a scene without a safely identifiable semantic subject, use a restrained luminance-range, linear-gradient, or radial mask instead of inventing a subject.',
         'Treat the supplied render as the color-managed photographic baseline. When a matching camera JPEG was imported with a RAW file, RAWcket has already matched the RAW baseline to its tone and color; do not undo that calibration. Otherwise judge only what is visibly present. Diagnose visible color casts, weak chroma, compressed midtones, or haze independently instead of applying blanket exposure or saturation.',
         'The default finish must look photographically rich and natural, never pale, milky, faded, or low-density unless the photographer explicitly requests that aesthetic. Preserve a convincing black point, luminous rather than grey highlights, midtone separation, and the scene’s existing warm/cool atmosphere.',
         'When the visible image looks flat or washed out, restore separation with a restrained RGB or luminance tone curve and modest vibrance where needed. Prefer curve shape, black/white placement, local contrast, and vibrance over blanket exposure, lifted shadows, or heavy saturation. Do not combine raised blacks, strongly opened shadows, and reduced color density.',
@@ -59,11 +60,26 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
     };
   }
 
-  private missingExplicitTools(context: EditingContext, result: { suggestedIntent: string; explanation: string; operations: Array<{ kind: string }> }): string[] {
+  private missingExplicitTools(context: EditingContext, result: OpenAiEditProposal): string[] {
     const requested = context.intent ?? '';
     const missing: string[] = [];
     if (/(crop|cropping|reframe|reframing|recort|encuadr)/iu.test(requested) && !result.operations.some((operation) => operation.kind === 'viewport')) missing.push('crop/viewport');
-    if (/(tone curve|curves|curve|curvas|curva)/iu.test(context.intent ?? '') && !result.operations.some((operation) => operation.kind === 'tone-curve')) missing.push('tone-curve');
+    if (!this.excludesToneCurves(requested) && !result.operations.some((operation) => operation.kind === 'tone-curve')) missing.push('tone-curve');
+    if (!this.excludesLocalMasks(requested) && !result.operations.some((operation) => this.isLocalMask(operation.kind))) {
+      missing.push('local mask (radial-mask, linear-gradient-mask, luminance-range-mask, or smart-mask)');
+    }
     return missing;
+  }
+
+  private excludesToneCurves(intent: string): boolean {
+    return /((without|avoid|exclude|sin|evita|excluye)[^.!?]{0,24}(tone[ -]?curves?|curves?|curvas?)|\bno\s+(tone[ -]?curves?|curves?|curvas?)\b)/iu.test(intent);
+  }
+
+  private excludesLocalMasks(intent: string): boolean {
+    return /((without|avoid|exclude|sin|evita|excluye)[^.!?]{0,24}(local[ -]?masks?|masks?|máscaras?|mascaras?)|\bno\s+(local[ -]?masks?|masks?|máscaras?|mascaras?)\b)/iu.test(intent);
+  }
+
+  private isLocalMask(kind: string): boolean {
+    return kind === 'radial-mask' || kind === 'linear-gradient-mask' || kind === 'luminance-range-mask' || kind === 'smart-mask';
   }
 }

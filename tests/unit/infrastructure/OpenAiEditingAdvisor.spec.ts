@@ -3,6 +3,16 @@ import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import { OpenAiEditProposalMapper } from '@/contexts/projects/infrastructure/advisors/OpenAiEditProposalMapper';
 import { OpenAiEditingAdvisor } from '@/contexts/projects/infrastructure/advisors/OpenAiEditingAdvisor';
 
+const restrainedCurve = {
+  kind: 'tone-curve', channel: 'rgb', interpolation: 'monotonic-cubic',
+  points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.2 }, { x: 0.75, y: 0.8 }, { x: 1, y: 1 }]
+};
+const restrainedLuminanceMask = {
+  kind: 'luminance-range-mask', minimum: 0.35, maximum: 0.85,
+  inverted: false, opacity: 0.65, feather: 0.55, density: 1,
+  localAdjustments: [{ key: 'clarity', value: 5 }]
+};
+
 describe('OpenAiEditingAdvisor', () => {
   it('returns domain-validated curves, crop geometry, and local masks alongside global adjustments', async () => {
     const reason = vi.fn<(request: OpenAiStructuredRequest) => Promise<unknown>>().mockResolvedValue({
@@ -48,17 +58,23 @@ describe('OpenAiEditingAdvisor', () => {
     expect(reason.mock.calls[0]?.[0].instructions).toContain('matching camera JPEG');
     expect(reason.mock.calls[0]?.[0].instructions).toContain('judge only what is visibly present');
     expect(reason.mock.calls[0]?.[0].instructions).toContain('restrained RGB or luminance tone curve');
+    expect(reason.mock.calls[0]?.[0].instructions).toContain('not slider-only');
+    expect(reason.mock.calls[0]?.[0].instructions).toContain('FIRST response');
     expect(reason.mock.calls[0]?.[0].instructions).toContain('never pale, milky, faded, or low-density');
     expect(reason.mock.calls[0]?.[0].instructions).toContain('preserve or gently strengthen perceptual color density');
     expect(proposal.operations[4]).toMatchObject({ mask: { shape: { kind: 'ai-segmentation', prompt: 'face' } } });
   });
 
-  it('keeps an open visual opinion to one call when its prose mentions a crop but does not propose one', async () => {
+  it('keeps a complete open visual opinion to one call without forcing a crop', async () => {
     const reason = vi.fn<(request: OpenAiStructuredRequest) => Promise<unknown>>().mockResolvedValue({
       suggestedIntent: 'Keep the existing crop and add restrained tonal separation.',
       critique: 'The framing already supports the subject.', strengths: ['Composition'], opportunities: ['Midtone separation'],
       explanation: 'The crop is already effective, so only a small contrast adjustment is useful.',
-      operations: [{ kind: 'global-adjustment', key: 'contrast', value: 6 }]
+      operations: [
+        { kind: 'global-adjustment', key: 'contrast', value: 6 },
+        restrainedCurve,
+        restrainedLuminanceMask
+      ]
     });
     const advisor = new OpenAiEditingAdvisor({ reason } as unknown as OpenAiResponsesClient, new OpenAiEditProposalMapper());
 
@@ -73,7 +89,11 @@ describe('OpenAiEditingAdvisor', () => {
       },
       currentViewport: { cropFrame: { x: 0, y: 0, width: 1, height: 1 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
       existingMaskCount: 0
-    })).resolves.toMatchObject({ operations: [{ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT }] });
+    })).resolves.toMatchObject({ operations: [
+      { kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT },
+      { kind: EDIT_OPERATION.SET_CURVE },
+      { kind: EDIT_OPERATION.ADD_MASK }
+    ] });
     expect(reason).toHaveBeenCalledTimes(1);
   });
 
@@ -91,7 +111,11 @@ describe('OpenAiEditingAdvisor', () => {
       suggestedIntent: 'Aplicar un recorte leve para dirigir la mirada.',
       critique: 'El encuadre tiene espacio prescindible.', strengths: ['Atmósfera'], opportunities: ['Recorte'],
       explanation: 'El recorte mejora la jerarquía.',
-      operations: [{ kind: 'global-adjustment', key: 'contrast', value: 5 }]
+      operations: [
+        { kind: 'global-adjustment', key: 'contrast', value: 5 },
+        restrainedCurve,
+        restrainedLuminanceMask
+      ]
     };
     const viewport = { kind: 'viewport', cropFrame: { x: 0.05, y: 0.05, width: 0.9, height: 0.9 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null };
     const reason = vi.fn<(request: OpenAiStructuredRequest) => Promise<unknown>>()
@@ -117,17 +141,19 @@ describe('OpenAiEditingAdvisor', () => {
     expect(proposal.operations.some((operation) => operation.kind === EDIT_OPERATION.SET_VIEWPORT_TRANSFORM)).toBe(true);
   });
 
-  it('repairs a proposal that omits an explicitly requested tone curve', async () => {
+  it('repairs a proposal that omits the required purposeful tone curve', async () => {
     const base = {
       suggestedIntent: 'Use a restrained tonal adjustment.',
       critique: 'The midtones lack separation.', strengths: ['Atmosphere'], opportunities: ['Tonal structure'],
       explanation: 'A small contrast adjustment will improve separation.',
-      operations: [{ kind: 'global-adjustment', key: 'contrast', value: 5 }]
+      operations: [
+        { kind: 'global-adjustment', key: 'contrast', value: 5 },
+        restrainedLuminanceMask
+      ]
     };
-    const curve = { kind: 'tone-curve', channel: 'rgb', interpolation: 'monotonic-cubic', points: [{ x: 0, y: 0 }, { x: 0.25, y: 0.2 }, { x: 0.75, y: 0.8 }, { x: 1, y: 1 }] };
     const reason = vi.fn<(request: OpenAiStructuredRequest) => Promise<unknown>>()
       .mockResolvedValueOnce(base)
-      .mockResolvedValueOnce({ ...base, operations: [...base.operations, curve] });
+      .mockResolvedValueOnce({ ...base, operations: [...base.operations, restrainedCurve] });
     const advisor = new OpenAiEditingAdvisor({ reason } as unknown as OpenAiResponsesClient, new OpenAiEditProposalMapper());
 
     const proposal = await advisor.propose({
@@ -146,5 +172,38 @@ describe('OpenAiEditingAdvisor', () => {
     expect(reason).toHaveBeenCalledTimes(2);
     expect(reason.mock.calls[1]?.[0].instructions).toContain('tone-curve');
     expect(proposal.operations.some((operation) => operation.kind === EDIT_OPERATION.SET_CURVE)).toBe(true);
+  });
+
+  it('repairs a slider-and-curve proposal that omits local masking', async () => {
+    const base = {
+      suggestedIntent: 'Build a natural hierarchy around the subject.',
+      critique: 'The subject needs local separation.', strengths: ['Expression'], opportunities: ['Local hierarchy'],
+      explanation: 'Global tone alone cannot direct attention precisely.',
+      operations: [
+        { kind: 'global-adjustment', key: 'contrast', value: 5 },
+        restrainedCurve
+      ]
+    };
+    const reason = vi.fn<(request: OpenAiStructuredRequest) => Promise<unknown>>()
+      .mockResolvedValueOnce(base)
+      .mockResolvedValueOnce({ ...base, operations: [...base.operations, restrainedLuminanceMask] });
+    const advisor = new OpenAiEditingAdvisor({ reason } as unknown as OpenAiResponsesClient, new OpenAiEditProposalMapper());
+
+    const proposal = await advisor.propose({
+      projectName: 'Portrait', intent: 'Build a natural portrait', preview: new Blob(['preview']), shadowClipping: 0, highlightClipping: 0,
+      currentAdjustments: {},
+      currentCurves: {
+        rgb: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        red: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        green: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' },
+        blue: { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], interpolation: 'monotonic-cubic' }, luminance: null
+      },
+      currentViewport: { cropFrame: { x: 0, y: 0, width: 1, height: 1 }, translation: { x: 0.5, y: 0.5 }, scale: 1, rotationDegrees: 0, horizontalPerspective: 0, verticalPerspective: 0, flipHorizontal: false, flipVertical: false, aspectRatio: null },
+      existingMaskCount: 0
+    });
+
+    expect(reason).toHaveBeenCalledTimes(2);
+    expect(reason.mock.calls[1]?.[0].instructions).toContain('local mask');
+    expect(proposal.operations.some((operation) => operation.kind === EDIT_OPERATION.ADD_MASK)).toBe(true);
   });
 });

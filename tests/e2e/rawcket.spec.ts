@@ -426,8 +426,10 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(activeRecipe.getByRole('article').filter({ hasText: 'Night master' })).toBeVisible();
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
-  await expect(page.getByRole('img', { name: 'After of night' })).toBeVisible();
-  await expect(page.getByText('AFTER', { exact: true })).toBeVisible();
+  const libraryPreview = page.getByRole('img', { name: 'Preview of night' });
+  await expect(libraryPreview).toBeVisible();
+  await expect(page.getByText('RAW', { exact: true })).toHaveCount(0);
+  await expect.poll(() => libraryPreview.evaluate((image) => getComputedStyle(image).objectFit)).toBe('contain');
   await page.getByRole('button', { name: 'Open night' }).hover();
   await page.getByRole('button', { name: 'Rate night 4 stars' }).click();
   await expect(page.getByRole('button', { name: 'Rate night 4 stars' })).toHaveAttribute('aria-pressed', 'true');
@@ -703,6 +705,8 @@ test('imports a Sony ARW container and develops its embedded preview locally', a
   await page.getByRole('tab', { name: 'Edit' }).click();
   await page.getByLabel('Exposure numeric value').fill('0.25');
   await page.getByRole('button', { name: 'Close project and return' }).click();
+  await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeVisible();
+  await expect(page.getByText('RAW', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open a6600-sample' }).click();
   await expect(page.getByRole('status', { name: 'Preparing edited preview' })).toBeVisible();
   await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeHidden();

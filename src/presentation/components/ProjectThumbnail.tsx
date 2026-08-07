@@ -3,7 +3,7 @@ import { RenderProjectThumbnailMessage } from '@/contexts/projects/application/r
 import { useApplication } from '../ApplicationContext';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 
-export function ProjectThumbnail({ projectId, name }: { projectId: string; name: string }): ReactElement {
+export function ProjectThumbnail({ projectId, name, raw }: { projectId: string; name: string; raw: boolean }): ReactElement {
   const { renderProjectThumbnail } = useApplication();
   const [source, setSource] = useState<Blob | null>(null);
   const url = useObjectUrl(source);
@@ -18,8 +18,8 @@ export function ProjectThumbnail({ projectId, name }: { projectId: string; name:
   }, [projectId, renderProjectThumbnail]);
   return (
     <div className="thumbnail">
-      {url === null ? <div className="thumbnail-placeholder" aria-label="Loading thumbnail">R</div> : <img src={url} alt={`After of ${name}`} />}
-      <span className="developed-badge">AFTER</span>
+      {url === null ? <div className="thumbnail-placeholder" aria-label="Loading thumbnail">R</div> : <img src={url} alt={`Preview of ${name}`} />}
+      {raw && <span className="raw-badge">RAW</span>}
     </div>
   );
 }
