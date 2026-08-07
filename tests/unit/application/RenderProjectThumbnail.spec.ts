@@ -1,65 +1,58 @@
+import { Timestamp } from '@haskou/value-objects';
 import { RenderProjectThumbnail } from '@/contexts/projects/application/render-project-thumbnail/RenderProjectThumbnail';
 import { RenderProjectThumbnailMessage } from '@/contexts/projects/application/render-project-thumbnail/messages/RenderProjectThumbnailMessage';
-import type { ProjectThumbnailRenderer } from '@/contexts/projects/application/ports/ProjectThumbnailRenderer';
-import type { SourceImageInspector } from '@/contexts/projects/application/ports/SourceImageInspector';
-import { ExifOrientation } from '@/contexts/projects/domain/CaptureMetadata';
-import { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
+import type { PreviewRenderer } from '@/contexts/projects/application/ports/PreviewRenderer';
+import { PreviewSize } from '@/contexts/projects/application/render-project-preview/PreviewSize';
+import { EDIT_OPERATION } from '@/contexts/projects/domain/EditOperation';
 import type { ProjectRepository } from '@/contexts/projects/domain/repositories/ProjectRepository';
 import type { SourceFileRepository } from '@/contexts/projects/domain/repositories/SourceFileRepository';
+import { AdjustmentKey } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
+import { GlobalAdjustmentValue } from '@/contexts/projects/domain/value-objects/GlobalAdjustmentValue';
 import { PhotoProjectMother } from '../../mothers/PhotoProjectMother';
 
 describe('RenderProjectThumbnail', () => {
-  it('renders an embedded RAW preview with the source EXIF orientation', async () => {
+  it('renders the current developed recipe at thumbnail size', async () => {
     const find = vi.fn<SourceFileRepository['find']>();
     const findById = vi.fn<ProjectRepository['findById']>();
-    const inspect = vi.fn<SourceImageInspector['inspect']>();
-    const render = vi.fn<ProjectThumbnailRenderer['render']>();
+    const render = vi.fn<PreviewRenderer['render']>();
     const sourceFiles = { find, save: vi.fn(), delete: vi.fn() } satisfies SourceFileRepository;
     const projects = { findById, findAll: vi.fn(), save: vi.fn(), delete: vi.fn() } satisfies ProjectRepository;
-    const inspector = { inspect } satisfies SourceImageInspector;
-    const renderer = { render } satisfies ProjectThumbnailRenderer;
+    const renderer = { render } satisfies PreviewRenderer;
     const source = new Blob(['raw'], { type: 'image/x-sony-arw' });
-    const embeddedPreview = new Blob(['preview'], { type: 'image/jpeg' });
     const rendered = new Blob(['thumbnail'], { type: 'image/webp' });
-    const baseProject = PhotoProjectMother.create();
-    const project = PhotoProject.fromPrimitives({
-      ...baseProject.toPrimitives(),
-      captureMetadata: { ...baseProject.toPrimitives().captureMetadata, orientation: 6 }
-    });
+    const project = PhotoProjectMother.create();
+    project.apply(
+      { kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT, key: 'exposure', value: 0.75, groupId: null },
+      Timestamp.now()
+    );
     findById.mockResolvedValue(project);
     find.mockResolvedValue(source);
-    inspect.mockResolvedValue({
-      width: 4_000,
-      height: 6_000,
-      mimeType: 'image/x-sony-arw',
-      embeddedPreview,
-      captureMetadata: project.getCaptureMetadata().toPrimitives()
-    });
     render.mockResolvedValue(rendered);
 
-    const result = await new RenderProjectThumbnail(projects, sourceFiles, inspector, renderer).render(
+    const result = await new RenderProjectThumbnail(projects, sourceFiles, renderer).render(
       new RenderProjectThumbnailMessage(project.getId().valueOf())
     );
 
     expect(result).toBe(rendered);
-    const orientation = render.mock.calls[0]?.[1];
-    expect(orientation?.isEqual(new ExifOrientation(6))).toBe(true);
+    const request = render.mock.calls[0]?.[0];
+    expect(request?.getProject()).toBe(project);
+    expect(request?.getSize().isEqual(PreviewSize.THUMBNAIL)).toBe(true);
+    const exposure = AdjustmentKey.fromPrimitives('exposure');
+    expect(request?.getRecipe().getGlobalAdjustment(exposure).isEqual(GlobalAdjustmentValue.for(exposure, 0.75))).toBe(true);
   });
 
   it('returns no thumbnail when the original is missing', async () => {
     const find = vi.fn<SourceFileRepository['find']>().mockResolvedValue(null);
     const findById = vi.fn<ProjectRepository['findById']>().mockResolvedValue(null);
-    const inspect = vi.fn<SourceImageInspector['inspect']>();
     const sourceFiles = { find, save: vi.fn(), delete: vi.fn() } satisfies SourceFileRepository;
     const projects = { findById, findAll: vi.fn(), save: vi.fn(), delete: vi.fn() } satisfies ProjectRepository;
-    const inspector = { inspect } satisfies SourceImageInspector;
-    const renderer = { render: vi.fn<ProjectThumbnailRenderer['render']>() } satisfies ProjectThumbnailRenderer;
+    const renderer = { render: vi.fn<PreviewRenderer['render']>() } satisfies PreviewRenderer;
 
-    const result = await new RenderProjectThumbnail(projects, sourceFiles, inspector, renderer).render(
+    const result = await new RenderProjectThumbnail(projects, sourceFiles, renderer).render(
       new RenderProjectThumbnailMessage('0f416f85-88cb-45c5-bb29-85203546ee51')
     );
 
     expect(result).toBeNull();
-    expect(inspect.mock.calls).toHaveLength(0);
+    expect(renderer.render).not.toHaveBeenCalled();
   });
 });

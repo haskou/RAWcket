@@ -76,7 +76,6 @@ import { RenderSourceDecoder } from '@/contexts/projects/infrastructure/renderer
 import { CachingRenderSourceDecoder } from '@/contexts/projects/infrastructure/renderers/CachingRenderSourceDecoder';
 import { BrowserImagePixelReader } from '@/contexts/projects/infrastructure/renderers/BrowserImagePixelReader';
 import { ReferenceRawDisplayCalibrator } from '@/contexts/projects/infrastructure/renderers/ReferenceRawDisplayCalibrator';
-import { BrowserProjectThumbnailRenderer } from '@/contexts/projects/infrastructure/renderers/BrowserProjectThumbnailRenderer';
 import { RawDisplayStatisticsAnalyzer } from '@/contexts/projects/infrastructure/renderers/RawDisplayStatisticsAnalyzer';
 import { RawDisplayToneMapper } from '@/contexts/projects/infrastructure/renderers/RawDisplayToneMapper';
 import { LocalDevelopmentTutor } from '@/contexts/projects/infrastructure/advisors/LocalDevelopmentTutor';
@@ -225,7 +224,7 @@ export function createApplication(databaseName = 'rawcket'): Application {
     renderProjectPreview: new RenderProjectPreview(previewRenderer),
     renderProjectBaseline: new RenderProjectBaseline(previewRenderer),
     renderProjectCropPreview: new RenderProjectCropPreview(previewRenderer),
-    renderProjectThumbnail: new RenderProjectThumbnail(projects, sourceFiles, sourceImageInspector, new BrowserProjectThumbnailRenderer()),
+    renderProjectThumbnail: new RenderProjectThumbnail(projects, sourceFiles, previewRenderer),
     requestEditingAdvice: new RequestEditingAdvice(new OpenAiEditingAdvisor(openAi, new OpenAiEditProposalMapper())),
     recordAiDevelopmentAdvice: new RecordAiDevelopmentAdvice(),
     requestPhotoOpinion: new RequestPhotoOpinion(new OpenAiPhotoOpinionAdvisor(openAi)),

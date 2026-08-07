@@ -18,8 +18,8 @@ export function ProjectThumbnail({ projectId, name }: { projectId: string; name:
   }, [projectId, renderProjectThumbnail]);
   return (
     <div className="thumbnail">
-      {url === null ? <div className="thumbnail-placeholder" aria-label="Loading thumbnail">R</div> : <img src={url} alt={`Original of ${name}`} />}
-      <span className="original-badge">ORIGINAL</span>
+      {url === null ? <div className="thumbnail-placeholder" aria-label="Loading thumbnail">R</div> : <img src={url} alt={`After of ${name}`} />}
+      <span className="developed-badge">AFTER</span>
     </div>
   );
 }

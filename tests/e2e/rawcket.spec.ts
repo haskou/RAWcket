@@ -426,6 +426,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(activeRecipe.getByRole('article').filter({ hasText: 'Night master' })).toBeVisible();
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
+  await expect(page.getByRole('img', { name: 'After of night' })).toBeVisible();
+  await expect(page.getByText('AFTER', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open night' }).hover();
   await page.getByRole('button', { name: 'Rate night 4 stars' }).click();
   await expect(page.getByRole('button', { name: 'Rate night 4 stars' })).toHaveAttribute('aria-pressed', 'true');
