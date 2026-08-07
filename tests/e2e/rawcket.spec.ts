@@ -12,6 +12,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   test.setTimeout(60_000);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+  await expect(page.locator('link[rel="icon"][sizes="any"]')).toHaveAttribute('href', '/favicon.ico');
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', '/apple-touch-icon.png');
 
   const pngBase64 = await page.evaluate(() => {
     const canvas = document.createElement('canvas');

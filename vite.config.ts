@@ -26,10 +26,14 @@ export default defineConfig({
         background_color: '#10100f',
         display: 'standalone',
         start_url: basePath,
-        scope: basePath
+        scope: basePath,
+        icons: [
+          { src: 'rawcket-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'rawcket-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }
+        ]
       },
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,png,webp,svg,woff2}', 'assets/libraw-*.wasm'],
+        globPatterns: ['**/*.{js,css,html,png,webp,svg,woff2,ico}', 'assets/libraw-*.wasm'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024
       }
     })
