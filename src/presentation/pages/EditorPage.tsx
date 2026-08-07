@@ -71,7 +71,7 @@ import { downloadBlob } from '../lib/browserImages';
 
 type EditorPanel = AdjustmentSection | 'curves' | 'crop' | 'masks' | 'ai';
 type ToolWorkspace = 'ai' | 'develop';
-type InspectorTab = 'edit' | 'crop' | 'masks' | 'ai' | 'history';
+type InspectorTab = 'edit' | 'crop' | 'masks' | 'ai';
 type Pan = { x: number; y: number };
 type PanGesture = Pan & { pointerId: number; startX: number; startY: number };
 type BrushGesture = { pointerId: number; maskId: string; groupId: string };
@@ -87,8 +87,7 @@ const inspectorTabs: ReadonlyArray<{ id: InspectorTab; label: string; icon: stri
   { id: 'edit', label: 'Edit', icon: '☼' },
   { id: 'crop', label: 'Crop', icon: '⌗' },
   { id: 'masks', label: 'Masks', icon: '◐' },
-  { id: 'ai', label: 'AI', icon: '✦' },
-  { id: 'history', label: 'History', icon: '◷' }
+  { id: 'ai', label: 'AI', icon: '✦' }
 ];
 
 const minimumZoom = 0.1;
@@ -519,11 +518,7 @@ export function EditorPage(): ReactElement {
     if (tab === 'edit') openPanel(activePanel === 'color' || activePanel === 'detail' || activePanel === 'curves' ? activePanel : 'light');
     else if (tab === 'crop') openPanel('crop');
     else if (tab === 'masks') openPanel('masks');
-    else if (tab === 'ai') openPanel('ai');
-    else {
-      setInspectorTab('history');
-      setToolWorkspace('develop');
-    }
+    else openPanel('ai');
   };
 
   const toggleComparison = useCallback((): void => {
@@ -560,7 +555,7 @@ export function EditorPage(): ReactElement {
       else if (event.key.toLowerCase() === 'b' && beforeSource !== null) toggleComparison();
       else if (event.key.toLowerCase() === 'g') setCompositionGuide((current) => compositionGuideSequence[(compositionGuideSequence.indexOf(current) + 1) % compositionGuideSequence.length] ?? 'none');
       else if (event.key.toLowerCase() === 'm') openPanel('masks');
-      else if (event.key.toLowerCase() === 'r') setInspectorTab('history');
+      else if (event.key.toLowerCase() === 'r') setRecipeCollapsed(false);
       else if (event.key.toLowerCase() === 'i') setPhotoInformationOpen(true);
       else if (event.key.toLowerCase() === 'h') setHistoryOpen(true);
       else if (event.key === 'Escape') { setBrushActive(false); setColorPointActive(false); setAiPointActive(false); }
@@ -1620,10 +1615,6 @@ export function EditorPage(): ReactElement {
                 </article>)}
               </div>
             </details>}
-          </div>}
-          {inspectorTab === 'history' && <div className="inspector-pane history-inspector" role="tabpanel">
-            <div className="history-inspector-actions"><button type="button" disabled={!project.canUndo()} onClick={() => changeHistory('undo')}>Undo</button><button type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')}>Redo</button><button type="button" onClick={() => setHistoryOpen(true)}>Timeline</button></div>
-            <div className="history-inspector-empty"><strong>Visual history</strong><p>Use Timeline for the complete undo and redo sequence. The active recipe stays visible in the left panel.</p></div>
           </div>}
         </aside>
       </section>

@@ -46,19 +46,20 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   });
 
   await expect(page.getByLabel('Project name')).toHaveValue('night');
+  const activeRecipe = page.getByRole('complementary', { name: 'Active Recipe', exact: true });
   await expect(page.getByRole('navigation', { name: 'Spatial tools' })).toHaveCount(0);
-  for (const [tab, icon] of [['Edit', '☼'], ['Crop', '⌗'], ['Masks', '◐'], ['AI', '✦'], ['History', '◷']] as const) {
+  for (const [tab, icon] of [['Edit', '☼'], ['Crop', '⌗'], ['Masks', '◐'], ['AI', '✦']] as const) {
     await expect(page.getByRole('tab', { name: tab }).locator('span')).toHaveText(icon);
   }
-  const recipeBounds = await page.getByRole('complementary', { name: 'Active Recipe', exact: true }).boundingBox();
+  await expect(page.getByRole('tab', { name: 'History' })).toHaveCount(0);
+  const recipeBounds = await activeRecipe.boundingBox();
   const canvasAreaBounds = await page.locator('.canvas-area').boundingBox();
   if (recipeBounds === null || canvasAreaBounds === null) throw new Error('The desktop editor columns are unavailable.');
   expect(recipeBounds.x + recipeBounds.width).toBeLessThanOrEqual(canvasAreaBounds.x + 1);
   await page.getByRole('button', { name: 'Collapse Active Recipe' }).click();
   await expect(page.getByRole('complementary', { name: 'Active Recipe collapsed', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Expand Active Recipe' }).click();
-  await expect(page.getByRole('complementary', { name: 'Active Recipe', exact: true })).toBeVisible();
-  await page.getByRole('tab', { name: 'History' }).click();
+  await expect(activeRecipe).toBeVisible();
   await expect(page.getByText('No active edits')).toBeVisible();
   await expect(
     page
@@ -128,30 +129,27 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('checkbox', { name: 'Update crop and geometry' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Add local mask' })).toBeChecked();
   await page.getByRole('button', { name: 'Apply selected' }).click();
-  await page.getByRole('tab', { name: 'History' }).click();
-  await expect(page.getByRole('button', { name: /Contrast \+14/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Contrast \+14/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Local Masks/ })).toBeVisible();
   await page.getByRole('tab', { name: 'Edit' }).click();
   await page.getByLabel('Edit target').selectOption('image');
   await page.getByRole('button', { name: 'Apply Auto Enhance' }).click();
-  await page.getByRole('tab', { name: 'History' }).click();
-  await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Local Masks/ })).toBeVisible();
   await page.keyboard.press('1');
   await expect(page.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute('aria-expanded', 'true');
   await page.getByLabel('Exposure numeric value').fill('0.25');
-  await page.getByRole('tab', { name: 'History' }).click();
-  await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
-  await page.keyboard.press('h');
+  await expect(activeRecipe.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Editor menu' }).click();
+  await page.getByRole('button', { name: 'Full visual history' }).click();
   await expect(page.getByRole('dialog', { name: 'Visual history' }).getByText('Exposure: +0.25')).toBeVisible();
   await page.getByRole('button', { name: 'Close visual history' }).click();
   await page.getByRole('tab', { name: 'Edit' }).click();
   await expect(page.locator('.adjustment-control.modified').filter({ has: page.getByLabel('Exposure numeric value') }).getByLabel('Modified')).toBeVisible();
   await page.getByRole('button', { name: 'Reset Exposure' }).click();
-  await page.getByRole('tab', { name: 'History' }).click();
   await expect(
     page
       .getByRole('complementary', { name: 'Active Recipe', exact: true })
@@ -423,10 +421,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('tab', { name: 'Red' }).click();
   await page.getByRole('button', { name: 'Paste RGB to Red' }).click();
   await expect(page.locator('.curve-graph.channel-red circle')).toHaveCount(3);
-  await page.getByRole('tab', { name: 'History' }).click();
-  await page.getByLabel('New preset name').fill('Night master');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByRole('article').filter({ hasText: 'Night master' })).toBeVisible();
+  await activeRecipe.getByLabel('New preset name').fill('Night master');
+  await activeRecipe.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(activeRecipe.getByRole('article').filter({ hasText: 'Night master' })).toBeVisible();
   await page.getByRole('button', { name: 'Close project and return' }).click();
 
   await page.getByRole('button', { name: 'Open night' }).hover();
@@ -449,16 +446,14 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByLabel('Minimum rating').selectOption('4');
   await expect(page.getByRole('button', { name: 'Open night' })).toBeVisible();
   await page.getByRole('button', { name: 'Open night' }).click();
-  await page.getByRole('tab', { name: 'History' }).click();
-  await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
   await page.getByRole('tab', { name: 'AI' }).click();
   await expect(page.getByText('Saved AI sessions · 1')).toBeVisible();
   await page.getByText('Saved AI sessions · 1').click();
   const savedCompanionAdvice = page.getByRole('article');
   await expect(savedCompanionAdvice.getByText('Shape a cinematic night portrait while keeping skin believable.')).toBeVisible();
   await expect(savedCompanionAdvice.getByText('applied', { exact: true })).toBeVisible();
-  await page.getByRole('tab', { name: 'History' }).click();
-  await page.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
+  await activeRecipe.getByRole('button', { name: 'Crop & Geometry', exact: true }).click();
   await expect(page.getByLabel('Rotation numeric value')).toHaveValue('10');
   await expect(page.getByLabel('Vertical perspective numeric value')).toHaveValue('18');
   await expect(page.getByLabel('Horizontal perspective numeric value')).toHaveValue('-12');
@@ -483,17 +478,16 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.keyboard.press('4');
   await page.locator('.curve-graph circle').nth(1).click();
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.11');
-  await page.getByRole('tab', { name: 'History' }).click();
-  let customPreset = page.getByRole('article').filter({ hasText: 'Night master' });
+  let customPreset = activeRecipe.getByRole('article').filter({ hasText: 'Night master' });
   await expect(customPreset).toBeVisible();
-  await page.getByRole('button', { name: 'Clear recipe' }).click();
+  await activeRecipe.getByRole('button', { name: 'Clear recipe' }).click();
   await expect(page.getByText('No active edits')).toBeVisible();
   await customPreset.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
+  await expect(activeRecipe.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
   await customPreset.getByRole('button', { name: 'Rename' }).click();
   await page.getByLabel('Rename Night master').fill('Night final');
   await page.getByRole('button', { name: 'Done' }).click();
-  customPreset = page.getByRole('article').filter({ hasText: 'Night final' });
+  customPreset = activeRecipe.getByRole('article').filter({ hasText: 'Night final' });
   const presetDownloadPromise = page.waitForEvent('download');
   await customPreset.getByRole('button', { name: 'Export' }).click();
   const presetDownload = await presetDownloadPromise;
@@ -502,7 +496,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await customPreset.getByRole('button', { name: 'Delete' }).click();
   await expect(customPreset).toHaveCount(0);
   await page.getByLabel('Select a RAWcket recipe preset').setInputFiles(presetPath);
-  await expect(page.getByRole('article').filter({ hasText: 'Night final' })).toBeVisible();
+  await expect(activeRecipe.getByRole('article').filter({ hasText: 'Night final' })).toBeVisible();
   await page.locator('header').getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByLabel('Format', { exact: true }).selectOption('png');
   await page.getByLabel('Output sharpening').selectOption('high');
