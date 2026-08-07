@@ -26,7 +26,7 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
         'The supplied image is the CURRENT rendered state after the active recipe, not the untouched original. Judge it as shown and propose absolute final settings that build on that current state.',
         'Return a candid critique, strengths, opportunities, a concrete suggestedIntent, and a complete editable proposal in this single response.',
         'Judge the visible photograph, preserve believable color and texture, and propose any combination of global adjustments, monotonic-cubic tone curves, crop and geometry, radial masks, linear gradient masks, luminance-range masks, and point-guided smart masks that materially supports the intent.',
-        'A complete RAWcket proposal is not slider-only. In the FIRST response include at least one purposeful tone-curve operation and at least one purposeful local mask operation unless the photographer explicitly excludes curves or masks. For a scene without a safely identifiable semantic subject, use a restrained luminance-range, linear-gradient, or radial mask instead of inventing a subject.',
+        'A complete RAWcket proposal is not slider-only. The toneCurves field must contain at least one purposeful tone curve and the localMasks field must contain at least one purposeful local mask in this FIRST response. For a scene without a safely identifiable semantic subject, use a restrained luminance-range, linear-gradient, or radial mask instead of inventing a subject.',
         'Use multiple local masks when different subjects, depth planes, or tonal regions need independent treatment. Multiple tone-curve operations are also supported when they target different channels (RGB, luminance, red, green, or blue); return at most one curve operation per channel, with as many control points as that channel needs.',
         'Treat the supplied render as the color-managed photographic baseline. When a matching camera JPEG was imported with a RAW file, RAWcket has already matched the RAW baseline to its tone and color; do not undo that calibration. Otherwise judge only what is visibly present. Diagnose visible color casts, weak chroma, compressed midtones, or haze independently instead of applying blanket exposure or saturation.',
         'The default finish must look photographically rich and natural, never pale, milky, faded, or low-density unless the photographer explicitly requests that aesthetic. Preserve a convincing black point, luminous rather than grey highlights, midtone separation, and the scene’s existing warm/cool atmosphere.',
@@ -42,14 +42,14 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
       ].join('\n')
     };
     let result = parseAiStructuredResult(openAiEditProposalSchema, await this.client.reason(request), 'an editing proposal');
-    const missing = this.missingExplicitTools(context, result);
+    const missing = this.missingRequestedViewport(context, result);
     if (missing.length > 0) {
       result = parseAiStructuredResult(openAiEditProposalSchema, await this.client.reason({
         ...request,
         instructions: `${request.instructions}\nYour previous proposal contradicted the requested/recommended edit by omitting: ${missing.join(', ')}. Return a corrected complete proposal and include those operation kinds explicitly.`
       }), 'a repaired editing proposal');
-      const stillMissing = this.missingExplicitTools(context, result);
-      if (stillMissing.length > 0) throw new Error(`AI Companion omitted required ${stillMissing.join(' and ')} operations twice. No incomplete proposal was accepted.`);
+      const stillMissing = this.missingRequestedViewport(context, result);
+      if (stillMissing.length > 0) throw new Error('AI Companion omitted the explicitly requested crop twice. No incomplete proposal was accepted.');
     }
     return {
       suggestedIntent: result.suggestedIntent,
@@ -61,26 +61,10 @@ export class OpenAiEditingAdvisor implements EditingAdvisor {
     };
   }
 
-  private missingExplicitTools(context: EditingContext, result: OpenAiEditProposal): string[] {
+  private missingRequestedViewport(context: EditingContext, result: OpenAiEditProposal): string[] {
     const requested = context.intent ?? '';
     const missing: string[] = [];
     if (/(crop|cropping|reframe|reframing|recort|encuadr)/iu.test(requested) && !result.operations.some((operation) => operation.kind === 'viewport')) missing.push('crop/viewport');
-    if (!this.excludesToneCurves(requested) && !result.operations.some((operation) => operation.kind === 'tone-curve')) missing.push('tone-curve');
-    if (!this.excludesLocalMasks(requested) && !result.operations.some((operation) => this.isLocalMask(operation.kind))) {
-      missing.push('local mask (radial-mask, linear-gradient-mask, luminance-range-mask, or smart-mask)');
-    }
     return missing;
-  }
-
-  private excludesToneCurves(intent: string): boolean {
-    return /((without|avoid|exclude|sin|evita|excluye)[^.!?]{0,24}(tone[ -]?curves?|curves?|curvas?)|\bno\s+(tone[ -]?curves?|curves?|curvas?)\b)/iu.test(intent);
-  }
-
-  private excludesLocalMasks(intent: string): boolean {
-    return /((without|avoid|exclude|sin|evita|excluye)[^.!?]{0,24}(local[ -]?masks?|masks?|máscaras?|mascaras?)|\bno\s+(local[ -]?masks?|masks?|máscaras?|mascaras?)\b)/iu.test(intent);
-  }
-
-  private isLocalMask(kind: string): boolean {
-    return kind === 'radial-mask' || kind === 'linear-gradient-mask' || kind === 'luminance-range-mask' || kind === 'smart-mask';
   }
 }

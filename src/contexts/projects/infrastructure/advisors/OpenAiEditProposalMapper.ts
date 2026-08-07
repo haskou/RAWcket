@@ -7,10 +7,13 @@ import { AdjustmentKey } from '../../domain/value-objects/AdjustmentKey';
 import { GlobalAdjustmentValue } from '../../domain/value-objects/GlobalAdjustmentValue';
 import type { OpenAiEditProposal } from './OpenAiEditProposalContract';
 
+type OpenAiEditOperation = OpenAiEditProposal['operations'][number] | OpenAiEditProposal['toneCurves'][number] | OpenAiEditProposal['localMasks'][number];
+
 export class OpenAiEditProposalMapper {
   public map(proposal: OpenAiEditProposal): EditOperation[] {
-    this.rejectDuplicateTargets(proposal);
-    return proposal.operations.map((operation) => {
+    const operations: OpenAiEditOperation[] = [...proposal.operations, ...proposal.toneCurves, ...proposal.localMasks];
+    this.rejectDuplicateTargets(operations);
+    return operations.map((operation) => {
       if (operation.kind === 'global-adjustment') {
         const key = AdjustmentKey.fromPrimitives(operation.key);
         return {
@@ -44,7 +47,7 @@ export class OpenAiEditProposalMapper {
     });
   }
 
-  private mask(operation: Extract<OpenAiEditProposal['operations'][number], { kind: 'radial-mask' | 'linear-gradient-mask' | 'luminance-range-mask' | 'smart-mask' }>): MaskDefinitionPrimitives {
+  private mask(operation: OpenAiEditProposal['localMasks'][number]): MaskDefinitionPrimitives {
     const common = {
       id: crypto.randomUUID(),
       enabled: true,
@@ -77,8 +80,8 @@ export class OpenAiEditProposalMapper {
     };
   }
 
-  private rejectDuplicateTargets(proposal: OpenAiEditProposal): void {
-    const targets = proposal.operations.map((operation) => {
+  private rejectDuplicateTargets(operations: OpenAiEditOperation[]): void {
+    const targets = operations.map((operation) => {
       if (operation.kind === 'global-adjustment') return `adjustment:${operation.key}`;
       if (operation.kind === 'tone-curve') return `curve:${operation.channel}`;
       if (operation.kind === 'viewport') return 'viewport';

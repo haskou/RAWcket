@@ -11,26 +11,28 @@ const cropSchema = z.object({
   height: z.number().gt(0).max(1)
 });
 
-const operationSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('global-adjustment'), key: z.enum(adjustmentKeys), value: z.number().min(-100).max(100) }),
-  z.object({
-    kind: z.literal('tone-curve'),
-    channel: z.enum(channels),
-    points: z.array(pointSchema).min(2).max(12),
-    interpolation: z.literal('monotonic-cubic')
-  }),
-  z.object({
-    kind: z.literal('viewport'),
-    cropFrame: cropSchema,
-    translation: pointSchema,
-    scale: z.number().min(0.1).max(32),
-    rotationDegrees: z.number().min(-180).max(180),
-    horizontalPerspective: z.number().min(-100).max(100),
-    verticalPerspective: z.number().min(-100).max(100),
-    flipHorizontal: z.boolean(),
-    flipVertical: z.boolean(),
-    aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
-  }),
+const globalAdjustmentOperationSchema = z.object({
+  kind: z.literal('global-adjustment'), key: z.enum(adjustmentKeys), value: z.number().min(-100).max(100)
+});
+const toneCurveOperationSchema = z.object({
+  kind: z.literal('tone-curve'),
+  channel: z.enum(channels),
+  points: z.array(pointSchema).min(2).max(12),
+  interpolation: z.literal('monotonic-cubic')
+});
+const viewportOperationSchema = z.object({
+  kind: z.literal('viewport'),
+  cropFrame: cropSchema,
+  translation: pointSchema,
+  scale: z.number().min(0.1).max(32),
+  rotationDegrees: z.number().min(-180).max(180),
+  horizontalPerspective: z.number().min(-100).max(100),
+  verticalPerspective: z.number().min(-100).max(100),
+  flipHorizontal: z.boolean(),
+  flipVertical: z.boolean(),
+  aspectRatio: z.object({ width: z.number().positive(), height: z.number().positive() }).nullable()
+});
+const localMaskOperationSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('radial-mask'),
     center: pointSchema,
@@ -76,6 +78,10 @@ const operationSchema = z.discriminatedUnion('kind', [
     localAdjustments: z.array(adjustmentSchema).min(1).max(8)
   })
 ]);
+const operationSchema = z.discriminatedUnion('kind', [
+  globalAdjustmentOperationSchema,
+  viewportOperationSchema
+]);
 
 export const openAiEditProposalSchema = z.object({
   suggestedIntent: z.string().min(3).max(500),
@@ -83,7 +89,9 @@ export const openAiEditProposalSchema = z.object({
   strengths: z.array(z.string().min(1).max(300)).min(1).max(4),
   opportunities: z.array(z.string().min(1).max(300)).min(1).max(4),
   explanation: z.string().min(1).max(1200),
-  operations: z.array(operationSchema).min(1).max(16)
+  operations: z.array(operationSchema).max(16),
+  toneCurves: z.array(toneCurveOperationSchema).min(1).max(5),
+  localMasks: z.array(localMaskOperationSchema).min(1).max(8)
 });
 
 export type OpenAiEditProposal = z.infer<typeof openAiEditProposalSchema>;
@@ -112,11 +120,78 @@ const maskProperties = {
   localAdjustments: localAdjustmentsJsonSchema
 };
 const maskRequired = ['kind', 'inverted', 'opacity', 'feather', 'density', 'localAdjustments'];
+const globalAdjustmentJsonSchema = {
+  type: 'object', additionalProperties: false, required: ['kind', 'key', 'value'],
+  properties: { kind: { type: 'string', enum: ['global-adjustment'] }, key: { type: 'string', enum: [...adjustmentKeys] }, value: number(-100, 100) }
+};
+const toneCurveJsonSchema = {
+  type: 'object', additionalProperties: false, required: ['kind', 'channel', 'points', 'interpolation'],
+  properties: {
+    kind: { type: 'string', enum: ['tone-curve'] }, channel: { type: 'string', enum: [...channels] },
+    points: { type: 'array', minItems: 2, maxItems: 12, items: pointJsonSchema },
+    interpolation: { type: 'string', enum: ['monotonic-cubic'] }
+  }
+};
+const viewportJsonSchema = {
+  type: 'object', additionalProperties: false,
+  required: ['kind', 'cropFrame', 'translation', 'scale', 'rotationDegrees', 'horizontalPerspective', 'verticalPerspective', 'flipHorizontal', 'flipVertical', 'aspectRatio'],
+  properties: {
+    kind: { type: 'string', enum: ['viewport'] },
+    cropFrame: {
+      type: 'object', additionalProperties: false, required: ['x', 'y', 'width', 'height'],
+      properties: { x: number(0, 1), y: number(0, 1), width: number(0, 1, true), height: number(0, 1, true) }
+    },
+    translation: pointJsonSchema,
+    scale: number(0.1, 32), rotationDegrees: number(-180, 180),
+    horizontalPerspective: number(-100, 100), verticalPerspective: number(-100, 100),
+    flipHorizontal: { type: 'boolean' }, flipVertical: { type: 'boolean' },
+    aspectRatio: {
+      anyOf: [
+        { type: 'null' },
+        { type: 'object', additionalProperties: false, required: ['width', 'height'], properties: { width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 } } }
+      ]
+    }
+  }
+};
+const localMaskJsonSchemas = [
+  {
+    type: 'object', additionalProperties: false,
+    required: [...maskRequired, 'center', 'radiusX', 'radiusY', 'rotationDegrees'],
+    properties: { kind: { type: 'string', enum: ['radial-mask'] }, ...maskProperties, center: pointJsonSchema, radiusX: number(0, 1, true), radiusY: number(0, 1, true), rotationDegrees: number(-180, 180) }
+  },
+  {
+    type: 'object', additionalProperties: false,
+    required: [...maskRequired, 'start', 'end'],
+    properties: { kind: { type: 'string', enum: ['linear-gradient-mask'] }, ...maskProperties, start: pointJsonSchema, end: pointJsonSchema }
+  },
+  {
+    type: 'object', additionalProperties: false,
+    required: [...maskRequired, 'minimum', 'maximum'],
+    properties: { kind: { type: 'string', enum: ['luminance-range-mask'] }, ...maskProperties, minimum: number(0, 1), maximum: number(0, 1) }
+  },
+  {
+    type: 'object', additionalProperties: false,
+    required: [...maskRequired, 'prompt', 'positivePoints', 'negativePoints', 'boundingBoxes'],
+    properties: {
+      kind: { type: 'string', enum: ['smart-mask'] }, ...maskProperties,
+      prompt: { type: 'string', minLength: 1, maxLength: 300 },
+      positivePoints: { type: 'array', minItems: 1, maxItems: 8, items: pointJsonSchema },
+      negativePoints: { type: 'array', maxItems: 8, items: pointJsonSchema },
+      boundingBoxes: {
+        type: 'array', maxItems: 3,
+        items: {
+          type: 'object', additionalProperties: false, required: ['x', 'y', 'width', 'height'],
+          properties: { x: number(0, 1), y: number(0, 1), width: number(0, 1, true), height: number(0, 1, true) }
+        }
+      }
+    }
+  }
+];
 
 export const openAiEditProposalJsonSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['suggestedIntent', 'critique', 'strengths', 'opportunities', 'explanation', 'operations'],
+  required: ['suggestedIntent', 'critique', 'strengths', 'opportunities', 'explanation', 'operations', 'toneCurves', 'localMasks'],
   properties: {
     suggestedIntent: { type: 'string', minLength: 3, maxLength: 500 },
     critique: { type: 'string', minLength: 1, maxLength: 1200 },
@@ -124,76 +199,10 @@ export const openAiEditProposalJsonSchema = {
     opportunities: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string', minLength: 1, maxLength: 300 } },
     explanation: { type: 'string', minLength: 1, maxLength: 1200 },
     operations: {
-      type: 'array', minItems: 1, maxItems: 16,
-      items: {
-        anyOf: [
-          {
-            type: 'object', additionalProperties: false, required: ['kind', 'key', 'value'],
-            properties: { kind: { type: 'string', enum: ['global-adjustment'] }, key: { type: 'string', enum: [...adjustmentKeys] }, value: number(-100, 100) }
-          },
-          {
-            type: 'object', additionalProperties: false, required: ['kind', 'channel', 'points', 'interpolation'],
-            properties: {
-              kind: { type: 'string', enum: ['tone-curve'] }, channel: { type: 'string', enum: [...channels] },
-              points: { type: 'array', minItems: 2, maxItems: 12, items: pointJsonSchema },
-              interpolation: { type: 'string', enum: ['monotonic-cubic'] }
-            }
-          },
-          {
-            type: 'object', additionalProperties: false,
-            required: ['kind', 'cropFrame', 'translation', 'scale', 'rotationDegrees', 'horizontalPerspective', 'verticalPerspective', 'flipHorizontal', 'flipVertical', 'aspectRatio'],
-            properties: {
-              kind: { type: 'string', enum: ['viewport'] },
-              cropFrame: {
-                type: 'object', additionalProperties: false, required: ['x', 'y', 'width', 'height'],
-                properties: { x: number(0, 1), y: number(0, 1), width: number(0, 1, true), height: number(0, 1, true) }
-              },
-              translation: pointJsonSchema,
-              scale: number(0.1, 32), rotationDegrees: number(-180, 180),
-              horizontalPerspective: number(-100, 100), verticalPerspective: number(-100, 100),
-              flipHorizontal: { type: 'boolean' }, flipVertical: { type: 'boolean' },
-              aspectRatio: {
-                anyOf: [
-                  { type: 'null' },
-                  { type: 'object', additionalProperties: false, required: ['width', 'height'], properties: { width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 } } }
-                ]
-              }
-            }
-          },
-          {
-            type: 'object', additionalProperties: false,
-            required: [...maskRequired, 'center', 'radiusX', 'radiusY', 'rotationDegrees'],
-            properties: { kind: { type: 'string', enum: ['radial-mask'] }, ...maskProperties, center: pointJsonSchema, radiusX: number(0, 1, true), radiusY: number(0, 1, true), rotationDegrees: number(-180, 180) }
-          },
-          {
-            type: 'object', additionalProperties: false,
-            required: [...maskRequired, 'start', 'end'],
-            properties: { kind: { type: 'string', enum: ['linear-gradient-mask'] }, ...maskProperties, start: pointJsonSchema, end: pointJsonSchema }
-          },
-          {
-            type: 'object', additionalProperties: false,
-            required: [...maskRequired, 'minimum', 'maximum'],
-            properties: { kind: { type: 'string', enum: ['luminance-range-mask'] }, ...maskProperties, minimum: number(0, 1), maximum: number(0, 1) }
-          },
-          {
-            type: 'object', additionalProperties: false,
-            required: [...maskRequired, 'prompt', 'positivePoints', 'negativePoints', 'boundingBoxes'],
-            properties: {
-              kind: { type: 'string', enum: ['smart-mask'] }, ...maskProperties,
-              prompt: { type: 'string', minLength: 1, maxLength: 300 },
-              positivePoints: { type: 'array', minItems: 1, maxItems: 8, items: pointJsonSchema },
-              negativePoints: { type: 'array', maxItems: 8, items: pointJsonSchema },
-              boundingBoxes: {
-                type: 'array', maxItems: 3,
-                items: {
-                  type: 'object', additionalProperties: false, required: ['x', 'y', 'width', 'height'],
-                  properties: { x: number(0, 1), y: number(0, 1), width: number(0, 1, true), height: number(0, 1, true) }
-                }
-              }
-            }
-          }
-        ]
-      }
-    }
+      type: 'array', minItems: 0, maxItems: 16,
+      items: { anyOf: [globalAdjustmentJsonSchema, viewportJsonSchema] }
+    },
+    toneCurves: { type: 'array', minItems: 1, maxItems: 5, items: toneCurveJsonSchema },
+    localMasks: { type: 'array', minItems: 1, maxItems: 8, items: { anyOf: localMaskJsonSchemas } }
   }
 };
