@@ -192,11 +192,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .mask-overlay .mask-shape.dimmed { opacity: .18; }
 .mask-overlay .mask-shape.selected { opacity: 1; filter: drop-shadow(0 0 4px rgba(201,240,107,.75)); }
 .mask-gradient-axis { stroke: rgba(255,255,255,.75); stroke-width: .004; stroke-dasharray: .015 .012; vector-effect: non-scaling-stroke; }
-.mask-overlay .smart-mask-points circle { stroke: #11150d; stroke-width: .004; vector-effect: non-scaling-stroke; }
-.mask-overlay .smart-mask-points circle.positive { fill: var(--accent); }
-.mask-overlay .smart-mask-points circle.negative { fill: #ff766c; }
-.mask-overlay .color-mask-samples circle { fill: rgba(16,19,17,.8); stroke: #fff; stroke-width: .004; }
-.mask-overlay .color-mask-samples path { fill: none; stroke: var(--accent); stroke-width: .004; vector-effect: non-scaling-stroke; }
+.mask-point-overlay, .mask-point-group { position: absolute; z-index: 2; inset: 0; overflow: hidden; pointer-events: none; }
+.mask-point-group { transition: opacity .15s ease; }
+.mask-point-group.dimmed { opacity: .18; }
+.mask-point-marker { position: absolute; display: block; width: 14px; height: 14px; transform: translate(-50%, -50%); border: 2px solid #11150d; border-radius: 50%; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,.65); }
+.mask-point-marker.positive { background: var(--accent); }
+.mask-point-marker.negative { background: #ff766c; }
+.mask-point-marker.color { width: 18px; height: 18px; border-color: #fff; background: rgba(16,19,17,.85); }
+.mask-point-marker.color::before, .mask-point-marker.color::after { content: ''; position: absolute; left: 50%; top: 50%; background: var(--accent); transform: translate(-50%, -50%); }
+.mask-point-marker.color::before { width: 24px; height: 1px; }
+.mask-point-marker.color::after { width: 1px; height: 24px; }
 .composite-mask-guides .mask-composite-child { opacity: .52; }
 .composite-mask-guides .mask-composite-child.primary { opacity: .72; filter: drop-shadow(0 0 3px rgba(201,240,107,.55)); }
 .composite-mask-guides.subtract .mask-composite-child.secondary { color: rgba(255,118,108,.42); }
@@ -408,6 +413,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .mask-create-actions button small { margin-top: 3px; color: #737c75; font-size: .54rem; }
 .mask-create-actions button, .mask-list button { border: 1px solid #323733; border-radius: 7px; background: #1b1e1c; color: #bdc3be; cursor: pointer; font-size: .65rem; }
 .mask-empty { padding: 12px; border: 1px dashed #3a403b; border-radius: 8px; color: #858d87; }
+.mask-stack-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border-bottom: 1px solid var(--line-soft); }
+.mask-stack-heading span > strong, .mask-stack-heading span > small { display: block; }
+.mask-stack-heading span > strong { color: #ccd3cd; font-size: .65rem; }
+.mask-stack-heading span > small, .mask-stack-heading > small { margin-top: 2px; color: #737c75; font-size: .54rem; }
 .mask-list { display: grid; gap: 4px; }
 .mask-list button { display: flex; min-height: 39px; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 10px; text-align: left; }
 .mask-list button.active { border-color: var(--accent); background: var(--accent-dark); color: var(--accent); }
@@ -674,6 +683,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .auto-enhance-row strong { color: #d7dbd5; font-size: .68rem; }
 .auto-enhance-row small { margin-top: 3px; color: var(--muted-quiet); font-size: .56rem; }
 .auto-enhance-row .button { min-height: 30px; padding-inline: 9px; font-size: .6rem; }
+.edit-target-card { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 9px; align-items: center; margin: 0 14px 12px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #141714; }
+.edit-target-card.local { border-color: #64794a; background: #141a11; }
+.edit-target-card > div > strong, .edit-target-card > div > small { display: block; }
+.edit-target-card > div > strong { margin-top: 2px; color: #d6ded3; font-size: .68rem; }
+.edit-target-card > div > small { margin-top: 3px; color: #828c82; font-size: .55rem; line-height: 1.4; }
+.edit-target-card select { width: 100%; height: 31px; border: 1px solid #394137; border-radius: 6px; background: #0d100c; color: #d2d9cf; font-size: .59rem; }
+.edit-target-card > button { grid-column: 1 / -1; }
+.local-adjustment-list .modified-mark { color: var(--accent); }
 .tool-heading { min-height: 44px; padding-inline: 14px; font-size: .74rem; }
 .tool-content { padding: 0 14px 17px; }
 .adjustment-list { gap: 15px; }

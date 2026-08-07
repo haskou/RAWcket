@@ -41,7 +41,7 @@ import { DevelopmentRecipe, type DevelopmentSettingsPrimitives } from '@/context
 import type { MaskDefinitionPrimitives } from '@/contexts/projects/domain/MaskDefinition';
 import type { PhotoProject } from '@/contexts/projects/domain/PhotoProject';
 import type { RecipePreset } from '@/contexts/projects/domain/RecipePreset';
-import { CurveSet, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
+import { CurveChannel, CurveSet, ToneCurve, type CurveChannelPrimitive, type ToneCurvePrimitives } from '@/contexts/projects/domain/ToneCurve';
 import type { ViewportTransformPrimitives } from '@/contexts/projects/domain/ViewportTransform';
 import { AdjustmentKey, type AdjustmentKeyPrimitive } from '@/contexts/projects/domain/value-objects/AdjustmentKey';
 import type { SemanticMaskCategoryPrimitive } from '@/contexts/projects/domain/value-objects/SemanticMaskCategory';
@@ -53,6 +53,7 @@ import { AiSettingsDialog } from '../components/AiSettingsDialog';
 import { CloudStorageDialog } from '../components/CloudStorageDialog';
 import { GeometryControls } from '../components/GeometryControls';
 import { ExportPhotoDialog, type PhotoExportSettings } from '../components/ExportPhotoDialog';
+import { MaskAdjustmentControls } from '../components/MaskAdjustmentControls';
 import { MaskControls } from '../components/MaskControls';
 import { PhotoInformationDialog } from '../components/PhotoInformationDialog';
 import { SemanticMaskControls, type SemanticModelTask } from '../components/SemanticMaskControls';
@@ -78,6 +79,7 @@ type CropGesture =
   | { kind: 'draw'; pointerId: number; anchor: CropPoint }
   | { kind: 'move'; pointerId: number; pointerStart: CropPoint; cropStart: ViewportTransformPrimitives['cropFrame'] };
 type AiPointPolarity = 'positive' | 'negative';
+type EditTarget = 'image' | 'mask';
 type ImageDimensions = { width: number; height: number };
 type PendingAiAction = 'opinion' | 'prompt' | null;
 
@@ -207,6 +209,7 @@ export function EditorPage(): ReactElement {
   const [compositionGuide, setCompositionGuide] = useState<CompositionGuide>('none');
   const [maskOverlayVisible, setMaskOverlayVisible] = useState(true);
   const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<EditTarget>('image');
   const [brushActive, setBrushActive] = useState(false);
   const [colorPointActive, setColorPointActive] = useState(false);
   const [aiPointActive, setAiPointActive] = useState(false);
@@ -330,6 +333,9 @@ export function EditorPage(): ReactElement {
           setAiSelection(new Set(pendingAdvice.operations.map((_, index) => index)));
           setAiMessage('Restored an unapplied AI Companion proposal from this project.');
         }
+        const firstMask = loaded.getMasks()[0];
+        setSelectedMaskId(firstMask?.getId().valueOf() ?? null);
+        setEditTarget(firstMask === undefined ? 'image' : 'mask');
         const original = await application.sourceFiles.find(loaded.getId());
         if (original !== null && loaded.getSource().getSupportedMimeType() === 'image/x-sony-arw') {
           const inspection = await application.inspectSourceImage.inspect(new InspectSourceImageMessage(original, loaded.getSource().getFileName().valueOf()));
@@ -782,6 +788,7 @@ export function EditorPage(): ReactElement {
       }
     });
     setSelectedMaskId(id);
+    setEditTarget('mask');
     setBrushActive(true);
     setColorPointActive(false);
     setAiPointActive(false);
@@ -804,6 +811,7 @@ export function EditorPage(): ReactElement {
       }
     });
     setSelectedMaskId(id);
+    setEditTarget('mask');
     setBrushActive(false);
     setColorPointActive(false);
     setAiPointActive(false);
@@ -826,6 +834,7 @@ export function EditorPage(): ReactElement {
       }
     });
     setSelectedMaskId(id);
+    setEditTarget('mask');
     setBrushActive(false);
     setColorPointActive(false);
     setAiPointActive(false);
@@ -848,6 +857,7 @@ export function EditorPage(): ReactElement {
       }
     });
     setSelectedMaskId(id);
+    setEditTarget('mask');
     setBrushActive(false);
     setColorPointActive(false);
     setAiPointActive(false);
@@ -870,6 +880,7 @@ export function EditorPage(): ReactElement {
       }
     });
     setSelectedMaskId(id);
+    setEditTarget('mask');
     setBrushActive(false);
     setColorPointActive(true);
     setAiPointActive(false);
@@ -901,6 +912,7 @@ export function EditorPage(): ReactElement {
       }
     });
     setSelectedMaskId(id);
+    setEditTarget('mask');
     setBrushActive(false);
     setColorPointActive(false);
     setAiPointActive(true);
@@ -934,6 +946,7 @@ export function EditorPage(): ReactElement {
       );
       apply({ kind: EDIT_OPERATION.ADD_MASK, mask: mask.toPrimitives(), groupId: null });
       setSelectedMaskId(maskId);
+      setEditTarget('mask');
       setBrushActive(false);
       setColorPointActive(false);
       setAiPointActive(false);
@@ -952,6 +965,7 @@ export function EditorPage(): ReactElement {
 
   const selectMask = (id: string): void => {
     setSelectedMaskId(id);
+    setEditTarget('mask');
     setBrushActive(false);
     setColorPointActive(false);
     setAiPointActive(false);
@@ -1046,7 +1060,10 @@ export function EditorPage(): ReactElement {
           apply({ kind: EDIT_OPERATION.SET_GLOBAL_ADJUSTMENT_ENABLED, key: operation.key, enabled: true, groupId: null });
         }
       }
-      if (operation.kind === EDIT_OPERATION.ADD_MASK) setSelectedMaskId(operation.mask.id);
+      if (operation.kind === EDIT_OPERATION.ADD_MASK) {
+        setSelectedMaskId(operation.mask.id);
+        setEditTarget('mask');
+      }
       apply(operation);
     });
     if (project !== null && aiProposalId !== null) {
@@ -1082,6 +1099,7 @@ export function EditorPage(): ReactElement {
   const removeMask = (id: string): void => {
     apply({ kind: EDIT_OPERATION.REMOVE_MASK, maskId: id, groupId: null });
     setSelectedMaskId(null);
+    setEditTarget('image');
     setBrushActive(false);
     setColorPointActive(false);
     setAiPointActive(false);
@@ -1091,6 +1109,7 @@ export function EditorPage(): ReactElement {
     const compositeMaskId = crypto.randomUUID();
     apply({ kind: EDIT_OPERATION.COMPOSE_MASKS, compositeMaskId, maskIds, operation, groupId: null });
     setSelectedMaskId(compositeMaskId);
+    setEditTarget('mask');
     setBrushActive(false);
     setColorPointActive(false);
     setAiPointActive(false);
@@ -1101,6 +1120,7 @@ export function EditorPage(): ReactElement {
     const firstChildId = composite?.shape.kind === 'composite' ? composite.shape.children[0]?.id ?? null : null;
     apply({ kind: EDIT_OPERATION.DECOMPOSE_MASK, compositeMaskId, groupId: null });
     setSelectedMaskId(firstChildId);
+    setEditTarget(firstChildId === null ? 'image' : 'mask');
     setBrushActive(false);
     setColorPointActive(false);
     setAiPointActive(false);
@@ -1328,6 +1348,8 @@ export function EditorPage(): ReactElement {
   const projectMasks = project.getMasks().map((mask) => mask.toPrimitives());
   const selectedMaskIndex = projectMasks.findIndex((mask) => mask.id === selectedMaskId);
   const selectedMask = selectedMaskIndex < 0 ? null : projectMasks[selectedMaskIndex] ?? null;
+  const editingMask = editTarget === 'mask' ? selectedMask : null;
+  const selectedMaskLabel = selectedMask === null ? null : `${maskShapeLabel(selectedMask.shape.kind)} ${selectedMaskIndex + 1}`;
   const aiDevelopmentHistory = [...project.getAiDevelopmentJournal().advice].reverse();
   const statusLabel = autosave.status === 'saved' ? 'Saved locally' : autosave.status === 'saving' ? 'Saving…' : 'Save failed';
   const transform = `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`;
@@ -1339,6 +1361,21 @@ export function EditorPage(): ReactElement {
   const rawSource = project.getSource().getSupportedMimeType() === 'image/x-sony-arw';
   const comparisonHasDifference = !project.getRecipe().isVisuallyNeutral();
   const comparisonReady = beforeSource !== null && comparisonHasDifference;
+
+  const changeMaskAdjustment = (key: AdjustmentKeyPrimitive, value: number, groupId: string | null): void => {
+    if (editingMask === null || !Number.isFinite(value)) return;
+    const localAdjustments = { ...editingMask.localAdjustments };
+    if (value === 0) Reflect.deleteProperty(localAdjustments, key);
+    else localAdjustments[key] = value;
+    updateMask({ ...editingMask, localAdjustments }, groupId);
+  };
+
+  const changeMaskCurve = (channel: CurveChannelPrimitive, curve: ToneCurvePrimitives | null, groupId: string | null): void => {
+    if (editingMask === null) return;
+    const curves = CurveSet.fromPrimitives(editingMask.localCurves ?? CurveSet.identity().toPrimitives());
+    const next = curves.replace(CurveChannel.fromPrimitives(channel), curve === null ? null : ToneCurve.fromPrimitives(curve));
+    updateMask({ ...editingMask, localCurves: next.toPrimitives() }, groupId);
+  };
 
   return (
     <main className="editor-shell">
@@ -1422,7 +1459,10 @@ export function EditorPage(): ReactElement {
             {sourceUrl !== null && (
               <div ref={previewSurface} className={`preview-surface${initialPreviewReady ? '' : ' awaiting-first-frame'}`} style={{ transform, width: fitDimensions?.width, height: fitDimensions?.height, maxWidth: fitDimensions === null ? undefined : 'none', maxHeight: fitDimensions === null ? undefined : 'none' }}>
                 <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => { previewLoaded(event.currentTarget); setInitialPreviewReady(true); }} />
-                {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || colorPointActive || aiPointActive) && <MaskOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />}
+                {!showOriginal && maskOverlayVisible && (inspectorTab === 'masks' || editingMask !== null || brushActive || colorPointActive || aiPointActive) && <>
+                  <MaskOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />
+                  <MaskPointOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />
+                </>}
                 {fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame">
                   {toolWorkspace === 'develop' && activePanel === 'crop'
                     ? <CropSelectionOverlay crop={cropDraft ?? project.getViewportTransform().toPrimitives().cropFrame} guide={compositionGuide} />
@@ -1431,7 +1471,7 @@ export function EditorPage(): ReactElement {
               </div>
             )}
             <WorkspaceCompositionGuideOverlay guide={compositionGuide} />
-            {activePanel === 'masks' && <div className={`active-mask-canvas-status${selectedMask === null ? ' empty' : ''}`} role="status" aria-live="polite">
+            {(inspectorTab === 'masks' || editingMask !== null) && <div className={`active-mask-canvas-status${selectedMask === null ? ' empty' : ''}`} role="status" aria-live="polite">
               <span className="mask-status-swatch" aria-hidden="true" />
               {selectedMask === null ? <span><strong>No active mask</strong><small>Select or create a mask before painting or placing points.</small></span> : <span><strong>Editing {maskShapeLabel(selectedMask.shape.kind)} {selectedMaskIndex + 1}</strong><small>{selectedMask.enabled ? 'Enabled' : 'Disabled'} · {selectedMask.shape.kind === 'brush' ? `${brushMode === 'add' ? 'Paint' : 'Erase'} mode` : selectedMask.shape.kind === 'color-range' ? `${colorPointActive ? 'Add source sample' : 'Sample editing'} mode` : selectedMask.shape.kind === 'ai-segmentation' ? `${aiPointPolarity === 'positive' ? 'Include' : 'Exclude'} point mode` : 'Use the highlighted controls in the Masks panel'}</small></span>}
             </div>}
@@ -1447,22 +1487,39 @@ export function EditorPage(): ReactElement {
           </div>
           {inspectorTab === 'edit' && <div className="inspector-pane edit-inspector" role="tabpanel">
             <HistogramPanel analysis={previewAnalysis} />
-            <div className="auto-enhance-row"><span><strong>Auto Enhance</strong><small>Correct material clipping with standard controls.</small></span><button className="button ghost" type="button" aria-label="Apply Auto Enhance" disabled={aiGenerating || previewAnalysis === null} onClick={applyClassicAutoEnhance}>Apply</button></div>
+            <section className={`edit-target-card${editingMask === null ? '' : ' local'}`} aria-label="Editing target">
+              <div><span className="eyebrow">Editing target</span><strong>{editingMask === null ? 'Whole image' : `${selectedMaskLabel ?? 'Mask'} layer`}</strong><small>{editingMask === null ? 'The controls below affect every pixel.' : 'The controls below affect only the selected mask coverage, like a masked adjustment layer.'}</small></div>
+              <select aria-label="Edit target" value={editingMask?.id ?? 'image'} onChange={(event) => {
+                if (event.target.value === 'image') setEditTarget('image');
+                else selectMask(event.target.value);
+              }}>
+                <option value="image">Whole image</option>
+                {projectMasks.map((mask, index) => <option value={mask.id} key={mask.id}>{maskShapeLabel(mask.shape.kind)} {index + 1}</option>)}
+              </select>
+              {editingMask !== null && <button className="button ghost full" type="button" onClick={() => openPanel('masks')}>Edit mask shape</button>}
+            </section>
+            {editingMask === null && <div className="auto-enhance-row"><span><strong>Auto Enhance</strong><small>Correct material clipping with standard controls.</small></span><button className="button ghost" type="button" aria-label="Apply Auto Enhance" disabled={aiGenerating || previewAnalysis === null} onClick={applyClassicAutoEnhance}>Apply</button></div>}
             <ToolSection id="light" title="Light" active={activePanel === 'light'} onToggle={setActivePanel}>
-              <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+              {editingMask === null
+                ? <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+                : <MaskAdjustmentControls mask={editingMask} definitions={adjustmentDefinitions.filter((item) => item.section === 'light')} onChange={changeMaskAdjustment} />}
             </ToolSection>
             <ToolSection id="color" title="Color" active={activePanel === 'color'} onToggle={setActivePanel}>
-              <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+              {editingMask === null
+                ? <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+                : <MaskAdjustmentControls mask={editingMask} definitions={adjustmentDefinitions.filter((item) => item.section === 'color')} onChange={changeMaskAdjustment} />}
             </ToolSection>
             <ToolSection id="detail" title="Detail" active={activePanel === 'detail'} onToggle={setActivePanel}>
-              <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+              {editingMask === null
+                ? <AdjustmentControls project={project} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeAdjustment} onToggle={toggleAdjustment} />
+                : <MaskAdjustmentControls mask={editingMask} definitions={adjustmentDefinitions.filter((item) => item.section === 'detail')} onChange={changeMaskAdjustment} />}
             </ToolSection>
             <ToolSection id="curves" title="Tone Curve" active={activePanel === 'curves'} onToggle={setActivePanel}>
-              <p>Click the diagonal to add a point. Drag it or enter exact input and output values.</p>
-              <ToneCurveEditor curves={project.getDevelopmentSettings().curves} analysis={previewAnalysis} onChange={changeCurve} />
-              <div className="curve-presets">
+              <p>{editingMask === null ? 'Click the diagonal to add a point. Drag it or enter exact input and output values.' : `This curve is blended only through ${selectedMaskLabel ?? 'the active mask'}.`}</p>
+              <ToneCurveEditor curves={editingMask?.localCurves ?? project.getDevelopmentSettings().curves} analysis={previewAnalysis} onChange={editingMask === null ? changeCurve : changeMaskCurve} />
+              {editingMask === null && <div className="curve-presets">
                 {(Object.keys(curvePresets) as Array<keyof typeof curvePresets>).map((name) => <button type="button" key={name} onClick={() => chooseCurvePreset(name)}>{name}</button>)}
-              </div>
+              </div>}
             </ToolSection>
           </div>}
           {inspectorTab === 'crop' && <div id="tool-crop" className="inspector-pane crop-inspector" role="tabpanel">
@@ -1677,19 +1734,43 @@ function MaskShapeOverlay({ mask, className }: { mask: MaskDefinitionPrimitives;
     return <g className={className}><defs><linearGradient id={`mask-gradient-${mask.id}`} x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y}><stop offset="0" stopOpacity="0" /><stop offset="1" stopOpacity="1" /></linearGradient></defs><rect width="1" height="1" fill={`url(#mask-gradient-${mask.id})`} /><line className="mask-gradient-axis" x1={mask.shape.start.x} y1={mask.shape.start.y} x2={mask.shape.end.x} y2={mask.shape.end.y} /></g>;
   }
   if (mask.shape.kind === 'color-range') {
-    return <g className={`${className} color-mask-samples`}>{mask.shape.samples.map((point, index) => <g key={index} transform={`translate(${point.x} ${point.y})`}><circle r="0.016" /><path d="M-.024 0H.024 M0-.024V.024" /></g>)}</g>;
+    return null;
   }
   if (mask.shape.kind === 'ai-segmentation') {
     return <g className={`${className} smart-mask-points`}>
       {mask.shape.boundingBoxes.map((box, index) => <rect className="smart-mask-box" key={`box-${index}`} x={box.x} y={box.y} width={box.width} height={box.height} />)}
-      {mask.shape.positivePoints.map((point, index) => <circle className="positive" key={`positive-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
-      {mask.shape.negativePoints.map((point, index) => <circle className="negative" key={`negative-${index}`} cx={point.x} cy={point.y} r="0.012" />)}
     </g>;
   }
   if (mask.shape.kind === 'composite') {
     return <g className={`${className} composite-mask-guides ${mask.shape.operation}`} data-composition-operation={mask.shape.operation}>
       {mask.shape.children.map((child, index) => <MaskShapeOverlay className={`mask-composite-child ${index === 0 ? 'primary' : 'secondary'}`} key={child.id} mask={child} />)}
     </g>;
+  }
+  return null;
+}
+
+function MaskPointOverlay({ masks, selectedMaskId }: { masks: MaskDefinitionPrimitives[]; selectedMaskId: string | null }): ReactElement {
+  return <div className="mask-point-overlay" aria-hidden="true">
+    {masks.filter((mask) => mask.enabled).map((mask) => {
+      const className = `mask-point-group${selectedMaskId === mask.id ? ' selected' : selectedMaskId === null ? '' : ' dimmed'}`;
+      return <MaskPointMarkers className={className} key={mask.id} mask={mask} />;
+    })}
+  </div>;
+}
+
+function MaskPointMarkers({ mask, className }: { mask: MaskDefinitionPrimitives; className: string }): ReactNode {
+  if (!mask.enabled) return null;
+  if (mask.shape.kind === 'color-range') {
+    return <div className={`${className} color-mask-samples`}>{mask.shape.samples.map((point, index) => <span className="mask-point-marker color" key={index} style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }} />)}</div>;
+  }
+  if (mask.shape.kind === 'ai-segmentation') {
+    return <div className={`${className} smart-mask-points`}>
+      {mask.shape.positivePoints.map((point, index) => <span className="mask-point-marker positive" key={`positive-${index}`} style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }} />)}
+      {mask.shape.negativePoints.map((point, index) => <span className="mask-point-marker negative" key={`negative-${index}`} style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }} />)}
+    </div>;
+  }
+  if (mask.shape.kind === 'composite') {
+    return <div className={`${className} composite-mask-points ${mask.shape.operation}`}>{mask.shape.children.map((child, index) => <MaskPointMarkers className={`mask-point-group mask-composite-child ${index === 0 ? 'primary' : 'secondary'}`} key={child.id} mask={child} />)}</div>;
   }
   return null;
 }

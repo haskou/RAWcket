@@ -134,6 +134,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Crop & Geometry/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Local Masks/ })).toBeVisible();
   await page.getByRole('tab', { name: 'Edit' }).click();
+  await page.getByLabel('Edit target').selectOption('image');
   await page.getByRole('button', { name: 'Apply Auto Enhance' }).click();
   await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByRole('button', { name: /Tone Curve/ })).toBeVisible();
@@ -307,7 +308,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Vertical perspective numeric value')).toHaveValue('18');
   await expect(page.getByLabel('Horizontal perspective numeric value')).toHaveValue('-12');
   await page.getByRole('tab', { name: 'Masks' }).click();
-  await expect(page.getByText('How local masks work')).toBeVisible();
+  await expect(page.getByText('How mask layers work')).toBeVisible();
   await page.getByRole('button', { name: '+ Radial mask' }).click();
   await expect(page.getByText('Radial mask selected')).toBeVisible();
   await expect(page.getByText(/Editing Radial \d+/)).toBeVisible();
@@ -321,6 +322,13 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await localCurveGraph.click({ position: { x: localCurveBounds.width * 0.35, y: localCurveBounds.height * 0.38 } });
   await expect(localCurveGraph.locator('circle')).toHaveCount(3);
   await expect(page.getByRole('button', { name: /Radial 1 On/ })).toBeVisible();
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await expect(page.getByLabel('Editing target')).toContainText(`${editedRadialTitle} layer`);
+  await expect(page.getByLabel('Edit target').locator('option:checked')).toHaveText(editedRadialTitle);
+  await expect(page.getByLabel('Local mask overlay')).toBeVisible();
+  await page.getByLabel('Local Contrast numeric value').fill('12');
+  await expect(page.getByLabel('Local Contrast numeric value')).toHaveValue('12');
+  await page.getByRole('tab', { name: 'Masks' }).click();
   await page.getByRole('button', { name: '+ Brush mask' }).click();
   await expect(page.getByText('Brush mask selected')).toBeVisible();
   await page.getByLabel('Expand / contract numeric value').fill('0.05');
@@ -346,7 +354,10 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByLabel('Sample 1 X numeric value').fill('0.3');
   await page.getByLabel('Sample 1 Y numeric value').fill('0.4');
   await page.mouse.click(brushBounds.x + brushBounds.width * 0.75, brushBounds.y + brushBounds.height * 0.25);
-  await expect(page.locator('.color-mask-samples > g')).toHaveCount(2);
+  await expect(page.locator('.color-mask-samples > .mask-point-marker')).toHaveCount(2);
+  const colorPointBounds = await page.locator('.color-mask-samples .mask-point-marker').first().boundingBox();
+  if (colorPointBounds === null) throw new Error('The color sample point is unavailable.');
+  expect(Math.abs(colorPointBounds.width - colorPointBounds.height)).toBeLessThan(1);
   await expect(page.getByLabel('Sample 2 X numeric value')).toHaveValue('0.75');
   await expect(page.getByLabel('Sample 2 Y numeric value')).toHaveValue('0.25');
   await page.getByLabel(`Use ${editedRadialTitle} in composition`).check();
@@ -363,6 +374,9 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
   await page.mouse.click(brushBounds.x + brushBounds.width * 0.61, brushBounds.y + brushBounds.height * 0.36);
   await expect.poll(async () => Number(await page.getByLabel('Include point 1 X numeric value').inputValue())).toBeCloseTo(0.61, 2);
+  const smartPointBounds = await page.locator('.smart-mask-points .mask-point-marker.positive').first().boundingBox();
+  if (smartPointBounds === null) throw new Error('The Smart Mask include point is unavailable.');
+  expect(Math.abs(smartPointBounds.width - smartPointBounds.height)).toBeLessThan(1);
   await page.getByLabel('Include point 1 X numeric value').fill('0.58');
   await page.getByRole('button', { name: 'Add editable constraint box' }).click();
   await expect(page.getByLabel('Box 1 X numeric value')).toHaveValue('0.2');
@@ -371,6 +385,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await page.getByRole('button', { name: 'Remove constraint box 2' }).click();
   await expect(page.getByLabel('Box 2 X numeric value')).not.toBeVisible();
   await expect(page.getByText(new RegExp(webGpuAvailable ? 'WebGPU' : 'WebGL2'))).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await page.getByLabel('Edit target').selectOption('image');
   await page.keyboard.press('4');
   await expect(page.locator('.curve-histogram-backdrop')).toBeVisible();
   await page.getByRole('button', { name: 'Reset channel' }).click();
@@ -462,6 +478,8 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(page.getByLabel('Color tolerance numeric value')).toHaveValue('0.15');
   await expect(page.getByLabel('Sample 2 X numeric value')).toHaveValue('0.75');
   await expect(page.getByRole('button', { name: /Smart \d+ On/ })).toBeVisible();
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await page.getByLabel('Edit target').selectOption('image');
   await page.keyboard.press('4');
   await page.locator('.curve-graph circle').nth(1).click();
   await expect(page.getByLabel('Curve point Y')).toHaveValue('0.11');

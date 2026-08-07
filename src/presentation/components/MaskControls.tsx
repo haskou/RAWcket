@@ -239,9 +239,9 @@ export function MaskControls({
   return (
     <div className="mask-controls">
       <details className="context-help mask-help" open={masks.length === 0}>
-        <summary>How local masks work</summary>
-        <ol><li>Create a mask shape.</li><li>Select it below and position or paint it over the photograph.</li><li>Change <strong>Local exposure</strong>; only covered pixels are affected.</li><li>Use Feather for softer edges, Density for strength, and Invert for the opposite region.</li></ol>
-        <p>The colored overlay is an editing aid and is never exported. Every mask remains reversible recipe data.</p>
+        <summary>How mask layers work</summary>
+        <ol><li>Create a mask layer: brush, radial, gradient, luminance, color, or Smart selection.</li><li>Select its row below to define <strong>where</strong> the edit applies.</li><li>Open Edit: RAWcket keeps this layer selected, and Light, Color, Detail, and Tone Curve become local controls for it.</li><li>Return here to reshape the coverage, soften Feather, reduce Density, or Invert the selected area.</li></ol>
+        <p>Think of each row as a Photoshop-style masked adjustment layer: the mask defines where, while its local adjustments define what changes. The colored overlay is only an editing aid and is never exported.</p>
       </details>
       <label className="mask-overlay-switch"><input type="checkbox" checked={overlayVisible} onChange={(event) => onOverlayVisibleChange(event.target.checked)} /> Show colored mask overlay</label>
       <div className="mask-create-actions">
@@ -252,7 +252,8 @@ export function MaskControls({
         <button type="button" aria-label="+ Color range" title="Sample colors from the unchanged photograph, regardless of position" onClick={onAddColor}><strong>+ Color</strong><small>Match sampled colors</small></button>
       </div>
       {masks.length === 0 && <p className="mask-empty">Create a local mask, then paint or position it directly over the photograph.</p>}
-      <div className="mask-list">
+      <div className="mask-stack-heading"><span><strong>Mask layers</strong><small>Selecting a layer keeps it active in Edit.</small></span><small>{masks.length}</small></div>
+      <div className="mask-list" aria-label="Mask layers">
         {masks.map((mask, index) => {
           const row = projectMaskRow(mask, index);
           return <button className={mask.id === selectedId ? 'active' : ''} type="button" key={mask.id} onClick={() => onSelect(mask.id)}>
