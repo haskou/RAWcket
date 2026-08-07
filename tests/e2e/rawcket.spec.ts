@@ -151,6 +151,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   await expect(activeRecipe.getByRole('button', { name: /Exposure \+0.25/ })).toBeVisible();
   await page.getByRole('button', { name: 'Editor menu' }).click();
   await page.getByRole('button', { name: 'Full visual history' }).click();
+  await expect(page.locator('details.editor-more-menu')).not.toHaveAttribute('open', '');
   await expect(page.getByRole('dialog', { name: 'Visual history' }).getByText('Exposure: +0.25')).toBeVisible();
   await page.getByRole('button', { name: 'Close visual history' }).click();
   await page.getByRole('tab', { name: 'Edit' }).click();

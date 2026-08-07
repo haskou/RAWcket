@@ -177,6 +177,7 @@ export function EditorPage(): ReactElement {
   const cropDraftValue = useRef<ViewportTransformPrimitives['cropFrame'] | null>(null);
   const exportAbort = useRef<AbortController | null>(null);
   const horizonAbort = useRef<AbortController | null>(null);
+  const editorMoreMenu = useRef<HTMLDetailsElement>(null);
   const recipePresetInput = useRef<HTMLInputElement>(null);
   const semanticAbort = useRef<AbortController | null>(null);
   const semanticInstallAbort = useRef<AbortController | null>(null);
@@ -570,6 +571,10 @@ export function EditorPage(): ReactElement {
   const close = async (): Promise<void> => {
     await autosave.flush();
     void navigate('/');
+  };
+
+  const closeEditorMoreMenu = (): void => {
+    editorMoreMenu.current?.removeAttribute('open');
   };
 
   const exportBundle = async (): Promise<void> => {
@@ -1385,13 +1390,13 @@ export function EditorPage(): ReactElement {
           <button className="icon-button" type="button" disabled={!project.canRedo()} onClick={() => changeHistory('redo')} aria-label="Redo">↷</button>
         </div>
         <button className={`button compare-header ${showOriginal ? 'active' : ''}`} type="button" disabled={!comparisonReady} title={!comparisonHasDifference ? 'Before and After match because the recipe has no enabled edits.' : baselineError !== null ? `Before preview unavailable: ${baselineError}` : beforeSource === null ? 'Preparing the neutral developed RAW baseline' : 'Compare with the neutral developed baseline'} onClick={toggleComparison}>{showOriginal ? 'Before' : 'After'} <span>B</span></button>
-        <details className="editor-more-menu">
+        <details className="editor-more-menu" ref={editorMoreMenu}>
           <summary role="button" aria-label="Editor menu" title="Editor menu">•••</summary>
           <div>
-            <button type="button" onClick={() => setCloudStorageOpen(true)}>Sync &amp; Google Drive</button>
-            <button type="button" onClick={() => setPhotoInformationOpen(true)}>Photo information</button>
-            <button type="button" onClick={() => setShortcutsOpen(true)}>Keyboard shortcuts</button>
-            <button type="button" onClick={() => setHistoryOpen(true)}>Full visual history</button>
+            <button type="button" onClick={() => { closeEditorMoreMenu(); setCloudStorageOpen(true); }}>Sync &amp; Google Drive</button>
+            <button type="button" onClick={() => { closeEditorMoreMenu(); setPhotoInformationOpen(true); }}>Photo information</button>
+            <button type="button" onClick={() => { closeEditorMoreMenu(); setShortcutsOpen(true); }}>Keyboard shortcuts</button>
+            <button type="button" onClick={() => { closeEditorMoreMenu(); setHistoryOpen(true); }}>Full visual history</button>
           </div>
         </details>
         <button className="button primary" type="button" onClick={() => setExportOpen(true)}>Export</button>
