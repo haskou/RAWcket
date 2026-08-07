@@ -193,6 +193,7 @@ export function EditorPage(): ReactElement {
   const [showOriginal, setShowOriginal] = useState(false);
   const [renderProgress, setRenderProgress] = useState('Preparing preview');
   const [renderBusy, setRenderBusy] = useState(true);
+  const [initialPreviewReady, setInitialPreviewReady] = useState(false);
   const [baselineError, setBaselineError] = useState<string | null>(null);
   const [previewAnalysis, setPreviewAnalysis] = useState<PreviewAnalysis | null>(null);
   const [revision, setRevision] = useState(0);
@@ -244,9 +245,10 @@ export function EditorPage(): ReactElement {
   const [horizonMessage, setHorizonMessage] = useState('Local edge analysis can estimate a dominant horizon or architectural vertical.');
   const [loadError, setLoadError] = useState<string | null>(null);
   const cropWorkspaceActive = toolWorkspace === 'develop' && activePanel === 'crop';
+  const renderedPreviewSource = preview ?? (renderBusy ? null : loadingSource);
   const displayedSource = showOriginal
     ? beforeSource
-    : cropWorkspaceActive ? cropPreview ?? loadingSource : preview ?? loadingSource;
+    : cropWorkspaceActive ? cropPreview ?? renderedPreviewSource : renderedPreviewSource;
   const sourceUrl = useObjectUrl(displayedSource);
   const save = useCallback((active: PhotoProject) => application.saveProject.save(active), [application]);
   const autosave = useProjectAutosave(project, revision, save);
@@ -308,6 +310,7 @@ export function EditorPage(): ReactElement {
         setBeforeSource(null);
         setPreview(null);
         setPreviewAnalysis(null);
+        setInitialPreviewReady(false);
         setShowOriginal(false);
         setRenderBusy(true);
         setRenderProgress('Preparing preview');
@@ -1412,9 +1415,13 @@ export function EditorPage(): ReactElement {
             onWheel={zoomWithWheel}
             aria-label="Photo preview. Drag to pan and use the mouse wheel to zoom."
           >
+            {!initialPreviewReady && <div className={`initial-preview-state${!renderBusy && displayedSource === null ? ' error' : ''}`} role="status" aria-live="polite" aria-label="Preparing edited preview">
+              {renderBusy || displayedSource !== null ? <div className="loader" /> : null}
+              <span><strong>{!renderBusy && displayedSource === null ? 'Preview unavailable' : rawSource ? 'Developing edited RAW' : 'Preparing edited preview'}</strong><small>{renderBusy ? renderProgress : displayedSource === null ? renderProgress : 'Applying orientation and framing'}</small></span>
+            </div>}
             {sourceUrl !== null && (
-              <div ref={previewSurface} className="preview-surface" style={{ transform, width: fitDimensions?.width, height: fitDimensions?.height, maxWidth: fitDimensions === null ? undefined : 'none', maxHeight: fitDimensions === null ? undefined : 'none' }}>
-                <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => previewLoaded(event.currentTarget)} />
+              <div ref={previewSurface} className={`preview-surface${initialPreviewReady ? '' : ' awaiting-first-frame'}`} style={{ transform, width: fitDimensions?.width, height: fitDimensions?.height, maxWidth: fitDimensions === null ? undefined : 'none', maxHeight: fitDimensions === null ? undefined : 'none' }}>
+                <img draggable={false} className="source-preview" src={sourceUrl} alt={`Preview of ${project.getName().valueOf()}`} onLoad={(event) => { previewLoaded(event.currentTarget); setInitialPreviewReady(true); }} />
                 {!showOriginal && maskOverlayVisible && (activePanel === 'masks' || brushActive || colorPointActive || aiPointActive) && <MaskOverlay masks={projectMasks} selectedMaskId={selectedMaskId} />}
                 {fitDimensions !== null && <div ref={guideFrame} className="fixed-guide-frame">
                   {toolWorkspace === 'develop' && activePanel === 'crop'

@@ -268,7 +268,7 @@ test('imports, edits, saves, closes, and reopens a local project', async ({ page
   const resizeHandleCenter = { x: resizeHandleBounds.x + resizeHandleBounds.width / 2, y: resizeHandleBounds.y + resizeHandleBounds.height / 2 };
   await page.mouse.move(resizeHandleCenter.x, resizeHandleCenter.y);
   await page.mouse.down();
-  await page.mouse.move(resizeHandleCenter.x + 30, resizeHandleCenter.y + 30, { steps: 4 });
+  await page.mouse.move(resizeHandleCenter.x + 60, resizeHandleCenter.y + 60, { steps: 6 });
   await page.mouse.up();
   await expect.poll(async () => Number(await page.getByLabel('Width numeric value').inputValue())).toBeGreaterThan(widthBeforeCornerResize);
   await expect.poll(async () => Number(await page.getByLabel('Width numeric value').inputValue()) / Number(await page.getByLabel('Height numeric value').inputValue())).toBeCloseTo(0.5, 1);
@@ -671,7 +671,10 @@ test('imports a Sony ARW container and develops its embedded preview locally', a
   });
 
   await expect(page.getByLabel('Project name')).toHaveValue('a6600-sample');
+  await expect(page.getByRole('status', { name: 'Preparing edited preview' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeHidden();
   await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Preparing edited preview' })).toHaveCount(0);
   await expect(page.getByText(/Preview up to date/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/Embedded RAW preview fallback/)).toBeVisible();
   await page.locator('summary[aria-label="Editor menu"]').click();
@@ -681,4 +684,14 @@ test('imports a Sony ARW container and develops its embedded preview locally', a
   await expect(page.getByText(/Embedded 8-bit preview fallback/)).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Photo information' })).toContainText('Final export will not silently use this fallback.');
   await page.getByRole('button', { name: 'Close photo information' }).click();
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await page.getByLabel('Exposure numeric value').fill('0.25');
+  await page.getByRole('button', { name: 'Close project and return' }).click();
+  await page.getByRole('button', { name: 'Open a6600-sample' }).click();
+  await expect(page.getByRole('status', { name: 'Preparing edited preview' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeHidden();
+  await expect(page.getByRole('img', { name: 'Preview of a6600-sample' })).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Preparing edited preview' })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await expect(page.getByLabel('Exposure numeric value')).toHaveValue('0.25');
 });
