@@ -1,13 +1,23 @@
-const CACHE_NAME = 'rawcket-app-shell-v2';
 const ISOLATION_HEADERS = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'cross-origin'
 };
 const PRECACHE_ENTRIES = self.__WB_MANIFEST;
+const CACHE_NAME = `rawcket-app-shell-${precacheVersion(PRECACHE_ENTRIES)}`;
 const PRECACHE_URLS = PRECACHE_ENTRIES.map((entry) => new URL(entry.url, self.registration.scope).href);
 const PRECACHE_URL_SET = new Set(PRECACHE_URLS);
 const FALLBACK_URL = new URL('index.html', self.registration.scope).href;
+
+function precacheVersion(entries) {
+  const identity = entries.map((entry) => `${entry.url}:${entry.revision ?? ''}`).join('|');
+  let hash = 2166136261;
+  for (let index = 0; index < identity.length; index += 1) {
+    hash ^= identity.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
 
 function withIsolationHeaders(response) {
   const headers = new Headers(response.headers);
@@ -47,7 +57,10 @@ async function isolatedAsset(request) {
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(cacheAppShell());
+  event.waitUntil((async () => {
+    await cacheAppShell();
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {

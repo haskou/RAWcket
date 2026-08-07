@@ -17,7 +17,7 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'pwa-sw.js',
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       manifest: {
         name: 'RAWcket',
         short_name: 'RAWcket',
